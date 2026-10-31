@@ -178,9 +178,14 @@ def _record(db: Session, case: Case, user: User, body: dict) -> dict:
             or content.get("specVersionId") != (spec or {}).get("itemId")
         ):
             fail("BUSINESS_VALIDATION_FAILED", "订单引用的报价或规格版本已变化，请重新核对 PO", 422)
-        conflicts = [row for row in order_diff(content, (quotation or {}).get("content") or {}, (spec or {}).get("content") or {}) if row.get("status") == "conflict"]
-        if conflicts:
-            fail("BUSINESS_VALIDATION_FAILED", "PO 与当前报价/规格仍有硬冲突，不能确认订单", 422, {"conflicts": conflicts})
+        current_diff = order_diff(content, (quotation or {}).get("content") or {}, (spec or {}).get("content") or {})
+        conflicts = [row for row in current_diff if row.get("status") == "conflict"]
+        missing_rows = [row for row in current_diff if row.get("status") == "missing"]
+        if conflicts or missing_rows:
+            fail("BUSINESS_VALIDATION_FAILED", "PO 与当前报价/规格仍有冲突或关键字段缺失，不能确认订单", 422, {"conflicts": conflicts, "missing": missing_rows})
+        pi = content.get("pi") or {}
+        if not pi.get("number") or not pi.get("seller"):
+            fail("BUSINESS_VALIDATION_FAILED", "PI 尚缺编号或卖方抬头，不能确认订单", 422)
     if scope == "payment_verification":
         _require_refs(db, case, refs, "payment_receipt")
         if not str(body.get("verificationBasis") or "").strip():

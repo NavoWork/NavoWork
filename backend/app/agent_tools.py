@@ -121,7 +121,7 @@ class CalculateCostArgs(BaseModel):
     quantity: int = Field(ge=1, le=100_000_000)
     exchange_rate: str = Field(description="CNY/USD，必须来自用户确认或明确知识依据")
     margin: str = Field(description="目标毛利率比例，0.20 表示 20%")
-    extra_lines: list[dict] = Field(default_factory=list, description="补充成本行：[{category,label,amountCny,scope}]")
+    extra_lines: list[dict] = Field(default_factory=list, description="补充成本行：[{category,label,amountCny,scope,sourceId}]；sourceId 必须指向本项目证据/知识/资产，不能凭空添加")
 
 
 class UpdateQuotationArgs(BaseModel):
@@ -656,8 +656,17 @@ class WorkbenchToolbox:
                     raise AgentToolError("PRICING_BASIS_MISMATCH", "核价参数与用户确认的汇率/毛利率不一致", status="blocked")
             except InvalidOperation:
                 raise AgentToolError("INVALID_PRICING_BASIS", "汇率或毛利率格式无效")
+        if facts.get("quantity") is not None and int(facts["quantity"]) != args.quantity:
+            raise AgentToolError("PRICING_BASIS_MISMATCH", "核价数量与用户确认的数量不一致", status="blocked")
         with self._tx(write=True) as (db, case, user, run, job):
-            lines = list(args.extra_lines)
+            lines = []
+            for line in args.extra_lines:
+                if not isinstance(line, dict) or not line.get("sourceId"):
+                    raise AgentToolError("MISSING_COST_SOURCE", "补充成本行必须绑定来源，不能由模型凭空添加", status="needs_info")
+                source = db.get(Item, str(line["sourceId"]))
+                if not source or source.case_id != case.id or source.kind not in ("evidence", "resource", "asset"):
+                    raise AgentToolError("MISSING_COST_SOURCE", "补充成本来源不属于本项目")
+                lines.append(line)
             row = db.get(Item, args.supplier_offer_id)
             if not row or row.case_id != case.id or row.kind != "supplier_offer":
                 raise AgentToolError("OFFER_NOT_FOUND", "供应商报价不存在")

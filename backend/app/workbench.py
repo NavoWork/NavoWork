@@ -281,6 +281,12 @@ def release_gate(db: Session, case: Case) -> dict:
         conflicts = [row for row in diff if row.get("status") == "conflict"]
         if conflicts:
             gap("ORDER_CONFLICT", f"PO 与当前报价/规格有 {len(conflicts)} 项冲突", "order")
+        missing_rows = [row for row in diff if row.get("status") == "missing"]
+        if missing_rows:
+            gap("ORDER_INCOMPLETE", f"PO 有 {len(missing_rows)} 项关键字段缺失", "order")
+        pi = order_content.get("pi") or {}
+        if not pi.get("number") or not pi.get("seller"):
+            gap("ORDER_PI_INCOMPLETE", "PI 尚缺编号或卖方抬头", "order")
         if not _approval_for(db, case, "order_buyer_confirmation", order):
             gap("ORDER_BUYER_PENDING", "买方尚未确认订单文件", "order")
         if not _approval_for(db, case, "order_seller_confirmation", order):
@@ -439,6 +445,12 @@ def stage_state(db: Session, case: Case) -> list[dict]:
             conflicts = [row for row in current_diff if row.get("status") == "conflict"]
             if conflicts:
                 missing.append(f"{len(conflicts)} 项 PO 差异")
+            missing_rows = [row for row in current_diff if row.get("status") == "missing"]
+            if missing_rows:
+                missing.append(f"{len(missing_rows)} 项 PO 字段缺失")
+            pi = content.get("pi") or {}
+            if not pi.get("number") or not pi.get("seller"):
+                missing.append("PI 编号/卖方抬头")
             buyer = bool(order and _approval_for(db, case, "order_buyer_confirmation", order))
             seller = bool(order and _approval_for(db, case, "order_seller_confirmation", order))
             paid = bool(payment and _approval_for(db, case, "payment_verification", payment))

@@ -341,6 +341,7 @@ def order_diff(order: dict | None, quotation: dict | None, spec: dict | None) ->
     fields = (
         ("quantity", po.get("quantity"), quotation.get("quantity")),
         ("unitPriceUsd", po.get("unitPriceUsd"), quotation.get("unitPriceUsd")),
+        ("totalUsd", po.get("totalUsd"), quotation.get("totalUsd")),
         ("incoterm", po.get("incoterm"), quotation.get("incoterm")),
         ("namedPlace", po.get("namedPlace"), quotation.get("namedPlace")),
         ("paymentTerms", po.get("paymentTerms"), quotation.get("paymentTerms")),

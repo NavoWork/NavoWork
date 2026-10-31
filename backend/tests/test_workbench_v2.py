@@ -103,7 +103,7 @@ def test_new_inquiry_advances_node_by_node(client):
     _finish(run_id, job_id, work_id, "sample")
 
     toolbox, run_id, job_id, work_id, _ = _start(client, path, "order", "登记 PO 与付款计划", revision=3)
-    order = toolbox.call("record_order", {"po": {"number": "PO-DE-001", "buyer": "Nordlicht Outdoor", "quantity": 3000, "unitPriceUsd": "8.69", "totalUsd": "26070.00", "incoterm": "FOB", "namedPlace": "Ningbo", "paymentTerms": "30% deposit, 70% before shipment"}, "pi": {"number": "PI-DE-001", "seller": "NavoWork Trading", "bank": "Demo Bank"}, "payment_schedule": [{"milestone": "deposit", "ratio": "0.30", "amountUsd": "7821.00", "due": "2026-11-10"}]})
+    order = toolbox.call("record_order", {"po": {"number": "PO-DE-001", "buyer": "Nordlicht Outdoor", "quantity": 3000, "unitPriceUsd": "8.69", "totalUsd": "26070.00", "incoterm": "FOB", "namedPlace": "Ningbo", "paymentTerms": "30% deposit, 70% before shipment", "destination": "Hamburg, Germany", "deliveryDate": "45 days after sample approval"}, "pi": {"number": "PI-DE-001", "seller": "NavoWork Trading", "bank": "Demo Bank"}, "payment_schedule": [{"milestone": "deposit", "ratio": "0.30", "amountUsd": "7821.00", "due": "2026-11-10"}]})
     assert order["status"] == "success", order
     assert order["data"]["conflicts"] == []
     _finish(run_id, job_id, work_id, "order")

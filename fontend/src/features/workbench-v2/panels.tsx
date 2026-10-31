@@ -145,10 +145,12 @@ export function RequirementsPanel({ data, onAgent, onSave, onConfirm, busy }: { 
     const next = Object.fromEntries((data.schema.specFields || []).map((field) => [field.key, specValue(spec?.content?.fields, field.key)]));
     setFields(next);
     setDirty(false);
-  }, [version, data.schema.specFields, spec?.content?.fields]);
+    // Only reset when the server version changes; a refetch of the same
+    // version must not discard the user's in-progress edits.
+  }, [version, data.schema.specFields]);
 
   const missing = (spec?.content?.missing as string[]) || [];
-  const approved = data.approvals.some((item) => item.scope === 'customer_spec_approval' && item.targetVersionId === spec?.itemId);
+  const approved = data.stages.find((item) => item.key === 'requirements')?.status === 'confirmed';
   const groupMissing = (keys: string[]) => keys.filter((key) => missing.includes(key)).length;
   const save = async () => {
     if (!spec) return;
@@ -269,7 +271,8 @@ export function CostingPanel({ data, onAgent, onSave, onConfirm, onExport, busy 
       exclusions: (content.exclusions || []).join(', '),
     });
     setDirty(false);
-  }, [version, quote?.content]);
+    // Same rule as Tech Pack: keep local edits across a refetch of this version.
+  }, [version]);
   const saveTerms = async () => {
     if (!quote) return;
     setSaving(true);
@@ -280,8 +283,9 @@ export function CostingPanel({ data, onAgent, onSave, onConfirm, onExport, busy 
       setSaving(false);
     }
   };
-  const approved = data.approvals.some((item) => item.scope === 'commercial_quotation_approval' && item.targetVersionId === quote?.itemId);
-  const quoteReady = data.stages.find((stage) => stage.key === 'costing')?.status === 'ready';
+  const costingStatus = data.stages.find((stage) => stage.key === 'costing')?.status;
+  const approved = costingStatus === 'confirmed';
+  const quoteReady = costingStatus === 'ready';
   return (
     <div className="wbv2-stack">
       <Section
@@ -375,7 +379,7 @@ export function CostingPanel({ data, onAgent, onSave, onConfirm, onExport, busy 
 export function SamplePanel({ data, onAgent, onConfirm, busy }: { data: WorkbenchData; onAgent: RunAgent; onConfirm: ConfirmGate; busy: boolean }) {
   const sample = data.artifacts.sample;
   const content = sample?.content || {};
-  const approved = data.approvals.some((item) => item.scope === 'sample_approval' && item.targetVersionId === sample?.itemId);
+  const approved = data.stages.find((item) => item.key === 'sample')?.status === 'confirmed';
   return (
     <Section
       eyebrow="04 · SAMPLE"
@@ -428,7 +432,7 @@ export function OrderPanel({ data, onAgent, onConfirm, busy }: { data: Workbench
   const buyer = approvals.some((item) => item.scope === 'order_buyer_confirmation' && item.targetVersionId === order?.itemId);
   const seller = approvals.some((item) => item.scope === 'order_seller_confirmation' && item.targetVersionId === order?.itemId);
   const paid = approvals.some((item) => item.scope === 'payment_verification' && item.targetVersionId === payment?.itemId);
-  const orderConflicts = diff.some((row: any) => row.status === 'conflict');
+  const orderBlocked = diff.some((row: any) => row.status === 'conflict' || row.status === 'missing');
   return (
     <div className="wbv2-stack">
       <Section
@@ -489,8 +493,8 @@ export function OrderPanel({ data, onAgent, onConfirm, busy }: { data: Workbench
         description="定金、尾款或信用证节点逐项登记；到账只能由人工核验。"
         actions={
           <>
-            {order && !buyer && <button className="button" disabled={busy || orderConflicts} onClick={() => onConfirm('order_buyer_confirmation', order, 'customer_approval')}>买方确认</button>}
-            {order && !seller && <button className="button" disabled={busy || orderConflicts} onClick={() => onConfirm('order_seller_confirmation', order, 'internal_note')}>卖方确认</button>}
+            {order && !buyer && <button className="button" disabled={busy || orderBlocked} onClick={() => onConfirm('order_buyer_confirmation', order, 'customer_approval')}>买方确认</button>}
+            {order && !seller && <button className="button" disabled={busy || orderBlocked} onClick={() => onConfirm('order_seller_confirmation', order, 'internal_note')}>卖方确认</button>}
             {payment && !paid && <button className="button button-primary" disabled={busy} onClick={() => onConfirm('payment_verification', payment, 'payment_receipt', { basis: '人工核对付款凭据与合同金额' })}><ShieldCheck size={14} /> 核验付款</button>}
           </>
         }
@@ -527,7 +531,7 @@ export function ProductionPanel({ data, onAgent, onConfirm, onRelease, busy, onS
   const qc = data.artifacts.qc?.content || {};
   const content = production?.content || {};
   const supplier = data.approvals.some((item) => item.scope === 'supplier_production_confirmation' && item.targetVersionId === production?.itemId);
-  const released = data.approvals.some((item) => item.scope === 'production_release' && item.targetVersionId === production?.itemId);
+  const released = data.stages.find((item) => item.key === 'production')?.status === 'confirmed';
   return (
     <div className="wbv2-stack">
       <Section
