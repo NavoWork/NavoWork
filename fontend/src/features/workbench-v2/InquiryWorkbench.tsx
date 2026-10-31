@@ -519,7 +519,7 @@ function SourcesDialog({ data, path, selectedEvidence, selectedKnowledge, select
   }
 
   return (
-    <Modal title="项目资料" onClose={onClose}>
+    <Modal title="项目资料" onClose={onClose} wide>
       <div className="wbv2-sources">
         <div className="wbv2-source-tabs">
           <button className={tab === 'evidence' ? 'is-active' : ''} onClick={() => { setTab('evidence'); setPreview(''); }}>原件 {data.evidence.length}</button>

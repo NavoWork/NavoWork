@@ -377,7 +377,22 @@ class WorkbenchToolbox:
 
     def _user_facts(self) -> dict:
         with self._tx() as (db, case, user, run, job):
-            return decode(job.payload).get("agentFacts") or {}
+            facts = dict(decode(job.payload).get("agentFacts") or {})
+            # Case-specific confirmation documents may carry approved pricing
+            # assumptions (FX, margin, quantity). They are still only inputs;
+            # formal approval remains a separate human gate.
+            for row in items(db, "resource"):
+                value = item_view(row)
+                if (
+                    value.get("kind") == "knowledge"
+                    and value.get("status") == "published"
+                    and value.get("caseId") == case.id
+                    and isinstance(value.get("facts"), dict)
+                ):
+                    for key in ("fx", "margin", "quantity"):
+                        if facts.get(key) is None and value["facts"].get(key) is not None:
+                            facts[key] = value["facts"][key]
+            return facts
 
     # -- read tools ---------------------------------------------------
     def tool_get_case_context(self, _: Empty):
@@ -408,10 +423,23 @@ class WorkbenchToolbox:
                     artifacts[kind] = {"id": value["itemId"], "version": value["version"]}
             offers = [item_view(row) for row in items(db, "supplier_offer", case_id=case.id)]
             knowledge = []
+            project_knowledge = []
             for row in items(db, "resource"):
                 value = item_view(row)
                 if value.get("kind") == "knowledge" and value.get("status") == "published":
-                    knowledge.append({"id": row.id, "title": value.get("title"), "version": row.version})
+                    if value.get("caseId") and value.get("caseId") != case.id:
+                        continue
+                    knowledge.append({"id": row.id, "title": value.get("title"), "version": row.version, "caseId": value.get("caseId")})
+                    if value.get("caseId") == case.id:
+                        project_knowledge.append(
+                            {
+                                "id": row.id,
+                                "title": value.get("title"),
+                                "version": row.version,
+                                "facts": value.get("facts") or {},
+                                "content": str(value.get("content") or "")[:7000],
+                            }
+                        )
             from .workspace_api import asset_rows
             assets_by_id = {}
             for row in asset_rows(db, user):
@@ -430,6 +458,7 @@ class WorkbenchToolbox:
                 "artifacts": artifacts,
                 "evidence": [{"id": row.id, "title": item_view(row).get("title"), "sourceRole": item_view(row).get("sourceRole")} for row in items(db, "evidence", case_id=case.id)],
                 "knowledge": knowledge,
+                "projectKnowledge": project_knowledge,
                 "assets": assets,
                 "supplierOffers": offers,
                 "gate": release_gate(db, case),
@@ -492,6 +521,8 @@ class WorkbenchToolbox:
             for row in items(db, "resource"):
                 value = item_view(row)
                 if value.get("kind") != "knowledge" or value.get("status") != "published":
+                    continue
+                if value.get("caseId") and value.get("caseId") != case.id:
                     continue
                 title = str(value.get("title") or "")
                 content = str(value.get("content") or "")

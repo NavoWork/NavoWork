@@ -34,12 +34,12 @@ backend/.venv/Scripts/python.exe demo/seed.py
 
 演示路径：`询盘评估 → Tech Pack/BOM → 供应商报价与核价 → 客户报价 → 打样 → PO/PI 与付款 → 生产资料与放行`。每个节点由 Agent 通过工具读取原件、写成果或向用户提问；核价时在对话中明确汇率和毛利率（例如“汇率 7.20、毛利率 20%”），人工确认、付款核验和放行由界面单独记录。
 
-知识库包含 8 篇业务规则（客户评估、箱包 Tech Pack、核价、贸易术语、打样、订单/PI、生产/验货、材料参考）；Agent 会按节点加载对应 Skill。模型配置：
+知识库包含 8 篇通用业务规则（客户评估、箱包 Tech Pack、核价、贸易术语、打样、订单/PI、生产/验货、材料参考）和 3 份项目确认文档（Nordlicht / Casa Verde / Harbor，含客户确认人、规格补充和核价假设）。Agent 会优先用项目确认补全各案例缺项，再按节点加载对应 Skill。模型配置：
 
 ```dotenv
 MODEL_API_KEY=...
-MODEL_NAME=gpt-6.1-sol
-MODEL_BASE_URL=https://api.tokenhubcloud.net/v1
+MODEL_NAME=deepseek-flash
+MODEL_BASE_URL=https://api.deepseek.com/v1
 ```
 
 未配置模型时，Agent 工具不会伪造执行结果，会明确返回 `MODEL_NOT_CONFIGURED`。

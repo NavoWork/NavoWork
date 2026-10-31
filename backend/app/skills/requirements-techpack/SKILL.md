@@ -9,11 +9,11 @@
 - 知识库中的箱包规格、材料、包装、测试规则
 
 ## 工具顺序
-1. `get_case_context` + `read_source` 读取客户资料。
+1. `get_case_context` + `read_source` 读取客户资料；若 `projectKnowledge` 含本项目《采购补充确认/需求补充确认》，先采用其中的客户已确认字段，不要重复询问。
 2. `search_knowledge` 查找材料、包装、测试标准；引用时记录文件名和版本。
 3. `update_requirements` 分批写入 Tech Pack 字段；缺项保持 null。
 4. `update_bom` 写入面料、里布、辅料、五金、包装等 BOM 行。
-5. 若关键字段缺失，调用 `request_info` 提问；不要一次问超过 5 个问题。
+5. 只有关键必填字段缺失时才调用 `request_info`；非阻断细节可留空或写入说明，不要因为可选字段暂停。一次最多 5 个问题。
 
 ## 字段规则
 - 必须覆盖：产品、数量、尺寸、面料/克重、LOGO 工艺与位置、包装、验货标准、目的地、贸易术语、指定地点。

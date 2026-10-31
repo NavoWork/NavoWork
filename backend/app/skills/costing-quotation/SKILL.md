@@ -10,7 +10,7 @@
 - 知识库中的核价规则、贸易术语规则
 
 ## 工具顺序
-1. `get_case_context` 确认规格、已有供应商报价和成本版本。
+1. `get_case_context` 确认规格、已有供应商报价、成本版本和 `projectKnowledge` 中的项目核价假设（汇率/毛利/数量）。
 2. `read_source` 读取每一份供应商报价原件；`search_knowledge` 查核价/FOB 规则。
 3. `record_supplier_quote` 逐家登记：基础价、包装价、本地费用、MOQ、交期、币种、含包装标记、有效期。
 4. `calculate_cost` 用 Decimal 计算；汇率/毛利必须来自用户确认或明确知识依据，不能猜。

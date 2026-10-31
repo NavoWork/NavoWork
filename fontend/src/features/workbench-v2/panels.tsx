@@ -458,7 +458,7 @@ export function OrderPanel({ data, onAgent, onConfirm, busy }: { data: Workbench
                   <div><dt>数量</dt><dd>{po.quantity || '—'}</dd></div>
                   <div><dt>单价</dt><dd>{money(po.unitPriceUsd)}</dd></div>
                   <div><dt>总额</dt><dd>{money(po.totalUsd)}</dd></div>
-                  <div><dt>交货</dt><dd>{po.deliveryDate || '—'}</dd></div>
+                  <div><dt>交货</dt><dd>{po.deliveryTerms || po.deliveryDate || '—'}</dd></div>
                 </dl>
               </div>
               <div>

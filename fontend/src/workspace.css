@@ -319,15 +319,18 @@
 }
 
 /* Inquiry: persistent composer, readable dialogue, independently scrolling results. */
-.inquiry-active .content-scroll {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.inquiry-mount:not([hidden]) {
-  min-height: 0;
-  flex: 1;
-  display: flex;
+@media (min-width: 1181px) {
+  .inquiry-active .content-scroll {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .inquiry-mount:not([hidden]) {
+    min-height: 0;
+    min-width: 0;
+    flex: 1;
+    display: flex;
+  }
 }
 .iw-page {
   padding: 0;

@@ -37,7 +37,7 @@ from app.workbench import next_stage_action, stage_state  # noqa: E402
 PACK = ROOT / "demo/workbench_v2"
 
 
-def ensure_resource(db, user, slug: str, title: str, folder: str, path: Path):
+def ensure_resource(db, user, slug: str, title: str, folder: str, path: Path, *, case_id: str | None = None, facts: dict | None = None):
     source_id = f"kb_workbench_{slug}"
     content = path.read_text(encoding="utf-8")
     row = db.get(Item, f"{source_id}:v1")
@@ -53,6 +53,8 @@ def ensure_resource(db, user, slug: str, title: str, folder: str, path: Path):
         "editVersion": 1,
         "ownerId": user.id,
         "updatedAt": now(),
+        "caseId": case_id,
+        "facts": facts or {},
     }
     if row:
         row.payload = encode(value)
@@ -175,6 +177,7 @@ CASES = {
             ("inquiry", "de-inquiry.eml", "customer_request", "客户询盘"),
             ("quote_a", "supplier-a-quote.txt", "supplier_quote", "工厂 A 报价"),
             ("quote_b", "supplier-b-quote.txt", "supplier_quote", "工厂 B 报价"),
+            ("quote_a_box", "supplier-a-colorbox.txt", "supplier_quote", "工厂 A 彩盒补充报价"),
             ("change", "customer-change.eml", "customer_change", "客户包装变更"),
             ("po", "po-de-001.txt", "customer_po", "客户 PO"),
             ("sample_feedback", "sample-feedback.eml", "sample_inspection", "样品反馈"),
@@ -222,6 +225,12 @@ WIKI = [
     ("materials", "箱包材料与辅料参考", "产品与规格", "08-bag-materials.md"),
 ]
 
+CASE_WIKI = [
+    ("case-nordlicht", "Nordlicht Outdoor · 采购补充确认", "项目确认", "case-nordlicht-confirmation.md", "de", {"fx": "7.20", "margin": "0.2", "quantity": 3000}),
+    ("case-casa-verde", "Casa Verde · 帆布袋试单确认", "项目确认", "case-casa-verde-confirmation.md", "mx", {"fx": "7.20", "margin": "0.25", "quantity": 600}),
+    ("case-harbor", "Harbor Promotions · 需求补充确认", "项目确认", "case-harbor-promotions-confirmation.md", "uk", {"fx": "7.20", "margin": "0.2", "quantity": 800}),
+]
+
 
 def seed(email: str | None = None):
     if os.getenv("APP_ENV", "demo") != "demo":
@@ -265,6 +274,8 @@ def seed(email: str | None = None):
                 evidence(db, case, file_key, filename, role, title)
             db.flush()
             case.payload = encode({**decode(case.payload), "nextAction": next_stage_action(stage_state(db, case))})
+        for slug, title, folder, filename, case_key, facts in CASE_WIKI:
+            ensure_resource(db, user, slug, title, folder, PACK / "wiki" / filename, case_id=CASES[case_key]["id"], facts=facts)
         db.commit()
     print("Workbench v2 seed complete. No revisions, artifacts or approvals were created.")
     for key, scenario in CASES.items():

@@ -572,7 +572,9 @@ def workbench_view(db: Session, case: Case, user: User) -> dict:
         value = item_view(row)
         if value.get("kind") != "knowledge" or value.get("status") != "published":
             continue
-        knowledge.append({"id": row.id, "sourceId": value.get("sourceId"), "title": value.get("title"), "version": row.version, "folder": value.get("folder")})
+        if value.get("caseId") and value.get("caseId") != case.id:
+            continue
+        knowledge.append({"id": row.id, "sourceId": value.get("sourceId"), "title": value.get("title"), "version": row.version, "folder": value.get("folder"), "caseId": value.get("caseId")})
     from .workspace_api import asset_rows
 
     assets_by_id = {}

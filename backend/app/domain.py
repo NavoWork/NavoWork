@@ -346,7 +346,7 @@ def order_diff(order: dict | None, quotation: dict | None, spec: dict | None) ->
         ("namedPlace", po.get("namedPlace"), quotation.get("namedPlace")),
         ("paymentTerms", po.get("paymentTerms"), quotation.get("paymentTerms")),
         ("destination", po.get("destination"), spec.get("fields", {}).get("destination")),
-        ("deliveryDate", po.get("deliveryDate"), spec.get("fields", {}).get("delivery")),
+        ("deliveryTerms", po.get("deliveryTerms") or po.get("deliveryDate"), spec.get("fields", {}).get("delivery")),
     )
     result = []
     for field, actual, baseline in fields:
@@ -358,7 +358,7 @@ def order_diff(order: dict | None, quotation: dict | None, spec: dict | None) ->
             status = "review"
         elif str(actual) == str(baseline):
             status = "match"
-        elif field in ("paymentTerms", "deliveryDate"):
+        elif field in ("paymentTerms", "deliveryDate", "deliveryTerms", "destination"):
             # Free-text clauses are rarely worded identically across PO and
             # quotation. Flag them for human review instead of a hard conflict.
             status = "review"

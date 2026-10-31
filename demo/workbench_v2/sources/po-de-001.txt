@@ -4,8 +4,8 @@ PO number: PO-DE-001
 PO date: 2026-11-20
 Product: custom commuter backpack, BP-DE-3000
 Quantity: 3,000 pcs
-Unit price: USD 8.69 / pc
-Total amount: USD 26,070.00
+Unit price: USD 9.21 / pc
+Total amount: USD 27,630.00
 Incoterm: FOB Ningbo, Incoterms 2020
 Payment: 30% deposit, 70% before shipment
 Delivery: 45 days after sample approval

@@ -121,7 +121,7 @@ def test_free_text_order_clauses_are_review_not_conflict():
     )
     rows = {row["field"]: row["status"] for row in diff}
     assert rows["paymentTerms"] == "review"
-    assert rows["deliveryDate"] == "review"
+    assert rows["deliveryTerms"] == "review"
 
 
 def test_payment_schedule_must_match_order_total():

@@ -16,12 +16,12 @@ import { useEffect as useEffectAlias } from 'react';
 type RecordItem = Record<string, any>;
 
 const stagePrompts: Record<string, string[]> = {
-  inquiry: ['分析这条询盘，列出需要向客户确认的关键信息', '核对客户背景与来源，标注待核验项'],
-  requirements: ['整理箱包 Tech Pack 与 BOM，缺失项问我', '核对当前规格和客户原件是否一致'],
-  costing: ['读取供应商报价原件，逐家登记并核价', '按已确认的汇率和毛利生成客户报价'],
-  sample: ['记录本轮样品、检查和客户反馈', '核对样品与规格版本是否一致'],
-  order: ['读取客户 PO，核对差异并生成 PI 草稿', '登记付款计划和双方确认状态'],
-  production: ['生成生产资料、T&A 和 QC 检查表', '检查生产放行缺口'],
+  inquiry: ['参考项目补充确认，核对客户背景与询盘关键信息', '核对客户背景与来源，标注待核验项'],
+  requirements: ['参考项目补充确认，整理箱包 Tech Pack 与 BOM，缺项再问我', '核对当前规格和客户原件是否一致'],
+  costing: ['读取供应商报价；参考项目补充确认中的汇率、毛利和数量核价', '按已确认的汇率和毛利生成客户报价'],
+  sample: ['参考项目补充确认，记录本轮样品、检查和客户反馈', '核对样品与规格版本是否一致'],
+  order: ['参考项目补充确认和 PO，核对差异并生成 PI 草稿', '登记付款计划和双方确认状态'],
+  production: ['参考项目补充确认，生成生产资料、T&A 和 QC 检查表', '检查生产放行缺口'],
 };
 
 export function AgentPanel({
