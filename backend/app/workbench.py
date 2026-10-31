@@ -28,6 +28,7 @@ from .domain import (
     normalize_spec,
     order_diff,
     quote_total,
+    payment_schedule_errors,
     spec_ready,
 )
 from .models import Case, Item, Job, Run, User
@@ -250,6 +251,15 @@ def release_gate(db: Session, case: Case) -> dict:
     else:
         if missing_quote_fields(quotation.get("content")):
             gap("QUOTE_INCOMPLETE", "报价条款仍不完整", "costing")
+        cost = latest.get("cost")
+        q = quotation.get("content") or {}
+        if (
+            not cost
+            or q.get("costVersionId") != cost["itemId"]
+            or q.get("unitPriceUsd") != (cost.get("content") or {}).get("unitPriceUsd")
+            or q.get("selectedSupplierOfferId") != (cost.get("content") or {}).get("supplierOfferId")
+        ):
+            gap("QUOTE_COST_STALE", "报价金额或成本基线已不是当前核价", "costing")
         if not _approval_for(db, case, "commercial_quotation_approval", quotation):
             gap("QUOTE_NOT_APPROVED", "报价尚未获得内部商业批准", "costing")
     if not sample:
@@ -261,24 +271,37 @@ def release_gate(db: Session, case: Case) -> dict:
     if not order:
         gap("ORDER_MISSING", "尚未登记 PO 与 PI", "order")
     else:
-        diff = order.get("content", {}).get("diff") or []
+        order_content = order.get("content") or {}
+        if (
+            order_content.get("quotationVersionId") != (quotation or {}).get("itemId")
+            or order_content.get("specVersionId") != (spec or {}).get("itemId")
+        ):
+            gap("ORDER_BASELINE_STALE", "订单引用的报价或规格版本已变化，请重新核对 PO", "order")
+        diff = order_diff(order_content, (quotation or {}).get("content") or {}, (spec or {}).get("content") or {})
         conflicts = [row for row in diff if row.get("status") == "conflict"]
         if conflicts:
-            gap("ORDER_CONFLICT", f"PO 与报价/规格有 {len(conflicts)} 项冲突", "order")
+            gap("ORDER_CONFLICT", f"PO 与当前报价/规格有 {len(conflicts)} 项冲突", "order")
         if not _approval_for(db, case, "order_buyer_confirmation", order):
             gap("ORDER_BUYER_PENDING", "买方尚未确认订单文件", "order")
         if not _approval_for(db, case, "order_seller_confirmation", order):
             gap("ORDER_SELLER_PENDING", "卖方尚未确认订单文件", "order")
     if not payment:
         gap("PAYMENT_MISSING", "尚未登记付款计划", "order")
-    elif not _approval_for(db, case, "payment_verification", payment):
-        gap("PAYMENT_NOT_VERIFIED", "定金或付款保障尚未核验", "order")
+    else:
+        payment_errors = payment_schedule_errors(
+            payment.get("content", {}).get("schedule"),
+            ((order or {}).get("content", {}).get("po") or {}).get("totalUsd"),
+        )
+        if payment_errors:
+            gap("PAYMENT_INCOMPLETE", "付款计划不完整或金额不一致", "order")
+        elif not _approval_for(db, case, "payment_verification", payment):
+            gap("PAYMENT_NOT_VERIFIED", "定金或付款保障尚未核验", "order")
     if not production:
         gap("PRODUCTION_MISSING", "尚未生成生产资料", "production")
     else:
         if production.get("content", {}).get("specVersionId") != (spec or {}).get("itemId"):
             gap("PRODUCTION_SPEC_STALE", "生产资料引用的规格版本已不是当前规格", "production")
-        if production.get("content", {}).get("sampleVersionId") and production.get("content", {}).get("sampleVersionId") != (sample or {}).get("itemId"):
+        if production.get("content", {}).get("sampleVersionId") != (sample or {}).get("itemId"):
             gap("PRODUCTION_SAMPLE_STALE", "生产资料引用的样品版本已不是当前样品", "production")
         if production.get("content", {}).get("orderVersionId") != (order or {}).get("itemId"):
             gap("PRODUCTION_ORDER_STALE", "生产资料引用的订单版本已不是当前订单", "production")
@@ -407,7 +430,13 @@ def stage_state(db: Session, case: Case) -> list[dict]:
                 for label, value in (("PO 编号", (content.get("po") or {}).get("number")), ("PI 编号", (content.get("pi") or {}).get("number"))):
                     if not value:
                         missing.append(label)
-            conflicts = [row for row in content.get("diff") or [] if row.get("status") == "conflict"]
+            if order and (
+                content.get("quotationVersionId") != (quotation or {}).get("itemId")
+                or content.get("specVersionId") != (spec or {}).get("itemId")
+            ):
+                missing.append("订单基线已变化")
+            current_diff = order_diff(content, (quotation or {}).get("content") or {}, (spec or {}).get("content") or {}) if order else []
+            conflicts = [row for row in current_diff if row.get("status") == "conflict"]
             if conflicts:
                 missing.append(f"{len(conflicts)} 项 PO 差异")
             buyer = bool(order and _approval_for(db, case, "order_buyer_confirmation", order))
@@ -451,8 +480,12 @@ def stage_state(db: Session, case: Case) -> list[dict]:
                 "available": key not in ("shipment", "payment"),
             }
         )
-    # The gate belongs to production; surface it once for the header and stage.
+    # A stage can never be shown as confirmed while its own gate has a gap.
     for stage in stages:
+        gaps = [gap["message"] for gap in gate["missing"] if gap["stage"] == stage["key"]]
+        if stage["status"] == "confirmed" and gaps:
+            stage["status"] = "blocked"
+            stage["missing"] = list(dict.fromkeys([*stage["missing"], *gaps]))
         if stage["key"] == "production":
             stage["gate"] = gate
     return stages

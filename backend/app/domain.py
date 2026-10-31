@@ -384,3 +384,41 @@ def can_generate_node(node: str, latest: dict[str, dict] | None) -> bool:
     if node == "production":
         return "order" in latest
     return False
+
+
+def payment_schedule_errors(schedule: Any, order_total: Any = None) -> list[str]:
+    """Validate a human-facing payment schedule without inventing dates."""
+    if not isinstance(schedule, list) or not schedule:
+        return ["付款计划为空"]
+    errors: list[str] = []
+    total = None
+    if order_total not in (None, ""):
+        try:
+            total = _number(order_total, "订单总额")
+        except DomainError:
+            errors.append("订单总额无效")
+    ratio_sum = Decimal("0")
+    for index, row in enumerate(schedule, 1):
+        if not isinstance(row, dict):
+            errors.append(f"第 {index} 个付款节点格式无效")
+            continue
+        if not _text(row.get("milestone")):
+            errors.append(f"第 {index} 个付款节点缺少名称")
+        if not _text(row.get("due")):
+            errors.append(f"第 {index} 个付款节点缺少到期/触发条件")
+        try:
+            ratio = _number(row.get("ratio"), "付款比例")
+            amount = _number(row.get("amountUsd"), "付款金额")
+        except DomainError:
+            errors.append(f"第 {index} 个付款节点比例或金额无效")
+            continue
+        if ratio <= 0 or ratio > 1:
+            errors.append(f"第 {index} 个付款节点比例必须在 0-1 之间")
+        if amount <= 0:
+            errors.append(f"第 {index} 个付款节点金额必须大于 0")
+        ratio_sum += ratio
+        if total is not None and abs(amount - ratio * total) > Decimal("0.01"):
+            errors.append(f"第 {index} 个付款节点金额与比例×订单总额不一致")
+    if ratio_sum > Decimal("1.001"):
+        errors.append("付款比例合计超过 100%")
+    return errors

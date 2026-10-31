@@ -75,7 +75,7 @@ def test_new_inquiry_advances_node_by_node(client):
     assert "quotation" not in view["artifacts"]
     assert view["stages"][2]["status"] == "empty"
 
-    toolbox, run_id, job_id, work_id, _ = _start(client, path, "costing", "登记供应商报价并报价", revision=1)
+    toolbox, run_id, job_id, work_id, _ = _start(client, path, "costing", "登记供应商报价并报价；汇率 7.2、毛利率 20%、数量 3000", revision=1)
     offer = toolbox.call("record_supplier_quote", {"supplier": "Factory A", "evidence_id": supplier["id"], "base_cny": "44", "packaging_cny": "2", "local_cny": "4", "moq": 1000, "lead_days": 28})
     assert offer["status"] == "success", offer
     offer_id = offer["data"]["offerId"]
@@ -171,3 +171,59 @@ def test_manual_edit_creates_new_revision_and_rejects_stale(client):
     assert updated["artifacts"]["spec"]["content"]["fields"]["style"] == "commuter"
     stale = client.put(path + "/workbench/artifacts/spec", json={"baseVersion": 1, "content": {"fields": {"style": "travel"}}})
     assert stale.status_code == 409
+
+
+def test_agent_tools_are_scoped_to_the_current_node():
+    from app.agent_tools import allowed_tools, tool_schemas
+
+    inquiry = {item["function"]["name"] for item in tool_schemas("inquiry")}
+    costing = {item["function"]["name"] for item in tool_schemas("costing")}
+    assert "update_customer_profile" in inquiry
+    assert "calculate_cost" not in inquiry
+    assert "record_supplier_quote" in costing
+    assert "update_requirements" not in costing
+    assert "calculate_cost" in allowed_tools("costing")
+    assert "calculate_cost" not in allowed_tools("inquiry")
+
+
+def test_manual_quote_edit_cannot_override_server_price(client):
+    from app.db import SessionLocal
+    from app.models import Case
+    from app.workbench import append_artifact, commit_revision
+
+    base = "/api/v1/workspaces/ws_demo"
+    case = client.post(base + "/inquiries", json={"title": "报价改价", "customer": "Price Buyer", "originalText": "3,000 bags"}).json()
+    with SessionLocal() as db:
+        row = db.get(Case, case["id"])
+        fields = {key: "x" for key in ("product", "quantity", "dimensions", "fabric", "logo", "packaging", "inspection", "destination", "incoterm", "incotermsVersion", "namedPlace")}
+        spec = append_artifact(db, row, "spec", {"fields": fields, "missing": []}, title="规格")
+        cost = append_artifact(db, row, "cost", {"unitPriceUsd": "8.69", "totalUsd": "26070.00", "quantity": 3000, "supplierOfferId": "offer_x", "unitCostCny": "50.00"}, title="成本")
+        commit_revision(db, row, "初始规格与成本")
+        db.commit()
+        cost_id = cost["itemId"]
+    path = base + "/inquiries/" + case["id"]
+    forged = client.put(path + "/workbench/artifacts/quotation", json={"baseVersion": 0, "content": {"incoterm": "FOB", "unitPriceUsd": "1.00", "totalUsd": "3000.00", "quantity": 3000}})
+    assert forged.status_code == 200, forged.text
+    view = client.get(path + "/workbench").json()
+    quote = view["artifacts"]["quotation"]
+    assert quote["content"]["unitPriceUsd"] == "8.69"
+    assert quote["content"]["totalUsd"] == "26070.00"
+    assert quote["content"]["costVersionId"] == cost_id
+
+
+def test_gate_flags_stale_order_baseline(client):
+    from app.db import SessionLocal
+    from app.models import Case
+    from app.workbench import append_artifact, release_gate
+
+    base = "/api/v1/workspaces/ws_demo"
+    case = client.post(base + "/inquiries", json={"title": "基线测试", "customer": "Baseline Buyer", "originalText": "bags"}).json()
+    with SessionLocal() as db:
+        row = db.get(Case, case["id"])
+        append_artifact(db, row, "spec", {"fields": {}, "missing": []}, title="规格")
+        append_artifact(db, row, "quotation", {"unitPriceUsd": "8.69", "costVersionId": "cost_x"}, title="报价")
+        append_artifact(db, row, "order", {"quotationVersionId": "old_quote", "specVersionId": "old_spec", "diff": []}, title="订单")
+        db.commit()
+        gate = release_gate(db, row)
+    codes = {gap["code"] for gap in gate["missing"]}
+    assert "ORDER_BASELINE_STALE" in codes

@@ -104,7 +104,7 @@ def _assistant_text(message) -> str:
 
 
 def build_graph(toolbox: WorkbenchToolbox, model, saver, *, system: str, max_tools: int = 36):
-    bound = model.bind_tools(tool_schemas())
+    bound = model.bind_tools(tool_schemas(toolbox.node))
 
     def model_node(state: State):
         if state.get("tool_steps", 0) >= max_tools:
@@ -266,7 +266,7 @@ def execute_agent_work(item_id: str, generation: int) -> None:
     if model is None:
         _fail(item_id, generation, "MODEL_NOT_CONFIGURED", "未配置模型，无法执行 Agent 工具调用")
         return
-    toolbox = WorkbenchToolbox(case_id=run.case_id, user_id=user.id, run_id=run.id, job_id=job.id, work_item_id=item_id, generation=generation)
+    toolbox = WorkbenchToolbox(case_id=run.case_id, user_id=user.id, run_id=run.id, job_id=job.id, work_item_id=item_id, generation=generation, node=node)
     checkpoint_path = Path(os.getenv("WORKBENCH_AGENT_CHECKPOINT_DB", "./data/workbench-agent-checkpoints.sqlite3"))
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
     with SqliteSaver.from_conn_string(str(checkpoint_path)) as saver:

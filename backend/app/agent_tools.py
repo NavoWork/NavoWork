@@ -117,7 +117,7 @@ class RecordSupplierQuoteArgs(BaseModel):
 
 
 class CalculateCostArgs(BaseModel):
-    supplier_offer_id: str | None = Field(default=None, description="已登记的供应商报价 ID；不传则必须给 extra_lines")
+    supplier_offer_id: str = Field(description="已登记且绑定原件的供应商报价 ID")
     quantity: int = Field(ge=1, le=100_000_000)
     exchange_rate: str = Field(description="CNY/USD，必须来自用户确认或明确知识依据")
     margin: str = Field(description="目标毛利率比例，0.20 表示 20%")
@@ -229,9 +229,32 @@ TOOL_DESCRIPTIONS = {
 }
 
 
-def tool_schemas() -> list[dict]:
+BASE_TOOLS = {
+    "get_case_context", "read_source", "search_knowledge", "list_assets",
+    "load_skill", "request_info", "export_artifact",
+}
+NODE_TOOLS = {
+    "inquiry": {"update_customer_profile"},
+    "requirements": {"update_requirements", "update_bom"},
+    "costing": {"record_supplier_quote", "calculate_cost", "update_quotation"},
+    "sample": {"record_sample"},
+    "order": {"record_order", "record_payment"},
+    "production": {"prepare_production"},
+}
+
+
+def allowed_tools(node: str | None) -> set[str]:
+    if node in NODE_TOOLS:
+        return BASE_TOOLS | NODE_TOOLS[node]
+    return set(TOOL_MODELS)
+
+
+def tool_schemas(node: str | None = None) -> list[dict]:
+    enabled = allowed_tools(node)
     schemas = []
     for name, model in TOOL_MODELS.items():
+        if name not in enabled:
+            continue
         schemas.append(
             {
                 "type": "function",
@@ -268,7 +291,8 @@ def _text_content(message) -> str:
 
 
 class WorkbenchToolbox:
-    def __init__(self, *, case_id: str, user_id: str, run_id: str, job_id: str, work_item_id: str, generation: int):
+    def __init__(self, *, case_id: str, user_id: str, run_id: str, job_id: str, work_item_id: str, generation: int, node: str | None = None):
+        self.node = node
         self.case_id = case_id
         self.user_id = user_id
         self.run_id = run_id
@@ -335,6 +359,8 @@ class WorkbenchToolbox:
     def call(self, name: str, arguments: dict) -> dict:
         if name not in TOOL_MODELS:
             return {"status": "error", "summary": f"未知工具：{name}"}
+        if name not in allowed_tools(self.node):
+            return {"status": "blocked", "summary": f"当前阶段不能使用工具 {name}"}
         try:
             args = TOOL_MODELS[name].model_validate(arguments or {})
         except ValidationError as exc:
@@ -348,6 +374,10 @@ class WorkbenchToolbox:
         except Exception as exc:  # keep the provider-facing message short
             result = {"status": "error", "summary": f"工具执行异常：{type(exc).__name__}"}
         return _clean(result)
+
+    def _user_facts(self) -> dict:
+        with self._tx() as (db, case, user, run, job):
+            return decode(job.payload).get("agentFacts") or {}
 
     # -- read tools ---------------------------------------------------
     def tool_get_case_context(self, _: Empty):
@@ -523,6 +553,12 @@ class WorkbenchToolbox:
             unknown = [key for key in args.fields if key not in SPEC_KEYS]
             if unknown:
                 raise AgentToolError("UNKNOWN_FIELD", f"未知规格字段：{', '.join(unknown[:8])}")
+            for ref in args.source_refs or []:
+                evidence_id = ref.get("evidenceId") if isinstance(ref, dict) else None
+                if evidence_id:
+                    row = db.get(Item, str(evidence_id))
+                    if not row or row.case_id != case.id or row.kind != "evidence":
+                        raise AgentToolError("SOURCE_NOT_FOUND", "规格来源不属于本项目")
             merged = merge_spec(current, {"fields": args.fields, "sourceRefs": args.source_refs or current.get("sourceRefs")})
             artifact = append_artifact(db, case, "spec", merged, title="客户需求与规格", run_id=run.id, job_id=job.id)
             known = {key: value for key, value in merged["fields"].items() if value}
@@ -610,24 +646,32 @@ class WorkbenchToolbox:
             return result
 
     def tool_calculate_cost(self, args: CalculateCostArgs):
+        facts = self._user_facts()
+        required = {"fx": args.exchange_rate, "margin": args.margin}
+        for key, value in required.items():
+            if facts.get(key) is None:
+                raise AgentToolError("PRICING_BASIS_REQUIRED", "请由用户明确汇率和毛利率后再核价", status="needs_info")
+            try:
+                if Decimal(str(facts[key])) != Decimal(str(value)):
+                    raise AgentToolError("PRICING_BASIS_MISMATCH", "核价参数与用户确认的汇率/毛利率不一致", status="blocked")
+            except InvalidOperation:
+                raise AgentToolError("INVALID_PRICING_BASIS", "汇率或毛利率格式无效")
         with self._tx(write=True) as (db, case, user, run, job):
             lines = list(args.extra_lines)
-            offer = None
-            if args.supplier_offer_id:
-                row = db.get(Item, args.supplier_offer_id)
-                if not row or row.case_id != case.id or row.kind != "supplier_offer":
-                    raise AgentToolError("OFFER_NOT_FOUND", "供应商报价不存在")
-                offer = item_view(row)
-                offer_lines = offer.get("costLines") or []
-                if not offer_lines:
-                    offer_lines = [
-                        {"category": "material", "label": "基础报价", "amountCny": offer.get("baseCny"), "scope": "per_unit"},
-                        {"category": "packaging", "label": "包装", "amountCny": offer.get("packagingCny"), "scope": "per_unit"},
-                        {"category": "domesticFreight", "label": "本地费用", "amountCny": offer.get("localCny"), "scope": "per_unit"},
-                    ]
-                lines = [*offer_lines, *lines]
+            row = db.get(Item, args.supplier_offer_id)
+            if not row or row.case_id != case.id or row.kind != "supplier_offer":
+                raise AgentToolError("OFFER_NOT_FOUND", "供应商报价不存在")
+            offer = item_view(row)
+            offer_lines = offer.get("costLines") or []
+            if not offer_lines:
+                offer_lines = [
+                    {"category": "material", "label": "基础报价", "amountCny": offer.get("baseCny"), "scope": "per_unit"},
+                    {"category": "packaging", "label": "包装", "amountCny": offer.get("packagingCny"), "scope": "per_unit"},
+                    {"category": "domesticFreight", "label": "本地费用", "amountCny": offer.get("localCny"), "scope": "per_unit"},
+                ]
+            lines = [*offer_lines, *lines]
             if not lines:
-                raise AgentToolError("MISSING_COST", "没有成本行；请先登记供应商报价或提供成本")
+                raise AgentToolError("MISSING_COST", "没有成本行；请先登记供应商报价")
             cost = calculate_cost(lines, exchange_rate=args.exchange_rate, margin=args.margin, quantity=args.quantity)
             warnings = []
             if offer and args.quantity < offer.get("moq", 1):
@@ -700,6 +744,9 @@ class WorkbenchToolbox:
             if not spec:
                 raise AgentToolError("SPEC_REQUIRED", "需要先生成客户需求与规格")
             spec_id = args.spec_version_id or spec["itemId"]
+            spec_row = db.get(Item, spec_id)
+            if not spec_row or spec_row.case_id != case.id or spec_row.kind != "artifact" or decode(spec_row.payload).get("kind") != "spec":
+                raise AgentToolError("SPEC_NOT_FOUND", "样品绑定的规格版本不属于本项目")
             latest = latest_artifact(db, case, "sample")
             content = (latest or {}).get("content") or {}
             checks = {key: (args.checks.get(key) or content.get("checks", {}).get(key) or "pending") for key in SAMPLE_CHECKS}
@@ -743,6 +790,8 @@ class WorkbenchToolbox:
                 "pi": args.pi,
                 "seller": args.pi.get("seller"),
                 "documents": args.documents,
+                "quotationVersionId": quotation["itemId"],
+                "specVersionId": spec["itemId"] if spec else None,
                 "confirmations": {"buyer": {"confirmed": False, "evidenceId": None}, "seller": {"confirmed": False, "evidenceId": None}},
                 "status": "draft",
             }

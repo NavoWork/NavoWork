@@ -128,6 +128,7 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
       qc.invalidateQueries({ queryKey: ['workbench-v2', scope] }),
       qc.invalidateQueries({ queryKey: ['workbench-messages', scope] }),
       qc.invalidateQueries({ queryKey: ['workbench-events', scope] }),
+      qc.invalidateQueries({ queryKey: ['workbench-run', scope] }),
     ]);
     onChanged();
   }, [qc, scope, onChanged]);
@@ -172,6 +173,7 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
       await invalidate();
     } catch (e) {
       setError(e);
+      await invalidate();
     } finally {
       setBusy(false);
     }
@@ -193,16 +195,29 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
     });
   };
 
-  const answerAgent = (answers: { questionId: string; value: string }[]) => {
-    if (!data || !run.data) return;
-    void operate(async () => {
+  const answerAgent = async (answers: { questionId: string; value: string }[]) => {
+    if (!data || !run.data) return false;
+    setBusy(true);
+    setError(undefined);
+    setNotice('');
+    try {
       const result = await api.post<Run>(`${path}/runs`, {
-        replyToRunId: run.data!.id,
-        baseRevision: run.data!.baseRevision,
+        replyToRunId: run.data.id,
+        baseRevision: run.data.baseRevision,
         answers,
       });
       setRunId(result.id);
-    }, '补充已提交，继续同一任务。');
+      await invalidate();
+      await qc.invalidateQueries({ queryKey: ['workbench-run', scope] });
+      setNotice('补充已提交，继续同一任务。');
+      return true;
+    } catch (e) {
+      setError(e);
+      await invalidate();
+      return false;
+    } finally {
+      setBusy(false);
+    }
   };
 
   const cancelAgent = () => {
@@ -212,10 +227,22 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
     }, '任务已停止。');
   };
 
-  const saveArtifact: (kind: string, content: Record<string, any>, baseVersion: number) => Promise<void> = async (kind, content, baseVersion) => {
-    await operate(async () => {
+  const saveArtifact: (kind: string, content: Record<string, any>, baseVersion: number) => Promise<boolean> = async (kind, content, baseVersion) => {
+    setBusy(true);
+    setError(undefined);
+    setNotice('');
+    try {
       await api.put(`${path}/workbench/artifacts/${kind}`, { baseVersion, content });
-    }, '已保存新版本。');
+      await invalidate();
+      setNotice('已保存新版本。');
+      return true;
+    } catch (e) {
+      setError(e);
+      await invalidate();
+      return false;
+    } finally {
+      setBusy(false);
+    }
   };
 
   const exportArtifact = (kind: string, format: string) => {
@@ -232,6 +259,7 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
   };
 
   const openConfirm = (scope: string, target: WorkbenchArtifact, evidenceRole: string, options?: { basis?: string }) => {
+    setError(undefined);
     setConfirm({ scope, target, evidenceRole, basis: options?.basis });
   };
 
@@ -256,6 +284,7 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
   const release = () => {
     const production = data?.artifacts.production;
     if (!production) return;
+    setError(undefined);
     setConfirm({ scope: 'production_release', target: production, evidenceRole: '' });
   };
 
@@ -370,7 +399,7 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
           busy={busy}
           stage={stage}
           selectedRefs={selectedRefCount}
-          onSend={(text) => sendAgent(text)}
+          onSend={(text) => sendAgent(text, stage)}
           onAnswer={answerAgent}
           onOpenSources={() => setSourcesOpen(true)}
           onCancel={cancelAgent}
@@ -383,6 +412,7 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
           state={confirm}
           data={data}
           busy={busy}
+          error={error}
           onClose={() => setConfirm(null)}
           onSubmit={submitConfirm}
         />
@@ -405,10 +435,11 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
   );
 }
 
-function ConfirmDialog({ state, data, busy, onClose, onSubmit }: {
+function ConfirmDialog({ state, data, busy, error, onClose, onSubmit }: {
   state: ConfirmState;
   data: WorkbenchData;
   busy: boolean;
+  error: unknown;
   onClose: () => void;
   onSubmit: (evidenceIds: string[], note: string, basis: string) => Promise<void>;
 }) {
@@ -437,6 +468,7 @@ function ConfirmDialog({ state, data, busy, onClose, onSubmit }: {
         )}
         {requiresBasis && <label className="field">核验依据<textarea rows={3} value={basis} onChange={(event) => setBasis(event.target.value)} placeholder="例如：财务核对银行入账记录与合同定金金额" /></label>}
         <label className="field">备注<textarea rows={2} value={note} onChange={(event) => setNote(event.target.value)} placeholder="可选" /></label>
+        <ErrorNotice error={error} />
         <div className="form-actions">
           <button className="button" disabled={busy} onClick={onClose}>取消</button>
           <button className="button button-primary" disabled={busy || !ready} onClick={() => void onSubmit(evidenceId ? [evidenceId] : [], note, basis)}>

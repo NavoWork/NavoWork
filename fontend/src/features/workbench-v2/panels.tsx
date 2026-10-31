@@ -24,7 +24,7 @@ import type {
 } from '../../api/types';
 import { EmptyHint, Field, MissingList, Pill, Section, money, shortDate, stageStatusLabel } from './ui';
 
-type SaveArtifact = (kind: string, content: Record<string, any>, baseVersion: number) => Promise<void>;
+type SaveArtifact = (kind: string, content: Record<string, any>, baseVersion: number) => Promise<boolean>;
 type ConfirmGate = (scope: string, target: WorkbenchArtifact, evidenceRole: string, options?: { basis?: string; note?: string }) => void;
 type RunAgent = (instruction: string, node?: string) => void;
 
@@ -154,8 +154,8 @@ export function RequirementsPanel({ data, onAgent, onSave, onConfirm, busy }: { 
     if (!spec) return;
     setSaving(true);
     try {
-      await onSave('spec', { fields }, spec.version);
-      setDirty(false);
+      const ok = await onSave('spec', { fields }, spec.version);
+      if (ok) setDirty(false);
     } finally {
       setSaving(false);
     }
@@ -274,8 +274,8 @@ export function CostingPanel({ data, onAgent, onSave, onConfirm, onExport, busy 
     if (!quote) return;
     setSaving(true);
     try {
-      await onSave('quotation', { ...terms, moq: terms.moq === '' ? null : Number(terms.moq), exclusions: String(terms.exclusions || '').split(',').map((item) => item.trim()).filter(Boolean) }, quote.version);
-      setDirty(false);
+      const ok = await onSave('quotation', { ...terms, moq: terms.moq === '' ? null : Number(terms.moq), exclusions: String(terms.exclusions || '').split(',').map((item) => item.trim()).filter(Boolean) }, quote.version);
+      if (ok) setDirty(false);
     } finally {
       setSaving(false);
     }
@@ -320,6 +320,7 @@ export function CostingPanel({ data, onAgent, onSave, onConfirm, onExport, busy 
             </table>
           </div>
         )}
+        <div className="wbv2-inline-note"><CircleAlert size={14} /> 核价需要你明确汇率和毛利率，例如“汇率 7.20、毛利率 20%”；Agent 不会自行假设。</div>
         {cost && (
           <div className="wbv2-cost-grid">
             <div><span>单件成本</span><strong>¥{cost.content.unitCostCny}</strong></div>

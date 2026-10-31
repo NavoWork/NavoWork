@@ -46,7 +46,7 @@ export function AgentPanel({
   stage: string;
   selectedRefs: number;
   onSend: (text: string) => void;
-  onAnswer: (answers: { questionId: string; value: string }[]) => void;
+  onAnswer: (answers: { questionId: string; value: string }[]) => Promise<boolean>;
   onOpenSources: () => void;
   onCancel: () => void;
   error: unknown;
@@ -70,16 +70,16 @@ export function AgentPanel({
 
   function submit() {
     const value = text.trim();
-    if (!value || busy || running) return;
+    if (!value || busy || running || waiting) return;
     onSend(value);
     setText('');
   }
 
-  function submitAnswers() {
+  async function submitAnswers() {
     const payload = questions.map((question) => ({ questionId: question.id, value: (answers[question.id] || '').trim() }));
     if (payload.some((item) => !item.value)) return;
-    onAnswer(payload);
-    setAnswers({});
+    const ok = await onAnswer(payload);
+    if (ok) setAnswers({});
   }
 
   return (
@@ -89,7 +89,7 @@ export function AgentPanel({
           <span className="wbv2-eyebrow">NAVOWORK AGENT</span>
           <h2>跟单助手</h2>
         </div>
-        <span className={`wbv2-live ${running ? 'is-running' : ''}`}>{running ? '执行中' : '就绪'}</span>
+        <span className={`wbv2-live ${running ? 'is-running' : ''}`}>{waiting ? '待补充' : running ? '执行中' : '就绪'}</span>
       </header>
 
       <div className="wbv2-agent-scroll" ref={messagesRef}>
@@ -139,7 +139,7 @@ export function AgentPanel({
 
         {waiting && (
           <div className="wbv2-questions">
-            <div className="wbv2-questions-head"><CircleAlert size={15} /><strong>需要你补充</strong></div>
+            <div className="wbv2-questions-head"><CircleAlert size={15} /><strong>需要你补充</strong><button className="wbv2-text-button" onClick={onCancel}>停止任务</button></div>
             {questions.map((question) => (
               <label key={question.id}>
                 <span>{question.question}</span>
@@ -150,7 +150,7 @@ export function AgentPanel({
                 />
               </label>
             ))}
-            <button className="button button-primary" disabled={busy || questions.some((question) => !(answers[question.id] || '').trim())} onClick={submitAnswers}>
+            <button className="button button-primary" disabled={busy || questions.some((question) => !(answers[question.id] || '').trim())} onClick={() => void submitAnswers()}>
               提交补充，继续任务
             </button>
           </div>
@@ -167,17 +167,18 @@ export function AgentPanel({
       <div className="wbv2-composer">
         <div className="wbv2-quick">
           {(stagePrompts[stage] || []).map((prompt) => (
-            <button key={prompt} onClick={() => setText(prompt)}>{prompt}</button>
+            <button key={prompt} disabled={waiting} onClick={() => setText(prompt)}>{prompt}</button>
           ))}
         </div>
         <div className="wbv2-input-shell">
           <textarea
             value={text}
             rows={3}
-            placeholder="告诉 Agent 下一步要完成什么…"
+            placeholder={waiting ? '请先回答上方问题，或停止当前任务' : '告诉 Agent 下一步要完成什么…'}
+            disabled={waiting}
             onChange={(event) => setText(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey) {
+              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
                 event.preventDefault();
                 submit();
               }
@@ -185,7 +186,7 @@ export function AgentPanel({
           />
           <div className="wbv2-input-tools">
             <button className="wbv2-ref-button" onClick={onOpenSources}><Paperclip size={13} /> 资料 {selectedRefs > 0 ? `· ${selectedRefs}` : ''}</button>
-            <button className="wbv2-send" disabled={!text.trim() || busy || running} onClick={submit} aria-label="发送">
+            <button className="wbv2-send" disabled={!text.trim() || busy || running || waiting} onClick={submit} aria-label="发送">
               <ArrowUp size={16} />
             </button>
           </div>

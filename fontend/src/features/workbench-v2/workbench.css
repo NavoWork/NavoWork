@@ -462,3 +462,4 @@
 .wbv2-audit > summary svg { transition: transform 140ms ease; color: var(--navo-color-text-muted); }
 .wbv2-audit[open] > summary svg { transform: rotate(180deg); }
 .wbv2-audit .wbv2-approval-list { padding: 0 18px 10px; }
+.wbv2-quick button:disabled { opacity: 0.45; cursor: default; }

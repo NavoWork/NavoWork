@@ -122,3 +122,13 @@ def test_free_text_order_clauses_are_review_not_conflict():
     rows = {row["field"]: row["status"] for row in diff}
     assert rows["paymentTerms"] == "review"
     assert rows["deliveryDate"] == "review"
+
+
+def test_payment_schedule_must_match_order_total():
+    from app.domain import payment_schedule_errors
+
+    assert payment_schedule_errors([{"milestone": "deposit", "ratio": "0.30", "amountUsd": "7821.00", "due": "2026-11-10"}], "26070.00") == []
+    errors = payment_schedule_errors([{"milestone": "deposit", "ratio": "0.30", "amountUsd": "0.01", "due": "2026-11-10"}], "26070.00")
+    assert any("不一致" in item for item in errors)
+    assert payment_schedule_errors([{"milestone": "deposit", "ratio": "0.30", "amountUsd": "7821.00", "due": "2026-11-10"}], "0")
+    assert payment_schedule_errors([], "26070.00") == ["付款计划为空"]

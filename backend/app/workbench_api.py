@@ -15,6 +15,8 @@ from .domain import (
     missing_quote_fields,
     normalize_bom,
     normalize_spec,
+    order_diff,
+    payment_schedule_errors,
     spec_ready,
 )
 from .models import Case, Item, User
@@ -86,11 +88,18 @@ def _manual_edit(db: Session, case: Case, kind: str, body: dict) -> dict:
         elif kind == "bom":
             merged = {"rows": normalize_bom(content.get("rows") if isinstance(content.get("rows"), list) else content)}
         elif kind == "quotation":
+            cost = latest_artifacts(db, case).get("cost")
+            if not cost:
+                fail("BUSINESS_VALIDATION_FAILED", "需要先完成核价，才能修改报价条款", 422)
+            cost_content = cost.get("content") or {}
             merged = {**((latest or {}).get("content") or {}), **content}
-            merged["costVersionId"] = merged.get("costVersionId") or (latest_artifacts(db, case).get("cost") or {}).get("itemId")
-            merged["unitPriceUsd"] = merged.get("unitPriceUsd") or ((latest_artifacts(db, case).get("cost") or {}).get("content") or {}).get("unitPriceUsd")
-            merged["totalUsd"] = merged.get("totalUsd") or ((latest_artifacts(db, case).get("cost") or {}).get("content") or {}).get("totalUsd")
-            merged["quantity"] = merged.get("quantity") or ((latest_artifacts(db, case).get("cost") or {}).get("content") or {}).get("quantity")
+            # Price, total, quantity and the cost baseline are server-owned;
+            # human edits may change terms but not invent money.
+            merged["costVersionId"] = cost["itemId"]
+            merged["unitPriceUsd"] = cost_content.get("unitPriceUsd")
+            merged["totalUsd"] = cost_content.get("totalUsd")
+            merged["quantity"] = cost_content.get("quantity")
+            merged["selectedSupplierOfferId"] = cost_content.get("supplierOfferId")
             merged["product"] = merged.get("product") or (((latest_artifacts(db, case).get("spec") or {}).get("content") or {}).get("fields") or {}).get("product")
             merged["status"] = "draft"
         else:
@@ -138,6 +147,17 @@ def _record(db: Session, case: Case, user: User, body: dict) -> dict:
         missing = missing_quote_fields(latest.get("content"))
         if missing:
             fail("BUSINESS_VALIDATION_FAILED", "报价条款仍不完整", 422, {"missing": missing})
+        cost = latest_artifact(db, case, "cost")
+        content = latest.get("content") or {}
+        if not cost:
+            fail("BUSINESS_VALIDATION_FAILED", "报价没有可核验的核价版本", 422)
+        cost_content = cost.get("content") or {}
+        if (
+            content.get("costVersionId") != cost["itemId"]
+            or content.get("unitPriceUsd") != cost_content.get("unitPriceUsd")
+            or content.get("selectedSupplierOfferId") != cost_content.get("supplierOfferId")
+        ):
+            fail("BUSINESS_VALIDATION_FAILED", "报价金额或成本基线已变化，请重新核价", 422)
     if scope == "sample_approval":
         _require_refs(db, case, refs, "customer_approval")
         if not latest.get("content", {}).get("specVersionId"):
@@ -150,13 +170,25 @@ def _record(db: Session, case: Case, user: User, body: dict) -> dict:
             _require_refs(db, case, refs, "customer_approval")
         else:
             _require_refs(db, case, refs, "internal_note")
-        conflicts = [row for row in latest.get("content", {}).get("diff") or [] if row.get("status") == "conflict"]
+        content = latest.get("content") or {}
+        quotation = latest_artifact(db, case, "quotation")
+        spec = latest_artifact(db, case, "spec")
+        if (
+            content.get("quotationVersionId") != (quotation or {}).get("itemId")
+            or content.get("specVersionId") != (spec or {}).get("itemId")
+        ):
+            fail("BUSINESS_VALIDATION_FAILED", "订单引用的报价或规格版本已变化，请重新核对 PO", 422)
+        conflicts = [row for row in order_diff(content, (quotation or {}).get("content") or {}, (spec or {}).get("content") or {}) if row.get("status") == "conflict"]
         if conflicts:
-            fail("BUSINESS_VALIDATION_FAILED", "PO 与报价/规格仍有硬冲突，不能确认订单", 422, {"conflicts": conflicts})
+            fail("BUSINESS_VALIDATION_FAILED", "PO 与当前报价/规格仍有硬冲突，不能确认订单", 422, {"conflicts": conflicts})
     if scope == "payment_verification":
         _require_refs(db, case, refs, "payment_receipt")
         if not str(body.get("verificationBasis") or "").strip():
             fail("INVALID_INPUT", "请填写人工核验依据", 400)
+        order = _latest_target(db, case, "order")
+        errors = payment_schedule_errors(latest.get("content", {}).get("schedule"), (order.get("content", {}).get("po") or {}).get("totalUsd"))
+        if errors:
+            fail("BUSINESS_VALIDATION_FAILED", "付款计划不完整或金额与订单不一致", 422, {"errors": errors})
     if scope == "supplier_production_confirmation":
         _require_refs(db, case, refs, "supplier_confirmation")
     if scope == "production_release":
