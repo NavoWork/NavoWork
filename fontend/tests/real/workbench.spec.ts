@@ -5,8 +5,8 @@ test('real workspace runs a quotation job and displays five saved artifacts', as
   await page.getByLabel('账号邮箱').fill('demo@navowork.local');
   await page.getByLabel('密码').fill('ChangeMe123!');
   await page.getByRole('button', { name: '登录工作空间' }).click();
-  await expect(page.getByRole('heading', { name: '把手上的事，向前推进。' })).toBeVisible();
-  await page.goto('/workbench');
+  await expect(page.getByRole('navigation', { name: '主导航' })).toBeVisible();
+  await page.goto('/workbench?case=inq_demo_bag');
   await expect(page.getByRole('heading', { name: '包袋出口工作流' })).toBeVisible();
   const source = await page.evaluate(async () => {
     const response = await fetch('/api/v1/workspaces/ws_demo/inquiries/inq_demo_bag/evidence', {

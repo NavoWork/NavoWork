@@ -14,7 +14,7 @@ from uuid import uuid4
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.datastructures import UploadFile
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from .agent import KEYWORDS, NODE_FIELDS, extract_without_model, price_quote
@@ -171,6 +171,9 @@ def case_routes(request: Request, db: Session, user: User, parts: list[str], bod
         return {key: values.count(key) for key in ("todo", "active", "waiting", "done")}
     case = require_case(db, user, parts[0])
     tail = parts[1:]
+    if tail and tail[0] == "canvas":
+        from .workspace_api import canvas_routes
+        return canvas_routes(request, db, user, case, tail, body, form)
     if not tail:
         if method == "GET":
             return case_view(case)
@@ -291,7 +294,16 @@ def case_routes(request: Request, db: Session, user: User, parts: list[str], bod
     if tail and tail[0] == "material-bundles":
         if method == "GET":
             return {"items": [item_view(i) for i in items(db, "bundle", case_id=case.id)]}
-        value = {"id": uid("bundle"), "inquiryId": case.id, "revision": body.get("revision"), "draftVersions": body.get("draftVersions", {}), "assetVersionIds": body.get("assetVersionIds", []), "sourceVersionIds": [], "status": "draft", "createdAt": now()}
+        revision = next((item_view(i) for i in revisions(db, case.id) if i.version == body.get("revision")), None)
+        if not revision:
+            fail("NOT_FOUND", "业务版本不存在", 404)
+        asset_refs = body.get("assetVersionIds", revision.get("assetRefs", []))
+        source_refs = body.get("sourceVersionIds", [r["sourceVersionId"] for r in revision.get("sourceRefs", [])])
+        if not isinstance(asset_refs, list) or not isinstance(source_refs, list) or any(ref not in revision.get("assetRefs", []) for ref in asset_refs) or any(ref not in [s["sourceVersionId"] for s in revision.get("sourceRefs", [])] for ref in source_refs):
+            fail("REVISION_CONFLICT", "材料清单只能使用该业务版本已引用的资料", 409)
+        for locale, version in body.get("draftVersions", {}).items():
+            latest_draft(db, case.id, revision["number"], locale, version)
+        value = {"id": uid("bundle"), "inquiryId": case.id, "revision": revision["number"], "draftVersions": body.get("draftVersions", {}), "assetVersionIds": asset_refs, "sourceVersionIds": source_refs, "status": "draft", "createdAt": now()}
         create_item(db, "bundle", value, case_id=case.id, item_id=value["id"])
         db.commit()
         return value
@@ -304,6 +316,8 @@ def case_routes(request: Request, db: Session, user: User, parts: list[str], bod
 
 
 def create_run(request: Request, db: Session, user: User, case: Case, body: dict, kind: str | None = None):
+    db.execute(text("BEGIN IMMEDIATE"))
+    db.refresh(case)
     previous, marker = idem_lookup(db, request, body)
     if previous:
         return previous
@@ -311,11 +325,18 @@ def create_run(request: Request, db: Session, user: User, case: Case, body: dict
         fail("INVALID_STATUS_TRANSITION", "请先恢复处理当前工作", 409)
     if case.active_run_id:
         fail("RUN_IN_PROGRESS", "当前工作正在执行", 409)
+    from .run_context import prepare_context, resume_run, route_intent, require_capability
+    require_capability(db, "agent")
+    if body.get("replyToRunId"):
+        return resume_run(request, db, user, case, body, marker)
+    if decode(case.payload).get("pendingRunId"):
+        fail("RUN_NEEDS_INPUT", "请先回答当前任务的问题或取消该任务", 409)
     base_revision = int(body.get("baseRevision", case.current_revision))
     if base_revision != case.current_revision:
         fail("REVISION_CONFLICT", "业务版本已有更新", 409, {"currentRevision": case.current_revision})
     action = str(body.get("action") or kind or "analyze")
-    kind = kind or {"analyze": "confirm_requirements", "revise": "confirm_requirements", "accept_proposal": "prepare_quote"}.get(action, action)
+    interactive = kind is None
+    kind = kind or route_intent(action, str(body.get("instruction", "")))
     allowed = {"qualify_inquiry", "confirm_requirements", "prepare_quote", "manage_sample", "confirm_order", "prepare_production", "manage_shipment", "reconcile_payment", "handle_aftersales", "apply_change", "follow_up"}
     if kind not in allowed:
         fail("INVALID_INPUT", "未知任务类型")
@@ -324,7 +345,9 @@ def create_run(request: Request, db: Session, user: User, case: Case, body: dict
     instruction = str(body.get("instruction") or body.get("goal") or "分析当前资料")[:20000]
     cost_inputs = body.get("costInputs") or {}
     selected_offer_id = body.get("selectedSupplierOfferId")
-    if kind == "prepare_quote" and not selected_offer_id:
+    if kind == "prepare_quote":
+        require_capability(db, "costing")
+    if kind == "prepare_quote" and not selected_offer_id and not interactive:
         fail("SUPPLIER_EVIDENCE_REQUIRED", "报价任务须选择已绑定原件的供应商报价", 422)
     if kind == "prepare_quote" and selected_offer_id:
         offer_row = db.get(Item, str(selected_offer_id))
@@ -332,9 +355,10 @@ def create_run(request: Request, db: Session, user: User, case: Case, body: dict
             fail("NOT_FOUND", "供应商报价不存在", 404)
         offer = item_view(offer_row)
         cost_inputs = {**cost_inputs, "base": offer["baseCny"], "packaging": offer["packagingCny"], "local": offer["localCny"]}
-        if int(cost_inputs.get("quantity") or 0) < offer["moq"]:
+        calculated = price_quote(cost_inputs)
+        if calculated and calculated["quantity"] < offer["moq"]:
             fail("INVALID_INPUT", "询价数量低于供应商起订量")
-        if not price_quote(cost_inputs):
+        if not calculated and not interactive:
             fail("INVALID_INPUT", "请补齐有效的汇率、毛利率和数量")
     if not isinstance(body.get("inputRefs") or [], list):
         fail("INVALID_INPUT", "输入来源必须是列表")
@@ -342,7 +366,8 @@ def create_run(request: Request, db: Session, user: User, case: Case, body: dict
         source = db.get(Item, str(ref))
         if not source or source.case_id != case.id or source.kind != "evidence":
             fail("NOT_FOUND", "输入来源不存在或不属于当前项目", 404)
-    job = Job(id=uid("job"), case_id=case.id, kind=kind, goal=instruction, payload=encode({"inputRefs": body.get("inputRefs", []), "costInputs": cost_inputs, "selectedSupplierOfferId": selected_offer_id, "changeSetId": body.get("changeSetId")}))
+    context = prepare_context(db, user, case, body)
+    job = Job(id=uid("job"), case_id=case.id, kind=kind, goal=instruction, graph_version="sop-v2", payload=encode({**context, "inputRefs": body.get("inputRefs", []), "costInputs": cost_inputs, "selectedSupplierOfferId": selected_offer_id, "changeSetId": body.get("changeSetId"), "interactive": interactive}))
     run = Run(id=uid("run"), job_id=job.id, case_id=case.id, base_revision=base_revision, action=action, instruction=instruction, payload=encode({"assetVersionIds": body.get("assetVersionIds", [])}))
     db.add(job)
     db.flush()
@@ -371,13 +396,20 @@ async def workspace_dispatch(workspace_id: str, rest: str, request: Request, db:
             form = await request.form()
         else:
             try:
-                body = await request.json()
+                raw = await request.body()
+                body = json.loads(raw) if raw else {}
             except json.JSONDecodeError:
                 fail("INVALID_JSON", "请求 JSON 无效")
             if not isinstance(body, dict):
                 fail("INVALID_INPUT", "请求正文必须是对象")
     if not parts:
         fail("NOT_FOUND", "接口不存在", 404)
+    if parts[0] == "library":
+        from .workspace_api import library_routes
+        return library_routes(request, db, user, parts, body, form)
+    if parts == ["skill-market"] and request.method == "GET":
+        from .workspace_api import skill_market
+        return skill_market(db)
     if parts[0] == "inquiries":
         return case_routes(request, db, user, parts[1:], body, form)
     if parts[0] == "runs":
@@ -386,17 +418,23 @@ async def workspace_dispatch(workspace_id: str, rest: str, request: Request, db:
             fail("NOT_FOUND", "任务不存在", 404)
         require_case(db, user, run.case_id)
         if len(parts) > 2 and parts[2] == "cancel" and request.method == "POST":
-            if run.status in ("queued", "running"):
+            if run.status in ("queued", "running", "needs_input"):
                 run.status = "cancelled"
                 run.last_seq += 1
                 case = db.get(Case, run.case_id)
+                if decode(case.payload).get("pendingRunId") == run.id:
+                    data = decode(case.payload)
+                    data.pop("pendingRunId", None)
+                    case.payload = encode(data)
+                job = db.get(Job, run.job_id)
+                job.status = "cancelled"
                 if case.active_run_id == run.id:
                     case.active_run_id = None
                     touch(case)
                 db.commit()
             return run_view(run)
         if len(parts) > 2 and parts[2] == "events":
-            return {"items": [{"runId": run.id, "inquiryId": run.case_id, "seq": run.last_seq, "type": f"run.{run.status}", "payload": {"phase": run.phase}, "createdAt": now()}]}
+            return {"items": sorted([item_view(i) for i in items(db, "run_event", parent_id=run.id)], key=lambda e: e["seq"])}
         return run_view(run)
     if parts[0] == "exports":
         from .exports import export_route
@@ -415,6 +453,8 @@ def resource_row(db: Session, source_id: str, version: int | None = None) -> Ite
 
 def workspace_resources(request: Request, db: Session, user: User, parts: list[str], body: dict, form):
     group, method = parts[0], request.method
+    if group in ("knowledge", "products", "sources") and method in ("POST", "PATCH", "PUT", "DELETE"):
+        db.execute(text("BEGIN IMMEDIATE"))
     if group in ("knowledge", "products", "sources"):
         if len(parts) == 1 and method == "GET":
             return {"items": latest_resources(db, group)}
@@ -445,6 +485,11 @@ def workspace_resources(request: Request, db: Session, user: User, parts: list[s
                 db.commit()
                 return value
             if method == "PATCH":
+                if value.get("ownerId") not in (None, user.id) and user.role != "admin":
+                    fail("FORBIDDEN", "仅创建人或管理员可更新", 403)
+                referenced = any(any(ref.get("sourceVersionId") == row.id for ref in decode(job.payload).get("sourceRefs", [])) for job in db.scalars(select(Job)))
+                if referenced:
+                    fail("SOURCE_VERSION_FROZEN", "此资料版本已被任务引用，请创建新版本", 409)
                 if value["status"] != "draft":
                     fail("INVALID_INPUT", "已发布资料不可覆盖")
                 if body.get("editVersion") != value["editVersion"]:
@@ -460,6 +505,8 @@ def workspace_resources(request: Request, db: Session, user: User, parts: list[s
         if len(parts) == 3 and parts[2] == "versions" and method == "POST":
             previous = resource_row(db, parts[1])
             old = item_view(previous)
+            if old.get("ownerId") not in (None, user.id) and user.role != "admin":
+                fail("FORBIDDEN", "仅创建人或管理员可更新", 403)
             value = {**old, "version": previous.version + 1, "status": "draft", "editVersion": 1, "title": body.get("title", old["title"]), "content": body.get("content", old["content"]), "updatedAt": now()}
             create_item(db, "resource", value, item_id=f"{parts[1]}:v{value['version']}", parent_id=parts[1], version=value["version"])
             db.commit()
@@ -473,6 +520,8 @@ def workspace_resources(request: Request, db: Session, user: User, parts: list[s
             fail("NOT_FOUND", "能力不存在", 404)
         value = item_view(row)
         if "enabled" in body:
+            if value.get("required") and body["enabled"] is False:
+                fail("INVALID_INPUT", "核心能力不可停用")
             value["enabled"] = bool(body["enabled"])
             row.payload = encode(value)
             db.commit()
@@ -531,7 +580,8 @@ def workspace_resources(request: Request, db: Session, user: User, parts: list[s
         return value
     if group == "assets":
         if len(parts) == 1 and method == "GET":
-            values = [item_view(i) for i in items(db, "asset")]
+            from .workspace_api import asset_rows
+            values = [item_view(i) for i in asset_rows(db, user)]
             return {"items": values}
         if method == "POST" and (len(parts) == 1 or len(parts) == 3 and parts[2] == "versions"):
             upload = form.get("file") if form else None
@@ -544,6 +594,15 @@ def workspace_resources(request: Request, db: Session, user: User, parts: list[s
                 fail("INVALID_INPUT", "仅支持 JPEG、PNG、WebP 或 PDF")
             blob = store_blob(db, data, upload.filename or "asset", media)
             asset_id = parts[1] if len(parts) > 1 else uid("asset")
+            previous_value = {}
+            if len(parts) > 1:
+                from .workspace_api import asset_rows
+                owned = [i for i in asset_rows(db, user) if item_view(i)["id"] == asset_id]
+                if not owned:
+                    fail("NOT_FOUND", "文件不存在", 404)
+                previous_value = item_view(owned[-1])
+                if previous_value.get("ownerId") not in (None, user.id) and user.role != "admin":
+                    fail("FORBIDDEN", "仅创建人或管理员可更新", 403)
             previous = [i for i in items(db, "asset") if decode(i.payload).get("id") == asset_id]
             version = max((i.version for i in previous), default=0) + 1
             sku = str(form.get("skuScope") or "[]")
@@ -552,14 +611,12 @@ def workspace_resources(request: Request, db: Session, user: User, parts: list[s
             except json.JSONDecodeError:
                 sku_scope = [x.strip() for x in sku.split(",") if x.strip()]
             value = {"id": asset_id, "title": str(form.get("title") or upload.filename), "name": upload.filename, "version": version, "skuScope": sku_scope, "locale": str(form.get("locale") or "zh-CN"), "mediaType": media, "source": str(form.get("source") or "用户上传"), "size": len(data), "createdAt": now(), "blobId": blob.id}
+            value.update({"ownerId": previous_value.get("ownerId", user.id), "space": previous_value.get("space", "company"), "folder": previous_value.get("folder", "未分类")})
             create_item(db, "asset", value, parent_id=asset_id, version=version)
             db.commit()
             return value
         if len(parts) == 5 and parts[2] == "versions" and parts[4] == "download":
             asset_id, version = parts[1], int(parts[3])
-            row = next((i for i in items(db, "asset") if decode(i.payload).get("id") == asset_id and i.version == version), None)
-            if not row:
-                fail("NOT_FOUND", "素材不存在", 404)
-            blob = db.get(Blob, decode(row.payload)["blobId"])
-            return FileResponse(blob.path, media_type=blob.media_type, filename=blob.filename)
+            from .workspace_api import asset_version, attachment
+            return attachment(db, asset_version(db, user, asset_id, version))
     fail("NOT_FOUND", "接口不存在", 404)

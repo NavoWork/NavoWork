@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../../api';
 import type { Inquiry, Page, Run, Session } from '../../api/types';
 import { ErrorNotice, Loading } from '../../components/ui';
@@ -217,6 +217,7 @@ export function RealWorkbench({ session }: { session: Session }) {
   if (loading) return <Loading label="正在读取服务端工作台" />;
   return <div className="rw-page">
     <header className="rw-header">
+      {caseId && <Link className="button" to={`/inquiries/${encodeURIComponent(caseId)}`}>返回询盘画板</Link>}
       <div><span className="tw-eyebrow">REAL WORKSPACE / SOP</span><h1>包袋出口工作流</h1><p>资料、版本、节点影响与人工门禁由服务端记录。</p></div>
       <select aria-label="选择客户项目" value={caseId} onChange={(e) => { setCaseId(e.target.value); setSearch({ case: e.target.value }); setImpact(null); }}>
         {cases.map((item) => <option value={item.id} key={item.id}>{item.title}</option>)}

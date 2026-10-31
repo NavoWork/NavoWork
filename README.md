@@ -34,5 +34,6 @@ npm run build
 - [产品需求](doc/TradeWorkbench_PRD_v1.0.md)
 - [后端设计](doc/TradeWorkbench_Backend_Design_v1.0.md)
 - [Agent 节点图](doc/TradeWorkbench_Agent_Node_Graph_v1.0.md)
+- [新版前端适配：架构、实际节点链路与接口 v1.1](doc/Frontend_Backend_Adaptation_v1.1.md)
 - [后端开发计划](后端开发计划.md)
 - [前端接口说明](fontend/docs/INTEGRATION.md)

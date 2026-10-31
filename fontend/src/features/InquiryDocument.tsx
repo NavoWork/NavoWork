@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Check, Download, FileText, LockKeyhole, Send, Save } from 'lucide-react';
-import { api } from '../api';
+import { api, mode } from '../api';
 import type { Inquiry } from '../api/types';
 import { ErrorNotice, Loading } from '../components/ui';
 import { getCanvasFile, type WorkspaceDocument, type WorkspaceFile } from './inquiry-canvas-model';
@@ -26,7 +26,9 @@ export function FilePreview({
     setUrl('');
     setText(null);
     setError(undefined);
-    const load = file.assetId
+    const load = file.serverFileId && file.caseId
+      ? api.download(`${base}/inquiries/${encodeURIComponent(file.caseId)}/canvas/files/${encodeURIComponent(file.serverFileId)}/download`)
+      : file.assetId
       ? api.download(
           `${base}/assets/${encodeURIComponent(file.assetId)}/versions/${file.version}/download`,
         )
@@ -224,7 +226,7 @@ export function WorkingDocument({
       </p>
       <div className="ic-document-status">
         <FileText size={13} />
-        {value !== doc.text ? '本机工作草稿 · 尚未生成新业务版本' : '版本内容 · 可编辑为工作草稿'}
+        {value !== doc.text ? `${mode === 'real' ? '工作草稿' : '本机工作草稿'} · 尚未生成新业务版本` : '版本内容 · 可编辑为工作草稿'}
       </div>
       <textarea
         className="ic-document-text"

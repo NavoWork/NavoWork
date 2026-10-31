@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Archive, Check, FilePlus2, Paperclip } from 'lucide-react';
-import { api } from '../api';
+import { api, mode } from '../api';
 import type { Asset, Locale, MaterialBundle, Revision } from '../api/types';
 import { EmptyState, ErrorNotice, Loading, Modal } from '../components/ui';
 export function MaterialsPanel({
@@ -144,11 +144,11 @@ export function MaterialsPanel({
             <ErrorNotice error={assets.error} onRetry={() => void assets.refetch()} />
           ) : assets.data?.items.length ? (
             <div className="iw-asset-chooser">
-              {assets.data.items.map((a) => {
+              {assets.data.items.filter(a => a.space !== 'personal').map((a) => {
                 const id = `${a.id}:v${a.version}`;
                 const matches =
-                  !!revision.proposal.selectedSku &&
-                  a.skuScope.includes(revision.proposal.selectedSku);
+                  (mode === 'real' && a.skuScope.length === 0) ||
+                  (!!revision.proposal.selectedSku && a.skuScope.includes(revision.proposal.selectedSku));
                 return (
                   <label key={id} className={!matches ? 'unavailable' : ''}>
                     <input

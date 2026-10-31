@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.types import Command
 from sqlalchemy import select, text
 
 from .agent import build_graph
@@ -30,6 +31,9 @@ def run_view(run: Run) -> dict:
         value["outputRevision"] = run.output_revision
     if run.error:
         value["error"] = decode(run.error)
+    if decode(run.payload).get("clarification"):
+        value["clarification"] = decode(run.payload)["clarification"]
+    value["completedPhases"] = decode(run.payload).get("completedPhases", [])
     return value
 
 
@@ -85,6 +89,11 @@ def finish_work(item_id: str, generation: int, state: dict):
             return
         previous = next((decode(i.payload) for i in items(db, "revision", case_id=case.id) if i.version == case.current_revision), None)
         rev = build_revision(case, run, state, previous)
+        context = decode(job.payload)
+        rev["sourceRefs"] = context.get("sourceRefs", [])
+        rev["inputManifest"] = {"evidence": context.get("evidence", []), "assets": context.get("assetManifest", []), "sourceRefs": rev["sourceRefs"]}
+        if context.get("acceptedProposal"):
+            rev["proposal"] = context["acceptedProposal"]
         if job.kind == "prepare_quote" and rev.get("quote"):
             if not decode(job.payload).get("selectedSupplierOfferId"):
                 raise ValueError("核价缺少供应商原件")
@@ -146,7 +155,11 @@ def finish_work(item_id: str, generation: int, state: dict):
         run.output_revision = rev["number"]
         run.status = "succeeded"
         run.phase = "committing"
+        data = decode(run.payload)
+        data["completedPhases"] = list(dict.fromkeys([*data.get("completedPhases", []), "committing"]))
+        run.payload = encode(data)
         run.last_seq += 1
+        create_item(db, "run_event", {"runId": run.id, "inquiryId": case.id, "seq": run.last_seq, "type": "run.succeeded", "payload": {"phase": "committing"}, "createdAt": now()}, case_id=case.id, parent_id=run.id)
         job.status = "needs_review" if job.kind in ("prepare_quote", "manage_sample", "confirm_order", "apply_change") else "completed"
         item.status = "done"
         create_item(db, "message", {"id": uid("msg"), "inquiryId": case.id, "role": "assistant", "text": state.get("summary", "已生成草稿和待办"), "runId": run.id, "createdAt": now()}, case_id=case.id)
@@ -177,6 +190,39 @@ def fail_work(item_id: str, generation: int, exc: Exception):
         db.commit()
 
 
+def record_progress(item_id, generation, phase, clarification=None):
+    with SessionLocal() as db:
+        db.execute(text("BEGIN IMMEDIATE"))
+        item = db.get(WorkItem, item_id)
+        run = db.get(Run, item.run_id) if item else None
+        if not item or item.lease_generation != generation or not run or run.status == "cancelled":
+            return False
+        run.phase = phase
+        run.last_seq += 1
+        data = decode(run.payload)
+        if phase != "committing":
+            data["completedPhases"] = list(dict.fromkeys([*data.get("completedPhases", []), phase]))
+        run.payload = encode(data)
+        if clarification:
+            run.status = "needs_input"
+            run.payload = encode({**decode(run.payload), "clarification": clarification})
+            job = db.get(Job, run.job_id)
+            job.status = "needs_input"
+            data = decode(job.payload)
+            data.pop("resume", None)
+            job.payload = encode(data)
+            case = db.get(Case, run.case_id)
+            case.active_run_id = None
+            case.payload = encode({**decode(case.payload), "pendingRunId": run.id})
+            case.metadata_version += 1
+            item.status = "waiting"
+        create_item(db, "run_event", {"runId": run.id, "inquiryId": run.case_id, "seq": run.last_seq,
+                    "type": f"run.{run.status}", "payload": {"phase": phase, "clarification": clarification}, "createdAt": now()},
+                    case_id=run.case_id, parent_id=run.id)
+        db.commit()
+        return True
+
+
 def work_once(graph, owner: str = "worker-local") -> bool:
     claimed = claim_work(owner)
     if not claimed:
@@ -197,16 +243,34 @@ def work_once(graph, owner: str = "worker-local") -> bool:
             run.last_seq += 1
             job.status = "running"
             db.commit()
-            texts = [decode(i.payload).get("text", "") for i in items(db, "evidence", case_id=case.id)]
             payload = decode(job.payload)
-            source_texts = [decode(i.payload).get("text", "") for i in items(db, "evidence", case_id=case.id) if i.id in payload.get("inputRefs", [])]
+            source_texts = [i.get("text", "") for i in payload.get("evidence", [])]
             if job.kind == "apply_change":
                 text_input = "\n".join([run.instruction, *source_texts])[:20000]
             else:
-                text_input = "\n".join([decode(case.payload).get("originalText", ""), run.instruction, *texts])[:20000]
-            offers = [decode(i.payload) for i in items(db, "supplier_offer", case_id=case.id)]
-            state = {"job_id": job.id, "case_id": case.id, "kind": job.kind, "text": text_input, "input_refs": payload.get("inputRefs", []), "costInputs": payload.get("costInputs", {}), "supplierOffers": offers, "selectedSupplierOfferId": payload.get("selectedSupplierOfferId")}
-        output = graph.invoke(state, config={"configurable": {"thread_id": job.id}})
+                text_input = "\n".join([run.instruction, payload.get("originalText", decode(case.payload).get("originalText", "")), *source_texts])[:20000]
+            state = {"job_id": job.id, "case_id": case.id, "kind": job.kind, "text": text_input, "input_refs": payload.get("inputRefs", []), "costInputs": payload.get("costInputs", {}), "supplierOffers": payload.get("supplierOffers", []), "selectedSupplierOfferId": payload.get("selectedSupplierOfferId"), "interactive": payload.get("interactive", False), "source_refs": payload.get("sourceRefs", []), "source_texts": payload.get("sourceTexts", []), "asset_manifest": payload.get("assetManifest", [])}
+            state.update(prior_extracted=payload.get("priorExtracted", {}), instruction=run.instruction)
+        config = {"configurable": {"thread_id": job.id}}
+        snapshot = graph.get_state(config)
+        if not snapshot.values:
+            graph_input = state
+        elif snapshot.next:
+            graph_input = Command(resume=payload["resume"]) if payload.get("resume") else None
+        else:
+            graph_input = None
+        if not snapshot.values or snapshot.next:
+            phases = {"read_context": "retrieving", "understand": "understanding", "clarify": "understanding", "impact": "calculating", "calculate": "calculating", "draft": "composing", "validate": "validating"}
+            for update in graph.stream(graph_input, config=config, stream_mode="updates"):
+                if update.get("__interrupt__"):
+                    record_progress(item_id, generation, "understanding", update["__interrupt__"][0].value)
+                    return True
+                for node in update:
+                    if not record_progress(item_id, generation, phases.get(node, "understanding")):
+                        return True
+        output = graph.get_state(config).values
+        if not record_progress(item_id, generation, "committing"):
+            return True
         finish_work(item_id, generation, output)
     except Exception as exc:
         fail_work(item_id, generation, exc)

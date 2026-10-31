@@ -326,11 +326,6 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
   }, [tabs, pref]);
   const open = useCallback(
     (i: Inquiry) => {
-      if (mode === 'real') {
-        navigate(`/workbench?case=${encodeURIComponent(i.id)}`);
-        setMobile(false);
-        return;
-      }
       setTabs((old) =>
         old.some((t) => t.id === i.id)
           ? old.map((t) => (t.id === i.id ? { id: i.id, title: i.title } : t))
@@ -485,7 +480,7 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
                 <button
                   className="recent-item"
                   onClick={() => {
-                    navigate(mode === 'real' ? `/workbench?case=${encodeURIComponent(t.id)}` : `/inquiries/${encodeURIComponent(t.id)}`);
+                    navigate(`/inquiries/${encodeURIComponent(t.id)}`);
                     setMobile(false);
                   }}
                 >
@@ -591,7 +586,7 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
           {!id && !isTrade && page !== 'home' && (
             <Suspense fallback={<Loading label="正在打开资源" />}>
               {page === 'capabilities' ? (
-                <SkillMarket />
+                <SkillMarket session={session} />
               ) : (
                 <Resources key={page} page={page} session={session} />
               )}

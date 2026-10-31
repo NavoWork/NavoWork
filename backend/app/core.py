@@ -139,9 +139,9 @@ def idem_store(db: Session, marker, response: dict):
         db.add(Idempotency(key=marker[0], body_hash=marker[1], response=encode(response)))
 
 
-def store_blob(db: Session, data: bytes, filename: str, media_type: str, case_id: str | None = None) -> Blob:
-    if len(data) > 20 * 1024 * 1024:
-        fail("FILE_TOO_LARGE", "文件超过 20 MB", 413)
+def store_blob(db: Session, data: bytes, filename: str, media_type: str, case_id: str | None = None, *, max_mb: int = 20) -> Blob:
+    if len(data) > max_mb * 1024 * 1024:
+        fail("FILE_TOO_LARGE", f"文件超过 {max_mb} MB", 413)
     blob_id = uid("blob")
     target = STORAGE_ROOT / blob_id
     tmp = STORAGE_ROOT / (blob_id + ".tmp")

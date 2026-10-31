@@ -2,6 +2,10 @@
 
 统一来源是任务包配套 V1.0 契约；`src/api/types.ts` 为前端当前消费的类型。部分文档未明确的响应包采用以下暂定约定，需要 B/C/D 联调评审，不能把它们当作已发布 OpenAPI。
 
+## 新版 real 模式契约
+
+新版首页统一进入 `/inquiries/:id`。画板、Wiki、个人/公司资产、收藏、技能目录与 LangGraph 澄清恢复已经接通真实后端，完整端点和校验规则见 [适配说明 v1.1](../../doc/Frontend_Backend_Adaptation_v1.1.md)。待回答任务通过 `Inquiry.pendingRunId` 恢复；Run 可返回 `clarification` 和 `completedPhases`。补充回答继续同一 Run，画板 editVersion 与业务 Revision 各自独立。旧工作台保留为原件、核价和业务审批入口。
+
 ## 传输约定
 
 - `api.get/post/put/patch/delete/request` 使用相对路径，如 `/me`、`/workspaces/ws_1/inquiries`。

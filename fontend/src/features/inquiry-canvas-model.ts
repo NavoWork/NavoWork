@@ -30,6 +30,8 @@ export interface WorkspaceDocument {
   revision?: Revision;
 }
 export interface WorkspaceFile {
+  serverFileId?: string;
+  caseId?: string;
   id: string;
   name: string;
   title: string;

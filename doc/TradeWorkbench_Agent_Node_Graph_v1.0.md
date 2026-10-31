@@ -1,5 +1,7 @@
 # NavoWork Agent 节点图 v1.0
 
+> 最新运行链路见 [适配说明 v1.1](Frontend_Backend_Adaptation_v1.1.md#3-实际-agent-链路)：已实现持久化 interrupt/resume，对话补充恢复同一 Run；本文的完整 SOP 能力图仍为目标设计。
+
 日期：2026-10-31  
 状态：设计图，尚未实现  
 依据：用户提供的《B2B 包袋出口外贸流程（业务 SOP）》与[后端详细设计](./TradeWorkbench_Backend_Design_v1.0.md#127-b2b-包袋出口-sop-顶层编排最新目标)

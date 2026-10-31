@@ -6,6 +6,7 @@ from decimal import Decimal, ROUND_CEILING
 from typing import TypedDict
 
 from langgraph.graph import END, START, StateGraph
+from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
 
@@ -34,6 +35,12 @@ class AgentState(TypedDict, total=False):
     artifacts: list[dict]
     risks: list[dict]
     summary: str
+    interactive: bool
+    source_refs: list[dict]
+    asset_manifest: list[dict]
+    source_texts: list[dict]
+    prior_extracted: dict
+    instruction: str
 
 
 NODE_FIELDS = {
@@ -72,6 +79,8 @@ def price_quote(cost: dict) -> dict | None:
         local = Decimal(str(cost.get("local", 0)))
         fx = Decimal(str(cost["exchangeRate"]))
         margin = Decimal(str(cost["margin"])) / 100
+        if not re.fullmatch(r"[1-9]\d{0,8}", str(cost["quantity"])):
+            return None
         quantity = int(cost["quantity"])
         if min(base, packaging, local) < 0 or fx <= 0 or not 0 <= margin < 1 or quantity < 1:
             return None
@@ -83,7 +92,7 @@ def price_quote(cost: dict) -> dict | None:
 
 
 def extract_without_model(text: str) -> Extracted:
-    quantity_match = re.search(r"(?:\b|^)(\d[\d,]{0,9})\s*(?:custom\s*)?(?:backpacks?|bags?|pieces?|pcs|件|个)", text, re.I)
+    quantity_match = re.search(r"(?<!\d)(\d[\d,]{0,9})\s*(?:custom\s*)?(?:backpacks?|bags?|pieces?|pcs|件|个)", text, re.I)
     if not quantity_match:
         quantity_match = re.search(r"(?:数量|quantity)\s*[:：]?\s*(\d[\d,]*)", text, re.I)
     quantity = int(quantity_match.group(1).replace(",", "")) if quantity_match else None
@@ -112,6 +121,13 @@ def read_node(state: AgentState):
 def understand_node(state: AgentState):
     text = state.get("text", "")
     result = extract_with_model(text) or extract_without_model(text)
+    if state.get("prior_extracted"):
+        update_text = state.get("instruction", "")
+        changes = extract_with_model(update_text) or extract_without_model(update_text)
+        merged = {**result.model_dump(), **state["prior_extracted"]}
+        merged.update({k: v for k, v in changes.model_dump().items() if v is not None and k != "missing_fields"})
+        merged["missing_fields"] = [f for f in result.missing_fields if not merged.get(f)]
+        result = Extracted.model_validate(merged)
     return {"extracted": result.model_dump(), "summary": f"已提取 {result.product or '待确认产品'} 的候选需求；未知字段保留为空。"}
 
 
@@ -121,11 +137,11 @@ def impact_node(state: AgentState):
     text = state.get("text", "").lower()
     fields = [field for field, words in KEYWORDS.items() if any(word.lower() in text for word in words)]
     if not fields:
-        fields = ["unclassified"]
+        return {"impacts": [{"field": "unclassified", "nodeKey": "manual_triage", "impactType": "direct", "reason": ["未能可靠定位变更字段，请人工选择受影响节点"], "requiredAction": "edit_or_review", "status": "potentially_impacted"}]}
     impacts = []
     for field in fields:
         for position, node in enumerate(NODE_FIELDS.get(field, [])):
-            impacts.append({"field": field, "nodeKey": node, "impactType": "direct" if position == 0 else "downstream", "reason": f"变更涉及 {field}，节点消费该字段或其下游成果", "requiredAction": "edit_or_review", "status": "potentially_impacted"})
+            impacts.append({"field": field, "nodeKey": node, "impactType": "direct" if position == 0 else "downstream", "reason": [f"变更涉及 {field}，节点消费该字段或其下游成果"], "requiredAction": "edit_or_review", "status": "potentially_impacted"})
     return {"impacts": impacts}
 
 
@@ -134,12 +150,28 @@ def calculate_node(state: AgentState):
     return {"quote": price_quote(inputs) if inputs else None}
 
 
+def clarify_node(state: AgentState):
+    if not state.get("interactive"):
+        return {}
+    updates = {}
+    if state.get("kind") == "prepare_quote" and (not state.get("selectedSupplierOfferId") or not price_quote(state.get("costInputs", {}))):
+        answer = interrupt({"questions": [{"id": "cost_parameters", "question": "请在业务资料工作台录入供应商原件与报价，再选择供应商报价并填写汇率、毛利率和数量。"}]})
+        updates.update({k: answer[k] for k in ("costInputs", "selectedSupplierOfferId", "supplierOffers")})
+    elif not state.get("extracted", {}).get("product"):
+        answer = interrupt({"questions": [{"id": "requirements", "question": "请补充具体的包袋产品类型和已知规格、数量；未确定的条件可注明待确认。"}]})
+        text_input = answer["text"] + "\n" + state.get("text", "")
+        extracted = extract_with_model(text_input) or extract_without_model(text_input)
+        updates.update(text=text_input, extracted=extracted.model_dump(), summary="已结合补充信息更新需求；未确定字段仍标记待确认。")
+    return updates
+
+
 def draft_node(state: AgentState):
     kind = state.get("kind", "qualify_inquiry")
     facts = state.get("extracted", {})
     artifacts = []
     if kind in ("qualify_inquiry", "confirm_requirements", "prepare_quote", "analyze", "revise"):
         artifacts.append({"kind": "spec", "title": "需求与规格表", "content": {"product": facts.get("product"), "quantity": facts.get("quantity"), "destination": facts.get("destination"), "requestedArrival": facts.get("requested_arrival"), "customization": facts.get("customization"), "material": None, "dimensions": None, "packaging": None, "inspectionStandard": None, "missingFields": facts.get("missing_fields", [])}})
+        artifacts[-1]["content"]["referenceExcerpts"] = state.get("source_texts", [])
     if kind == "prepare_quote":
         artifacts.append({"kind": "rfq", "title": "供应商询价单", "content": {"product": facts.get("product"), "quantity": facts.get("quantity"), "requiredSpecVersion": state.get("input_refs", []), "requestMaterial": True, "requestPackaging": True, "requestLeadTime": True, "status": "draft"}})
         offers = state.get("supplierOffers", [])
@@ -158,6 +190,10 @@ def draft_node(state: AgentState):
 
 def validate_node(state: AgentState):
     risks = []
+    if any(s.get("status") == "draft" for s in state.get("source_texts", [])):
+        risks.append({"code": "DRAFT_REFERENCE", "message": "本次引用包含未发布的知识草稿，使用前需人工核验。", "severity": "warning"})
+    if state.get("asset_manifest"):
+        risks.append({"code": "ATTACHMENT_REFERENCE", "message": "素材已固定原文件版本；本轮未自动识别文件内容，不能据此推断成本或客户批准。", "severity": "info"})
     if state.get("kind") == "prepare_quote" and not state.get("quote"):
         risks.append({"code": "COST_INPUT_MISSING", "message": "缺少可核验的成本输入，仅能生成报价草稿。", "severity": "warning"})
     if state.get("kind") == "confirm_order":
@@ -171,13 +207,15 @@ def build_graph(checkpointer):
     graph = StateGraph(AgentState)
     graph.add_node("read_context", read_node)
     graph.add_node("understand", understand_node)
+    graph.add_node("clarify", clarify_node)
     graph.add_node("impact", impact_node)
     graph.add_node("calculate", calculate_node)
     graph.add_node("draft", draft_node)
     graph.add_node("validate", validate_node)
     graph.add_edge(START, "read_context")
     graph.add_edge("read_context", "understand")
-    graph.add_conditional_edges("understand", lambda state: "impact" if state.get("kind") == "apply_change" else "calculate" if state.get("kind") == "prepare_quote" else "draft", {"impact": "impact", "calculate": "calculate", "draft": "draft"})
+    graph.add_edge("understand", "clarify")
+    graph.add_conditional_edges("clarify", lambda state: "impact" if state.get("kind") == "apply_change" else "calculate" if state.get("kind") == "prepare_quote" else "draft", {"impact": "impact", "calculate": "calculate", "draft": "draft"})
     graph.add_edge("impact", "draft")
     graph.add_edge("calculate", "draft")
     graph.add_edge("draft", "validate")

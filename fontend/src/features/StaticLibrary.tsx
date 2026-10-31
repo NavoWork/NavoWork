@@ -25,8 +25,9 @@ import {
   UserRound,
   X,
 } from 'lucide-react';
-import { EmptyState, Modal } from '../components/ui';
-import type { Session } from '../api';
+import { EmptyState, ErrorNotice, Loading, Modal } from '../components/ui';
+import { api, mode, type Session } from '../api';
+import { useLibraryCollection } from './library-api';
 import {
   assetKinds,
   libraryAssets,
@@ -328,19 +329,22 @@ function WikiCreate({
 }: {
   folder: string;
   onClose: () => void;
-  onCreate: (doc: WikiDocument) => void;
+  onCreate: (doc: WikiDocument) => void | Promise<void>;
 }) {
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState(wikiFolders.includes(folder) ? folder : wikiFolders[0]);
   const [content, setContent] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>();
   return (
     <Modal title="新建文档" onClose={onClose} wide>
       <form
         className="form-stack"
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
-          if (!title.trim() || !content.trim()) return;
-          onCreate({
+          if (busy || !title.trim() || !content.trim()) return;
+          setBusy(true); setError(undefined);
+          try { await onCreate({
             id: crypto.randomUUID(),
             title: title.trim().replace(/\.md$/i, ''),
             folder: category,
@@ -351,7 +355,7 @@ function WikiCreate({
               .slice(0, 72),
             updated: new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' }),
             starred: false,
-          });
+          }); } catch (e) { setError(e); } finally { setBusy(false); }
         }}
       >
         <div className="library-form-row">
@@ -386,23 +390,25 @@ function WikiCreate({
           />
         </label>
         <div className="library-dialog-footer">
-          <span>仅在当前页面演示，离开后恢复示例内容</span>
+          <span>{mode === 'real' ? '保存到团队知识库，引用时固定资料版本' : '仅在当前页面演示，离开后恢复示例内容'}</span>
           <div className="library-actions">
             <button type="button" className="button button-ghost" onClick={onClose}>
               取消
             </button>
-            <button className="button button-primary" disabled={!title.trim() || !content.trim()}>
-              创建文档
+            <button className="button button-primary" disabled={busy || !title.trim() || !content.trim()}>
+              {busy ? '保存中…' : '创建文档'}
             </button>
           </div>
         </div>
+        <ErrorNotice error={error} />
       </form>
     </Modal>
   );
 }
 
-function WikiLibrary() {
-  const [docs, setDocs] = useState(wikiDocuments);
+function WikiLibrary({ session }: { session: Session }) {
+  const { values: docs, setValues: setDocs, query: remote, path } = useLibraryCollection(session, 'documents', wikiDocuments);
+  const [error, setError] = useState<unknown>();
   const [folder, setFolder] = useState('all');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<SortOrder>('updated');
@@ -444,6 +450,8 @@ function WikiLibrary() {
         </div>
       </header>
       {notice && <Notice text={notice} onClose={() => setNotice('')} />}
+      <ErrorNotice error={error || remote.error} onRetry={() => { setError(undefined); void remote.refetch(); }} />
+      {mode === 'real' && remote.isLoading && <Loading label="正在读取知识库" />}
       <div className="wiki-layout">
         <aside className="wiki-sidebar" aria-label="知识目录">
           <button className={folder === 'all' ? 'is-active' : ''} onClick={() => setFolder('all')}>
@@ -509,13 +517,12 @@ function WikiLibrary() {
               <Favorite
                 active={doc.starred}
                 title={doc.title}
-                onClick={() =>
-                  setDocs((current) =>
-                    current.map((item) =>
-                      item.id === doc.id ? { ...item, starred: !item.starred } : item,
-                    ),
-                  )
-                }
+                onClick={() => { void (async () => {
+                  try {
+                    const result = mode === 'real' ? await api.put<{ starred: boolean }>(`${path}/${doc.id}/favorite`, { starred: !doc.starred }) : { starred: !doc.starred };
+                    setDocs(current => current.map(item => item.id === doc.id ? { ...item, ...result } : item));
+                  } catch (e) { setError(e); }
+                })(); }}
               />
             </div>
           ))}
@@ -542,12 +549,13 @@ function WikiLibrary() {
         <WikiCreate
           folder={folder}
           onClose={() => setCreating(false)}
-          onCreate={(doc) => {
-            setDocs((current) => [doc, ...current]);
+          onCreate={async (doc) => {
+            const saved = mode === 'real' ? await api.post<WikiDocument>(path, doc) : doc;
+            setDocs((current) => [saved, ...current]);
             setCreating(false);
             setFolder(doc.folder);
             setQuery('');
-            setNotice('文档已添加到当前演示');
+            setNotice(mode === 'real' ? '文档已保存到知识库' : '文档已添加到当前演示');
           }}
         />
       )}
@@ -570,11 +578,16 @@ function WikiLibrary() {
               updated: new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' }),
               starred: false,
             }));
-            setDocs((current) => [...added, ...current]);
+            if (mode === 'real') {
+              for (const doc of added) {
+                const saved = await api.post<WikiDocument>(path, doc);
+                setDocs(current => [saved, ...current]);
+              }
+            } else setDocs((current) => [...added, ...current]);
             setFolder(added[0].folder);
             setQuery('');
             setImporting(false);
-            setNotice(`已导入 ${added.length} 篇文档到当前演示`);
+            setNotice(`已导入 ${added.length} 篇文档${mode === 'real' ? '到知识库' : '到当前演示'}`);
           }}
         />
       )}
@@ -723,7 +736,7 @@ function ImportDialog({
         </p>
       )}
       <div className="library-dialog-footer">
-        <span>仅在当前页面演示，离开后恢复示例内容</span>
+        <span>{mode === 'real' ? '上传后保存到服务端；多文件按顺序上传' : '仅在当前页面演示，离开后恢复示例内容'}</span>
         <button
           className="button button-primary"
           disabled={!files.length || busy}
@@ -733,8 +746,8 @@ function ImportDialog({
             setBusy(true);
             try {
               await onImport(files);
-            } catch {
-              setError('文件读取失败，请重试。');
+            } catch (e) {
+              setError(e instanceof Error ? e.message : '文件读取或上传失败，请重试。');
             } finally {
               lock.current = false;
               setBusy(false);
@@ -755,7 +768,7 @@ function AssetArtwork({ asset, large = false }: { asset: LibraryAsset; large?: b
         <img src={asset.url} alt={asset.name} />
       </div>
     );
-  if (asset.url) {
+  if (asset.url || asset.downloadPath) {
     const Icon = typeIcons[asset.kind];
     return (
       <div className={`library-art art-${asset.kind}`}>
@@ -877,6 +890,22 @@ function AssetArtwork({ asset, large = false }: { asset: LibraryAsset; large?: b
 }
 
 function AssetPreview({ asset, onClose }: { asset: LibraryAsset; onClose: () => void }) {
+  const [remote, setRemote] = useState<LibraryAsset>();
+  const [error, setError] = useState<unknown>();
+  useEffect(() => {
+    if (!asset.downloadPath) return;
+    let live = true; let url = '';
+    setRemote(undefined); setError(undefined);
+    api.download(asset.downloadPath).then(blob => {
+      if (!live) return;
+      url = URL.createObjectURL(blob);
+      setRemote({ ...asset, downloadPath: undefined, url, file: new window.File([blob], asset.name, { type: asset.mime }) });
+    }).catch(e => { if (live) setError(e); });
+    return () => { live = false; if (url) URL.revokeObjectURL(url); };
+  }, [asset.id, asset.downloadPath]);
+  if (asset.downloadPath) return remote ? <AssetPreview asset={remote} onClose={onClose} /> : <Modal title={asset.name} onClose={onClose}>
+    {error ? <ErrorNotice error={error} /> : <Loading label="正在读取原文件" />}
+  </Modal>;
   const kindLabel = assetKinds.find((item) => item.id === asset.kind)?.label;
   const pdf = asset.mime === 'application/pdf';
   const canPreview =
@@ -947,8 +976,9 @@ function detectKind(file: File): AssetKind {
   return 'other';
 }
 
-function AssetLibrary() {
-  const [assets, setAssets] = useState(libraryAssets);
+function AssetLibrary({ session }: { session: Session }) {
+  const { values: assets, setValues: setAssets, query: remote, path } = useLibraryCollection(session, 'assets', libraryAssets);
+  const [error, setError] = useState<unknown>();
   const [space, setSpace] = useState<AssetSpace>('personal');
   const [folder, setFolder] = useState('all');
   const [foldersOpen, setFoldersOpen] = useState(false);
@@ -988,12 +1018,17 @@ function AssetLibrary() {
     setFavorites(false);
     setQuery('');
   };
-  const toggleStar = (id: string) =>
-    setAssets((current) =>
-      current.map((asset) => (asset.id === id ? { ...asset, starred: !asset.starred } : asset)),
-    );
+  const toggleStar = async (id: string) => {
+    const asset = assets.find(a => a.id === id); if (!asset) return;
+    try {
+      const result = mode === 'real' ? await api.put<{ starred: boolean }>(`${path}/${id}/favorite`, { starred: !asset.starred }) : { starred: !asset.starred };
+      setAssets(current => current.map(a => a.id === id ? { ...a, ...result } : a));
+    } catch (e) { setError(e); }
+  };
   return (
     <div className="feature-page library-page asset-library">
+      <ErrorNotice error={error || remote.error} onRetry={() => { setError(undefined); void remote.refetch(); }} />
+      {mode === 'real' && remote.isLoading && <Loading label="正在读取资产库" />}
       <header className="library-heading">
         <div>
           <h1>资产库</h1>
@@ -1199,6 +1234,17 @@ function AssetLibrary() {
           destination={`${spaceLabels[space]} / ${folder === 'all' ? '未分类' : folder}`}
           onClose={() => setUploading(false)}
           onImport={async (files) => {
+            if (mode === 'real') {
+              for (const file of files) {
+                const form = new FormData(); form.set('file', file); form.set('space', space);
+                form.set('folder', folder === 'all' ? '未分类' : folder);
+                const saved = await api.post<LibraryAsset>(path, form);
+                setAssets(current => [saved, ...current]);
+              }
+              setKind('all'); setFavorites(false); setQuery(''); setUploading(false);
+              setNotice(`已保存 ${files.length} 个文件到${spaceLabels[space]}`);
+              return;
+            }
             const added = files.map((file): LibraryAsset => {
               const url = URL.createObjectURL(file);
               urls.current.push(url);
@@ -1233,6 +1279,6 @@ function AssetLibrary() {
   );
 }
 
-export function StaticLibrary({ page }: { page: 'knowledge' | 'assets'; session: Session }) {
-  return page === 'knowledge' ? <WikiLibrary /> : <AssetLibrary />;
+export function StaticLibrary({ page, session }: { page: 'knowledge' | 'assets'; session: Session }) {
+  return page === 'knowledge' ? <WikiLibrary key={session.user.id} session={session} /> : <AssetLibrary key={session.user.id} session={session} />;
 }

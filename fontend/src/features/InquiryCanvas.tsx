@@ -39,9 +39,10 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import { api } from '../api';
+import { api, mode } from '../api';
 import type { Asset, Inquiry, MaterialBundle, Message, Revision, Source } from '../api/types';
-import { ErrorNotice, Modal } from '../components/ui';
+import { ErrorNotice, Loading, Modal } from '../components/ui';
+import { CanvasPersistence } from './canvas-persistence';
 import { ResizeHandle } from '../components/ResizeHandle';
 import { FilePreview, OriginalDocument, WorkingDocument } from './InquiryDocument';
 import {
@@ -131,7 +132,7 @@ function PreviewCard({ data, selected }: NodeProps<PreviewNode>) {
         </p>
       )}
       <footer>
-        <span>{data.modified ? '本机工作草稿' : doc.caption}</span>
+        <span>{data.modified ? (mode === 'real' ? '工作草稿' : '本机工作草稿') : doc.caption}</span>
         <span>双击打开</span>
       </footer>
       <Handle type="source" position={Position.Right} isConnectable={false} />
@@ -146,6 +147,8 @@ const edgeOptions = {
   deletable: false,
 };
 interface Props {
+  serverState?: CanvasState;
+  persist?: (state: CanvasState) => void;
   inquiry: Inquiry;
   revision?: Revision;
   revisions: Revision[];
@@ -168,11 +171,61 @@ interface Props {
 export function InquiryCanvas(props: Props) {
   return (
     <ReactFlowProvider>
-      <CanvasWorkspace key={props.scope} {...props} />
+      {mode === 'real' ? <ServerCanvas key={props.scope} {...props} /> : <CanvasWorkspace key={props.scope} {...props} />}
     </ReactFlowProvider>
   );
 }
+function ServerCanvas(props: Props) {
+  const [writer] = useState(() => new CanvasPersistence(`${props.path}/canvas`));
+  const [loaded, setLoaded] = useState<CanvasState>();
+  const [error, setError] = useState<unknown>();
+  const [status, setStatus] = useState('');
+  const [retry, setRetry] = useState(0);
+  const savedCallback = useRef(props.onSavedResultsChange);
+  savedCallback.current = props.onSavedResultsChange;
+  useEffect(() => {
+    let live = true;
+    writer.onStatus = (value) => { if (live) setStatus(value); };
+    writer.onSaved = (state) => { if (live) savedCallback.current((state.results || []).map(r => r.revision)); };
+    setError(undefined);
+    api.get<{ editVersion: number; state: CanvasState | null }>(writer.path).then(result => {
+      if (!live) return;
+      const state = result.state || { ...initialCanvas(), initialRevision: props.inquiry.currentRevision };
+      writer.initialize(result.editVersion, state);
+      setLoaded(state);
+      writer.onSaved(state);
+      setStatus('已与服务端同步');
+    }).catch(e => { if (live) setError(e); });
+    const leaving = (event: BeforeUnloadEvent) => {
+      if (writer.pending || writer.saving) { event.preventDefault(); event.returnValue = ''; }
+    };
+    window.addEventListener('beforeunload', leaving);
+    return () => {
+      live = false;
+      window.removeEventListener('beforeunload', leaving);
+      void writer.flush();
+    };
+  }, [writer, retry]);
+  if (error) return <ErrorNotice error={error} onRetry={() => setRetry(v => v + 1)} />;
+  if (!loaded) return <Loading label="正在恢复服务端画板" />;
+  return <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, minWidth: 0 }}>
+    <div role="status" style={{ padding: '4px 12px', fontSize: 12 }}>
+      {status}
+      {writer.error != null && <>
+        <button className="button button-ghost" onClick={() => writer.retry()}>重试保存</button>
+        <button className="button button-ghost" onClick={() => {
+          const url = URL.createObjectURL(new Blob([JSON.stringify(writer.pending, null, 2)], { type: 'application/json' }));
+          const link = document.createElement('a'); link.href = url; link.download = 'canvas-recovery.json'; link.click();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }}>下载当前草稿</button>
+      </>}
+    </div>
+    <CanvasWorkspace {...props} serverState={loaded} persist={state => writer.enqueue(state)} />
+  </div>;
+}
 function CanvasWorkspace({
+  serverState,
+  persist,
   inquiry,
   revision,
   revisions,
@@ -194,7 +247,7 @@ function CanvasWorkspace({
 }: Props) {
   const [initial] = useState(() => {
     try {
-      const saved = readCanvas(scope);
+      const saved = serverState || readCanvas(scope);
       return {
         state: { ...saved, initialRevision: saved.initialRevision ?? inquiry.currentRevision },
         error: '',
@@ -224,6 +277,7 @@ function CanvasWorkspace({
   const measurements = useRef<Record<string, { width: number; height: number }>>({});
   const flow = useReactFlow<PreviewNode>();
   useEffect(() => {
+    if (mode === 'real') return;
     onSavedResultsChange((state.results || []).map((result) => result.revision));
   }, [state.results, onSavedResultsChange]);
   const sourceRefs = revision?.sourceRefs ?? [];
@@ -249,6 +303,7 @@ function CanvasWorkspace({
       api.get<{ items: MaterialBundle[] }>(`${path}/material-bundles`, signal),
   });
   useEffect(() => {
+    if (persist) { persist(state); return; }
     if (initial.error) return;
     try {
       localStorage.setItem(canvasKey(scope), JSON.stringify(state));
@@ -310,14 +365,14 @@ function CanvasWorkspace({
     });
   });
   docs.push(
-    ...state.notes.map((n) => ({ ...n, kind: 'note' as const, caption: '本机笔记' })),
+    ...state.notes.map((n) => ({ ...n, kind: 'note' as const, caption: mode === 'real' ? '工作笔记' : '本机笔记' })),
     ...state.files.map((file) => ({
       id: file.id,
       title: file.title,
       kind: 'file' as const,
       folder: file.folder,
       text: '',
-      caption: '本机附件',
+      caption: mode === 'real' ? '询盘附件' : '本机附件',
       file,
     })),
   );
@@ -400,8 +455,14 @@ function CanvasWorkspace({
           size: file.size,
           folder: 'materials',
         };
-        await saveCanvasFile(scope, entry.id, file);
-        setState((s) => ({ ...s, files: [...s.files, entry] }));
+        if (mode === 'real') {
+          const form = new FormData(); form.set('file', file);
+          const uploaded = await api.post<WorkspaceFile>(`${path}/canvas/files`, form);
+          setState((s) => ({ ...s, files: [...s.files, uploaded] }));
+        } else {
+          await saveCanvasFile(scope, entry.id, file);
+          setState((s) => ({ ...s, files: [...s.files, entry] }));
+        }
       }
       setState((s) => ({ ...s, active: 'canvas' }));
     } catch (e) {
@@ -483,7 +544,7 @@ function CanvasWorkspace({
           : [...(state.results || []), result],
         positions: { ...state.positions, [id]: position },
       };
-      localStorage.setItem(canvasKey(scope), JSON.stringify(next));
+      if (mode === 'mock') localStorage.setItem(canvasKey(scope), JSON.stringify(next));
       setState(next);
       setSelected(id);
       setError(undefined);
@@ -918,7 +979,7 @@ function CanvasWorkspace({
                       />
                       <div className="ic-document-status">
                         <Check size={13} />
-                        {storageError ? '本机保存不可用' : '本机笔记 · 自动保存'}
+                        {storageError ? '本机保存不可用' : mode === 'real' ? '工作笔记 · 自动保存' : '本机笔记 · 自动保存'}
                       </div>
                       <label className="ic-folder-select">
                         所在文件夹
@@ -970,7 +1031,7 @@ function CanvasWorkspace({
                       <h2>{doc.title}</h2>
                       <p className="ic-document-subtitle">
                         {doc.file.name} · {Math.ceil(doc.file.size / 1024)} KB ·{' '}
-                        {doc.file.assetId ? `引用 V${doc.file.version}` : '本机附件'}
+                        {doc.file.assetId ? `引用 V${doc.file.version}` : mode === 'real' ? '询盘附件' : '本机附件'}
                       </p>
                       <label className="ic-file-alias">
                         显示名称

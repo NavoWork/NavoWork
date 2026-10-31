@@ -18,6 +18,7 @@ export interface Inquiry {
   metadataVersion: number;
   currentRevision: number;
   activeRunId: string | null;
+  pendingRunId?: string;
   updatedAt: string;
   nextAction: string;
 }
@@ -101,6 +102,7 @@ export interface Revision {
   changeSummary: string[];
 }
 export interface Run {
+  completedPhases?: string[];
   id: string;
   runId: string;
   inquiryId: string;
@@ -137,6 +139,7 @@ export interface Source {
   locator?: string;
 }
 export interface Asset {
+  space?: 'company' | 'personal';
   id: string;
   title: string;
   name: string;
