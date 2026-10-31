@@ -1,0 +1,23 @@
+From: Navo Demo Finance Reviewer <finance@navo-demo.invalid>
+To: Navo Demo Trading <sales@navo-demo.invalid>
+Subject: WB-26 costing assumptions checked
+Date: Sat, 31 Oct 2026 11:00:00 +0800
+Message-ID: <core15-finance-1100@demo.invalid>
+X-Demo-Data: SIMULATED
+X-Demo-Snapshot: core15_closeout_2026-10-31
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+MIME-Version: 1.0
+
+I checked the demo costing basis for 3,000 WB-26 pieces: manufacturing CNY 44=
+.00 per piece, custom color box CNY 5.00 per piece, and estimated local alloc=
+ation CNY 4.00 per piece, totaling CNY 53.00 per piece. Use the demo exchange=
+ rate CNY 7.20 per USD and target gross margin 20%. Round the unit selling pr=
+ice upward to USD 0.01 before multiplying by quantity.
+
+The CNY 4.00 local allocation is a simulated estimate. This check does not re=
+present a bank rate, a payment received, or a universal FOB cost model.
+
+SIMULATED INTERNAL REVIEW; no real finance signature.
+
+SIMULATED EVIDENCE: all events and approvals are fictional.

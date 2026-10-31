@@ -1,0 +1,30 @@
+[
+  {
+    "inputCell": "B16",
+    "inputValue": 2,
+    "outputCell": "B6",
+    "expected": 8.69,
+    "actual": 8.69
+  },
+  {
+    "inputCell": "B16",
+    "inputValue": null,
+    "outputCell": "B6",
+    "expected": "INPUT REQUIRED",
+    "actual": "INPUT REQUIRED"
+  },
+  {
+    "inputCell": "B23",
+    "inputValue": 0,
+    "outputCell": "B6",
+    "expected": "INPUT REQUIRED",
+    "actual": "INPUT REQUIRED"
+  },
+  {
+    "inputCell": "B24",
+    "inputValue": 1,
+    "outputCell": "B6",
+    "expected": "INPUT REQUIRED",
+    "actual": "INPUT REQUIRED"
+  }
+]
