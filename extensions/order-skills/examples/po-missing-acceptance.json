@@ -1,0 +1,373 @@
+{
+  "case_id": "BAG-2026-DE-001",
+  "po": {
+    "buyer": {
+      "value": "Weber Outdoor",
+      "raw": "Weber Outdoor",
+      "evidence": {
+        "case_id": "BAG-2026-DE-001",
+        "source_id": "synthetic-po",
+        "locator": "page:1;field:buyer",
+        "quote": "Weber Outdoor",
+        "role": "customer_po"
+      }
+    },
+    "seller": {
+      "value": "Navo Demo",
+      "raw": "Navo Demo",
+      "evidence": {
+        "case_id": "BAG-2026-DE-001",
+        "source_id": "synthetic-po",
+        "locator": "page:1;field:seller",
+        "quote": "Navo Demo",
+        "role": "customer_po"
+      }
+    },
+    "total_quantity": {
+      "value": "3000",
+      "raw": "3000",
+      "evidence": {
+        "case_id": "BAG-2026-DE-001",
+        "source_id": "synthetic-po",
+        "locator": "page:1;field:total_quantity",
+        "quote": "3000",
+        "role": "customer_po"
+      }
+    },
+    "total_amount": {
+      "value": "27630.00",
+      "raw": "27630.00",
+      "evidence": {
+        "case_id": "BAG-2026-DE-001",
+        "source_id": "synthetic-po",
+        "locator": "page:1;field:total_amount",
+        "quote": "27630.00",
+        "role": "customer_po"
+      }
+    },
+    "currency": {
+      "value": "USD",
+      "raw": "USD",
+      "evidence": {
+        "case_id": "BAG-2026-DE-001",
+        "source_id": "synthetic-po",
+        "locator": "page:1;field:currency",
+        "quote": "USD",
+        "role": "customer_po"
+      }
+    },
+    "incoterm": {
+      "value": "FOB",
+      "raw": "FOB",
+      "evidence": {
+        "case_id": "BAG-2026-DE-001",
+        "source_id": "synthetic-po",
+        "locator": "page:1;field:incoterm",
+        "quote": "FOB",
+        "role": "customer_po"
+      }
+    },
+    "named_place": {
+      "value": "Ningbo",
+      "raw": "Ningbo",
+      "evidence": {
+        "case_id": "BAG-2026-DE-001",
+        "source_id": "synthetic-po",
+        "locator": "page:1;field:named_place",
+        "quote": "Ningbo",
+        "role": "customer_po"
+      }
+    },
+    "incoterms_edition": {
+      "value": "2020",
+      "raw": "2020",
+      "evidence": {
+        "case_id": "BAG-2026-DE-001",
+        "source_id": "synthetic-po",
+        "locator": "page:1;field:incoterms_edition",
+        "quote": "2020",
+        "role": "customer_po"
+      }
+    },
+    "payment_terms": {
+      "value": "30% deposit, 70% against copy of shipping documents",
+      "raw": "30% deposit, 70% against copy of shipping documents",
+      "evidence": {
+        "case_id": "BAG-2026-DE-001",
+        "source_id": "synthetic-po",
+        "locator": "page:1;field:payment_terms",
+        "quote": "30% deposit, 70% against copy of shipping documents",
+        "role": "customer_po"
+      }
+    },
+    "spec_version_id": {
+      "value": "spec-v3",
+      "raw": "spec-v3",
+      "evidence": {
+        "case_id": "BAG-2026-DE-001",
+        "source_id": "synthetic-po",
+        "locator": "page:1;field:spec_version_id",
+        "quote": "spec-v3",
+        "role": "customer_po"
+      }
+    },
+    "delivery_terms": {
+      "value": "Arrival requested; no guarantee",
+      "raw": "Arrival requested; no guarantee",
+      "evidence": {
+        "case_id": "BAG-2026-DE-001",
+        "source_id": "synthetic-po",
+        "locator": "page:1;field:delivery_terms",
+        "quote": "Arrival requested; no guarantee",
+        "role": "customer_po"
+      }
+    },
+    "lines": [
+      {
+        "line_id": "1",
+        "sku": {
+          "value": "WB-26/navy",
+          "raw": "WB-26/navy",
+          "evidence": {
+            "case_id": "BAG-2026-DE-001",
+            "source_id": "synthetic-po",
+            "locator": "page:1;field:sku",
+            "quote": "WB-26/navy",
+            "role": "customer_po"
+          }
+        },
+        "quantity": {
+          "value": "3000",
+          "raw": "3000",
+          "evidence": {
+            "case_id": "BAG-2026-DE-001",
+            "source_id": "synthetic-po",
+            "locator": "page:1;field:quantity",
+            "quote": "3000",
+            "role": "customer_po"
+          }
+        },
+        "unit": {
+          "value": "piece",
+          "raw": "piece",
+          "evidence": {
+            "case_id": "BAG-2026-DE-001",
+            "source_id": "synthetic-po",
+            "locator": "page:1;field:unit",
+            "quote": "piece",
+            "role": "customer_po"
+          }
+        },
+        "unit_price": {
+          "value": "9.21",
+          "raw": "9.21",
+          "evidence": {
+            "case_id": "BAG-2026-DE-001",
+            "source_id": "synthetic-po",
+            "locator": "page:1;field:unit_price",
+            "quote": "9.21",
+            "role": "customer_po"
+          }
+        },
+        "amount": {
+          "value": "27630.00",
+          "raw": "27630.00",
+          "evidence": {
+            "case_id": "BAG-2026-DE-001",
+            "source_id": "synthetic-po",
+            "locator": "page:1;field:amount",
+            "quote": "27630.00",
+            "role": "customer_po"
+          }
+        }
+      }
+    ]
+  },
+  "baseline": {
+    "version_id": "quote-v3",
+    "status": "draft",
+    "document": {
+      "buyer": {
+        "value": "Weber Outdoor",
+        "raw": "Weber Outdoor",
+        "evidence": {
+          "case_id": "BAG-2026-DE-001",
+          "source_id": "synthetic-po",
+          "locator": "page:1;field:buyer",
+          "quote": "Weber Outdoor",
+          "role": "customer_po"
+        }
+      },
+      "seller": {
+        "value": "Navo Demo",
+        "raw": "Navo Demo",
+        "evidence": {
+          "case_id": "BAG-2026-DE-001",
+          "source_id": "synthetic-po",
+          "locator": "page:1;field:seller",
+          "quote": "Navo Demo",
+          "role": "customer_po"
+        }
+      },
+      "total_quantity": {
+        "value": "3000",
+        "raw": "3000",
+        "evidence": {
+          "case_id": "BAG-2026-DE-001",
+          "source_id": "synthetic-po",
+          "locator": "page:1;field:total_quantity",
+          "quote": "3000",
+          "role": "customer_po"
+        }
+      },
+      "total_amount": {
+        "value": "27630.00",
+        "raw": "27630.00",
+        "evidence": {
+          "case_id": "BAG-2026-DE-001",
+          "source_id": "synthetic-po",
+          "locator": "page:1;field:total_amount",
+          "quote": "27630.00",
+          "role": "customer_po"
+        }
+      },
+      "currency": {
+        "value": "USD",
+        "raw": "USD",
+        "evidence": {
+          "case_id": "BAG-2026-DE-001",
+          "source_id": "synthetic-po",
+          "locator": "page:1;field:currency",
+          "quote": "USD",
+          "role": "customer_po"
+        }
+      },
+      "incoterm": {
+        "value": "FOB",
+        "raw": "FOB",
+        "evidence": {
+          "case_id": "BAG-2026-DE-001",
+          "source_id": "synthetic-po",
+          "locator": "page:1;field:incoterm",
+          "quote": "FOB",
+          "role": "customer_po"
+        }
+      },
+      "named_place": {
+        "value": "Ningbo",
+        "raw": "Ningbo",
+        "evidence": {
+          "case_id": "BAG-2026-DE-001",
+          "source_id": "synthetic-po",
+          "locator": "page:1;field:named_place",
+          "quote": "Ningbo",
+          "role": "customer_po"
+        }
+      },
+      "incoterms_edition": {
+        "value": "2020",
+        "raw": "2020",
+        "evidence": {
+          "case_id": "BAG-2026-DE-001",
+          "source_id": "synthetic-po",
+          "locator": "page:1;field:incoterms_edition",
+          "quote": "2020",
+          "role": "customer_po"
+        }
+      },
+      "payment_terms": {
+        "value": "30% deposit, 70% against copy of shipping documents",
+        "raw": "30% deposit, 70% against copy of shipping documents",
+        "evidence": {
+          "case_id": "BAG-2026-DE-001",
+          "source_id": "synthetic-po",
+          "locator": "page:1;field:payment_terms",
+          "quote": "30% deposit, 70% against copy of shipping documents",
+          "role": "customer_po"
+        }
+      },
+      "spec_version_id": {
+        "value": "spec-v3",
+        "raw": "spec-v3",
+        "evidence": {
+          "case_id": "BAG-2026-DE-001",
+          "source_id": "synthetic-po",
+          "locator": "page:1;field:spec_version_id",
+          "quote": "spec-v3",
+          "role": "customer_po"
+        }
+      },
+      "delivery_terms": {
+        "value": "Arrival requested; no guarantee",
+        "raw": "Arrival requested; no guarantee",
+        "evidence": {
+          "case_id": "BAG-2026-DE-001",
+          "source_id": "synthetic-po",
+          "locator": "page:1;field:delivery_terms",
+          "quote": "Arrival requested; no guarantee",
+          "role": "customer_po"
+        }
+      },
+      "lines": [
+        {
+          "line_id": "1",
+          "sku": {
+            "value": "WB-26/navy",
+            "raw": "WB-26/navy",
+            "evidence": {
+              "case_id": "BAG-2026-DE-001",
+              "source_id": "synthetic-po",
+              "locator": "page:1;field:sku",
+              "quote": "WB-26/navy",
+              "role": "customer_po"
+            }
+          },
+          "quantity": {
+            "value": "3000",
+            "raw": "3000",
+            "evidence": {
+              "case_id": "BAG-2026-DE-001",
+              "source_id": "synthetic-po",
+              "locator": "page:1;field:quantity",
+              "quote": "3000",
+              "role": "customer_po"
+            }
+          },
+          "unit": {
+            "value": "piece",
+            "raw": "piece",
+            "evidence": {
+              "case_id": "BAG-2026-DE-001",
+              "source_id": "synthetic-po",
+              "locator": "page:1;field:unit",
+              "quote": "piece",
+              "role": "customer_po"
+            }
+          },
+          "unit_price": {
+            "value": "9.21",
+            "raw": "9.21",
+            "evidence": {
+              "case_id": "BAG-2026-DE-001",
+              "source_id": "synthetic-po",
+              "locator": "page:1;field:unit_price",
+              "quote": "9.21",
+              "role": "customer_po"
+            }
+          },
+          "amount": {
+            "value": "27630.00",
+            "raw": "27630.00",
+            "evidence": {
+              "case_id": "BAG-2026-DE-001",
+              "source_id": "synthetic-po",
+              "locator": "page:1;field:amount",
+              "quote": "27630.00",
+              "role": "customer_po"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

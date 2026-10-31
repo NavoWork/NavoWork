@@ -34,6 +34,8 @@ def run_view(run: Run) -> dict:
     if decode(run.payload).get("clarification"):
         value["clarification"] = decode(run.payload)["clarification"]
     value["completedPhases"] = decode(run.payload).get("completedPhases", [])
+    value["fileOutputs"] = decode(run.payload).get("fileOutputs", [])
+    value["agentVerification"] = decode(run.payload).get("agentVerification")
     return value
 
 
@@ -258,6 +260,10 @@ def work_once(graph, owner: str = "worker-local") -> bool:
             job.status = "running"
             db.commit()
             payload = decode(job.payload)
+            if payload.get("agentFileTools"):
+                from .file_worker import execute_file_work
+                execute_file_work(item_id, generation)
+                return True
             source_texts = [i.get("text", "") for i in payload.get("evidence", [])]
             if job.kind == "apply_change":
                 text_input = "\n".join([run.instruction, *source_texts])[:20000]

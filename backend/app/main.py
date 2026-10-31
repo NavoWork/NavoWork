@@ -381,6 +381,24 @@ def create_run(request: Request, db: Session, user: User, case: Case, body: dict
         from .revision_history import NODE_FIELDS
         if generation_target not in NODE_FIELDS:
             fail("INVALID_INPUT", "未知生成节点")
+    from .agent_files import enabled as file_tools_enabled, confirmed_facts
+    file_tools = file_tools_enabled() and interactive and kind in ("prepare_quote", "apply_change", "confirm_requirements")
+    if file_tools:
+        # Freeze actual case attachments at dispatch, including explicitly selected user-owned canvas files.
+        evidence_rows = items(db, "evidence", case_id=case.id) if not body.get("inputRefs") else [db.get(Item, ref) for ref in body["inputRefs"]]
+        context["evidence"] = [{"id": row.id, **item_view(row)} for row in evidence_rows]
+        from .workspace_api import canvas_file
+        canvas_refs = body.get("canvasFileIds") or []
+        if not isinstance(canvas_refs, list) or len(canvas_refs) > 50 or any(not isinstance(v, str) for v in canvas_refs):
+            fail("INVALID_INPUT", "画板附件引用必须是文件 ID 列表")
+        context["canvasManifest"] = []
+        for ref in canvas_refs:
+            row = canvas_file(db, user, case, ref)
+            blob = db.get(Blob, decode(row.payload)["blobId"])
+            context["canvasManifest"].append({"id": row.id, "blobId": blob.id, "sha256": blob.sha256})
+        facts = {**decode(case.payload).get("agentFacts", {}), **confirmed_facts(instruction)}
+        context.update(agentFileTools=True, agentFacts=facts, agentMessages=[instruction])
+        case.payload = encode({**decode(case.payload), "agentFacts": facts})
     job = Job(id=uid("job"), case_id=case.id, kind=kind, goal=instruction, graph_version="sop-v2", payload=encode({**context, "inputRefs": body.get("inputRefs", []), "costInputs": cost_inputs, "selectedSupplierOfferId": selected_offer_id, "changeSetId": body.get("changeSetId"), "interactive": interactive, "generationTarget": generation_target}))
     run = Run(id=uid("run"), job_id=job.id, case_id=case.id, base_revision=base_revision, action=action, instruction=instruction, payload=encode({"assetVersionIds": body.get("assetVersionIds", [])}))
     db.add(job)

@@ -74,21 +74,21 @@ KEYWORDS = {
 
 
 def price_quote(cost: dict) -> dict | None:
+    """Host DTO compatibility wrapper over the single Agent Kit Decimal calculator."""
+    from navowork_agent.contracts import Fact
+    from navowork_agent.tools.pricing import CostLine, PricingInput, calculate_quote
     try:
-        base = Decimal(str(cost["base"]))
-        packaging = Decimal(str(cost["packaging"]))
-        local = Decimal(str(cost.get("local", 0)))
-        fx = Decimal(str(cost["exchangeRate"]))
-        margin = Decimal(str(cost["margin"])) / 100
         if not re.fullmatch(r"[1-9]\d{0,8}", str(cost["quantity"])):
             return None
-        quantity = int(cost["quantity"])
-        if min(base, packaging, local) < 0 or fx <= 0 or not 0 <= margin < 1 or quantity < 1:
-            return None
-        total = base + packaging + local
-        unit = (total / fx / (1 - margin)).quantize(Decimal("0.01"), rounding=ROUND_CEILING)
-        return {"unitCostCny": str(total), "unitPriceUsd": str(unit), "quantity": quantity, "goodsSubtotalUsd": str(unit * quantity), "unitPriceMinor": int(unit * 100), "goodsSubtotalMinor": int(unit * quantity * 100), "ruleSetVersion": "trade-p0-v1"}
-    except (ValueError, KeyError, ArithmeticError):
+        value = calculate_quote(PricingInput(quantity=int(cost["quantity"]),
+            costs=[CostLine(category=key, amount=Fact(value=str(cost[key]) if cost.get(key) is not None else None), scope="per_unit") for key in ("base", "packaging", "local")],
+            fx_cny_per_usd=Fact(value=str(cost["exchangeRate"])), target_gross_margin=Fact(value=str(Decimal(str(cost["margin"])) / 100))))
+        quote = value["quote"]
+        if not quote: return None
+        unit, total = Decimal(quote["unit_usd"]), Decimal(quote["total_usd"])
+        return {"unitCostCny": quote["cost_cny_per_piece"], "unitPriceUsd": str(unit), "quantity": quote["quantity"],
+            "goodsSubtotalUsd": str(total), "unitPriceMinor": int(unit*100), "goodsSubtotalMinor": int(total*100), "ruleSetVersion": "quote-v1"}
+    except (ValueError, KeyError, TypeError, ArithmeticError):
         return None
 
 

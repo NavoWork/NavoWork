@@ -202,7 +202,7 @@ def sop_case_routes(request: Request, db: Session, user: User, case: Case, tail:
                 if upload and isinstance(upload, UploadFile):
                     data = upload.file.read(20 * 1024 * 1024 + 1)
                     ext = Path(upload.filename or "").suffix.lower()
-                    if ext not in (".txt", ".eml", ".csv", ".pdf", ".xlsx", ".jpg", ".jpeg", ".png", ".webp"):
+                    if ext not in (".txt", ".eml", ".csv", ".pdf", ".xlsx", ".docx", ".jpg", ".jpeg", ".png", ".webp"):
                         fail("INVALID_INPUT", "文件类型不受支持")
                     blob = store_blob(db, data, upload.filename or "evidence", upload.content_type or "application/octet-stream", case.id)
                     value = {"title": upload.filename, "sourceRole": str(form.get("sourceRole") or "internal_note"), "blobId": blob.id, "sha256": blob.sha256, "text": _extract_file(data, upload.filename or ""), "parseStatus": "pending"}

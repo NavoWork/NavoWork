@@ -1,0 +1,5 @@
+# Optional validation only; production domain functions use Python stdlib.
+jsonschema==4.25.1
+pypdf==6.10.0
+# Actual d23ab0a contracts/service compatibility tests use the host's existing
+# pydantic>=2.14,<3, openpyxl, python-docx and reportlab dependencies.

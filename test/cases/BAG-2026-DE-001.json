@@ -1,0 +1,1282 @@
+{
+  "schema_version": "tradeworkbench-fixture/v1",
+  "case": {
+    "id": "BAG-2026-DE-001",
+    "customer_ref": "Michael Weber (fictional)",
+    "product_type": "custom_backpack",
+    "all_values_simulated": true
+  },
+  "sources": [
+    {
+      "id": "src-bag-2026-de-001-inquiry",
+      "case_id": "BAG-2026-DE-001",
+      "name": "inquiry.eml",
+      "mime_type": "message/rfc822",
+      "sha256": "4a5be87b2954941cfc7799af499b2307f376e9cb888ede8404e096035bc5d362",
+      "simulated": true,
+      "storage_uri": "test/inputs/BAG-2026-DE-001/inquiry.eml",
+      "source_role": "customer_inquiry",
+      "locators": [
+        {
+          "type": "eml",
+          "header": "Subject",
+          "message_id": "<c28615264c660e9a@demo.invalid>"
+        },
+        {
+          "type": "eml",
+          "body_quote": "3,000 custom backpacks"
+        },
+        {
+          "type": "eml",
+          "body_quote": "FOB Ningbo, Incoterms 2020"
+        },
+        {
+          "type": "eml",
+          "body_quote": "preferred arrival is Hamburg within 45 days if feasible"
+        }
+      ]
+    },
+    {
+      "id": "src-bag-2026-de-001-backpack-reference",
+      "case_id": "BAG-2026-DE-001",
+      "name": "backpack-reference.png",
+      "mime_type": "image/png",
+      "sha256": "1b5b6c63ff59c2655068984c8a636183ba05769ee2216d1110bf84dadfd508d5",
+      "simulated": true,
+      "storage_uri": "test/inputs/BAG-2026-DE-001/backpack-reference.png",
+      "source_role": "product_reference",
+      "locators": [
+        {
+          "type": "image",
+          "region": "full_image",
+          "interpretation": "visible silhouette, straps, front pocket and logo patch only"
+        }
+      ]
+    },
+    {
+      "id": "src-bag-2026-de-001-factory-a-quote",
+      "case_id": "BAG-2026-DE-001",
+      "name": "factory-A-quote.xlsx",
+      "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "sha256": "1c5f30c00f2b86fd2df3859462508bbb96e85206589e80e26162468f40db37e3",
+      "simulated": true,
+      "storage_uri": "test/inputs/BAG-2026-DE-001/factory-A-quote.xlsx",
+      "source_role": "supplier_quote",
+      "locators": [
+        {
+          "type": "xlsx",
+          "sheet": "Factory A Quote",
+          "cell": "B10",
+          "field": "base price"
+        },
+        {
+          "type": "xlsx",
+          "sheet": "Factory A Quote",
+          "cell": "B11",
+          "field": "ordinary paper box"
+        },
+        {
+          "type": "xlsx",
+          "sheet": "Factory A Quote",
+          "cell": "B12",
+          "field": "estimated local allocation"
+        },
+        {
+          "type": "xlsx",
+          "sheet": "Factory A Quote",
+          "cell": "B13",
+          "field": "formula cost basis"
+        },
+        {
+          "type": "xlsx",
+          "sheet": "Factory A Quote",
+          "cell": "B14",
+          "field": "MOQ"
+        },
+        {
+          "type": "xlsx",
+          "sheet": "Factory A Quote",
+          "cell": "B15",
+          "field": "production estimate"
+        }
+      ]
+    },
+    {
+      "id": "src-bag-2026-de-001-factory-b-quote",
+      "case_id": "BAG-2026-DE-001",
+      "name": "factory-B-quote.pdf",
+      "mime_type": "application/pdf",
+      "sha256": "0a6651818467b9b74b86fdce70d33fbfb1ddff744fd505d9f2c409b031471b8d",
+      "simulated": true,
+      "storage_uri": "test/inputs/BAG-2026-DE-001/factory-B-quote.pdf",
+      "source_role": "supplier_quote",
+      "locators": [
+        {
+          "type": "pdf",
+          "page": 1,
+          "field": "Base manufacturing"
+        },
+        {
+          "type": "pdf",
+          "page": 1,
+          "field": "Standard packaging"
+        },
+        {
+          "type": "pdf",
+          "page": 1,
+          "field": "Allocated local charges"
+        },
+        {
+          "type": "pdf",
+          "page": 1,
+          "field": "Estimated cost basis"
+        },
+        {
+          "type": "pdf",
+          "page": 1,
+          "field": "MOQ"
+        },
+        {
+          "type": "pdf",
+          "page": 1,
+          "field": "Estimated production lead time"
+        }
+      ]
+    },
+    {
+      "id": "src-bag-2026-de-001-change-color-box",
+      "case_id": "BAG-2026-DE-001",
+      "name": "change-color-box.eml",
+      "mime_type": "message/rfc822",
+      "sha256": "2c8250e795bc97e50fe022b61831a3bdcf77d4c174904ecddb8ec6a5ff89c498",
+      "simulated": true,
+      "storage_uri": "test/inputs/BAG-2026-DE-001/change-color-box.eml",
+      "source_role": "change_request",
+      "locators": [
+        {
+          "type": "eml",
+          "body_quote": "change the individual retail packaging from the ordinary paper box to our custom printed color box"
+        }
+      ]
+    },
+    {
+      "id": "src-bag-2026-de-001-factory-a-color-box-update",
+      "case_id": "BAG-2026-DE-001",
+      "name": "factory-A-color-box-update.eml",
+      "mime_type": "message/rfc822",
+      "sha256": "bc76e73021687bcb47e86fa9dd9e9c095de1bb80ea60d8266cce29371996d1be",
+      "simulated": true,
+      "storage_uri": "test/inputs/BAG-2026-DE-001/factory-A-color-box-update.eml",
+      "source_role": "supplier_price_update",
+      "locators": [
+        {
+          "type": "eml",
+          "body_quote": "custom printed color box is CNY 5.00 per piece"
+        },
+        {
+          "type": "eml",
+          "body_quote": "This email confirms price only"
+        },
+        {
+          "type": "eml",
+          "body_quote": "Color-box MOQ, sample approval, production lead time and shipping feasibility remain unconfirmed"
+        }
+      ]
+    },
+    {
+      "id": "src-bag-2026-de-001-customer-conditional-confirmation",
+      "case_id": "BAG-2026-DE-001",
+      "name": "customer-conditional-confirmation.eml",
+      "mime_type": "message/rfc822",
+      "sha256": "f4c8ddd8be962c3c0c2add4742aad4a00bc0ad01d47bf7a821cc3ef9eb3a6c61",
+      "simulated": true,
+      "storage_uri": "test/inputs/BAG-2026-DE-001/customer-conditional-confirmation.eml",
+      "source_role": "conditional_customer_response",
+      "locators": [
+        {
+          "type": "eml",
+          "body_quote": "widen the logo to 60 mm and send a color-box sample before final approval"
+        }
+      ]
+    },
+    {
+      "id": "src-bag-2026-de-001-customer-unconditional-confirmation",
+      "case_id": "BAG-2026-DE-001",
+      "name": "customer-unconditional-confirmation.eml",
+      "mime_type": "message/rfc822",
+      "sha256": "a5be398621a177d714088a70fde43569e24786d4cd060cdb5bd267f22fcc0320",
+      "simulated": true,
+      "storage_uri": "test/inputs/BAG-2026-DE-001/customer-unconditional-confirmation.eml",
+      "source_role": "customer_commercial_confirmation",
+      "locators": [
+        {
+          "type": "eml",
+          "body_quote": "We confirm the revised commercial offer for 3,000 pieces at USD 9.21 each"
+        },
+        {
+          "type": "eml",
+          "body_quote": "It does not approve the separate 60 mm logo change request"
+        },
+        {
+          "type": "eml",
+          "body_quote": "final sample approval will follow"
+        }
+      ]
+    },
+    {
+      "id": "src-bag-2026-de-001-internal-commercial-approval-v1",
+      "case_id": "BAG-2026-DE-001",
+      "name": "internal-commercial-approval-v1.eml",
+      "mime_type": "message/rfc822",
+      "sha256": "ef59f5fa3205eb14a87b82c16f17fe998c16d570ca05e5e9b2ca513f520f9dba",
+      "simulated": true,
+      "storage_uri": "test/inputs/BAG-2026-DE-001/internal-commercial-approval-v1.eml",
+      "source_role": "internal_approval",
+      "locators": [
+        {
+          "type": "eml",
+          "body_quote": "I approve Quotation V1"
+        },
+        {
+          "type": "eml",
+          "body_quote": "USD 8.69 each, total USD 26,070"
+        }
+      ]
+    },
+    {
+      "id": "src-bag-2026-de-001-internal-commercial-approval",
+      "case_id": "BAG-2026-DE-001",
+      "name": "internal-commercial-approval.eml",
+      "mime_type": "message/rfc822",
+      "sha256": "acb97cd80b941eea54f782ec475c7f0c15be6139ba536eb60e149ce4914cc424",
+      "simulated": true,
+      "storage_uri": "test/inputs/BAG-2026-DE-001/internal-commercial-approval.eml",
+      "source_role": "internal_approval",
+      "locators": [
+        {
+          "type": "eml",
+          "body_quote": "I approve Quotation V2"
+        },
+        {
+          "type": "eml",
+          "body_quote": "USD 9.21 each, total USD 27,630"
+        }
+      ]
+    },
+    {
+      "id": "src-bag-2026-de-001-factory-a-conditions",
+      "case_id": "BAG-2026-DE-001",
+      "name": "factory-A-conditions.eml",
+      "mime_type": "message/rfc822",
+      "sha256": "ee272a15a856beb0e2370b79343b74a680a7fe274b933b702ab1df9747602cdb",
+      "simulated": true,
+      "storage_uri": "test/inputs/BAG-2026-DE-001/factory-A-conditions.eml",
+      "source_role": "supplier_schedule_status",
+      "locators": [
+        {
+          "type": "eml",
+          "body_quote": "not confirmed the custom color-box MOQ or revised production schedule"
+        }
+      ]
+    },
+    {
+      "id": "src-bag-2026-de-001-po-correct",
+      "case_id": "BAG-2026-DE-001",
+      "name": "po-correct.pdf",
+      "mime_type": "application/pdf",
+      "sha256": "9dd189015c2152a2da0ab602f2981a8be60145c0893ba434b9c892fa0ef477ce",
+      "simulated": true,
+      "storage_uri": "test/inputs/BAG-2026-DE-001/po-correct.pdf",
+      "source_role": "purchase_order",
+      "locators": [
+        {
+          "type": "pdf",
+          "page": 1,
+          "field": "quantity"
+        },
+        {
+          "type": "pdf",
+          "page": 1,
+          "field": "unit price"
+        },
+        {
+          "type": "pdf",
+          "page": 1,
+          "field": "total"
+        },
+        {
+          "type": "pdf",
+          "page": 1,
+          "field": "trade term"
+        }
+      ]
+    },
+    {
+      "id": "src-bag-2026-de-001-po-conflict",
+      "case_id": "BAG-2026-DE-001",
+      "name": "po-conflict.pdf",
+      "mime_type": "application/pdf",
+      "sha256": "bcba8c9aec9bdb2cd4a47832cb4f6dac01da00cd1c1371fc62920d1d2bac1422",
+      "simulated": true,
+      "storage_uri": "test/inputs/BAG-2026-DE-001/po-conflict.pdf",
+      "source_role": "purchase_order_conflict",
+      "locators": [
+        {
+          "type": "pdf",
+          "page": 1,
+          "field": "quantity"
+        },
+        {
+          "type": "pdf",
+          "page": 1,
+          "field": "unit price"
+        },
+        {
+          "type": "pdf",
+          "page": 1,
+          "field": "trade term"
+        }
+      ]
+    }
+  ],
+  "assertions": [
+    {
+      "id": "fa-001",
+      "case_id": "BAG-2026-DE-001",
+      "field_path": "quantity.value",
+      "value": {
+        "kind": "known",
+        "value": {
+          "amount": "3000",
+          "unit": "piece"
+        }
+      },
+      "status": "observed",
+      "source_id": "src-bag-2026-de-001-inquiry",
+      "source_locator": {
+        "type": "eml",
+        "body_quote": "3,000 custom backpacks"
+      },
+      "evidence_quote": "3,000 custom backpacks",
+      "asserted_by": "SIMULATED_SOURCE"
+    },
+    {
+      "id": "fa-002",
+      "case_id": "BAG-2026-DE-001",
+      "field_path": "trade.incoterm",
+      "value": {
+        "kind": "known",
+        "value": {
+          "rule": "FOB",
+          "place": "Ningbo",
+          "edition": "Incoterms 2020"
+        }
+      },
+      "status": "observed",
+      "source_id": "src-bag-2026-de-001-inquiry",
+      "source_locator": {
+        "type": "eml",
+        "body_quote": "FOB Ningbo, Incoterms 2020"
+      },
+      "evidence_quote": "FOB Ningbo, Incoterms 2020",
+      "asserted_by": "SIMULATED_SOURCE"
+    },
+    {
+      "id": "fa-003",
+      "case_id": "BAG-2026-DE-001",
+      "field_path": "customer.arrival_target",
+      "value": {
+        "kind": "known",
+        "value": {
+          "duration_days": 45,
+          "place": "Hamburg",
+          "kind": "request_only"
+        }
+      },
+      "status": "observed",
+      "source_id": "src-bag-2026-de-001-inquiry",
+      "source_locator": {
+        "type": "eml",
+        "body_quote": "preferred arrival is Hamburg within 45 days if feasible"
+      },
+      "evidence_quote": "preferred arrival is Hamburg within 45 days if feasible",
+      "asserted_by": "SIMULATED_SOURCE"
+    },
+    {
+      "id": "fa-004",
+      "case_id": "BAG-2026-DE-001",
+      "field_path": "spec.dimensions",
+      "value": {
+        "kind": "unknown",
+        "reason": "not_in_source_image"
+      },
+      "status": "unknown",
+      "source_id": "src-bag-2026-de-001-backpack-reference",
+      "source_locator": {
+        "type": "image",
+        "region": "full_image"
+      },
+      "evidence_quote": null,
+      "asserted_by": "SIMULATED_SOURCE"
+    },
+    {
+      "id": "fa-005",
+      "case_id": "BAG-2026-DE-001",
+      "field_path": "spec.material_grade",
+      "value": {
+        "kind": "unknown",
+        "reason": "not_in_source_image"
+      },
+      "status": "unknown",
+      "source_id": "src-bag-2026-de-001-backpack-reference",
+      "source_locator": {
+        "type": "image",
+        "region": "full_image"
+      },
+      "evidence_quote": null,
+      "asserted_by": "SIMULATED_SOURCE"
+    },
+    {
+      "id": "fa-006",
+      "case_id": "BAG-2026-DE-001",
+      "field_path": "supplier_a.cost.base",
+      "value": {
+        "kind": "known",
+        "value": {
+          "amount": "44.00",
+          "currency": "CNY",
+          "unit": "piece"
+        }
+      },
+      "status": "observed",
+      "source_id": "src-bag-2026-de-001-factory-a-quote",
+      "source_locator": {
+        "type": "xlsx",
+        "sheet": "Factory A Quote",
+        "cell": "B10"
+      },
+      "evidence_quote": "44",
+      "asserted_by": "SIMULATED_SOURCE"
+    },
+    {
+      "id": "fa-007",
+      "case_id": "BAG-2026-DE-001",
+      "field_path": "supplier_a.cost.packaging",
+      "value": {
+        "kind": "known",
+        "value": {
+          "amount": "2.00",
+          "currency": "CNY",
+          "unit": "piece",
+          "type": "ordinary_paper_box"
+        }
+      },
+      "status": "observed",
+      "source_id": "src-bag-2026-de-001-factory-a-quote",
+      "source_locator": {
+        "type": "xlsx",
+        "sheet": "Factory A Quote",
+        "cell": "B11"
+      },
+      "evidence_quote": "2",
+      "asserted_by": "SIMULATED_SOURCE"
+    },
+    {
+      "id": "fa-008",
+      "case_id": "BAG-2026-DE-001",
+      "field_path": "supplier_a.cost.local_allocation",
+      "value": {
+        "kind": "known",
+        "value": {
+          "amount": "4.00",
+          "currency": "CNY",
+          "unit": "piece",
+          "estimate": true
+        }
+      },
+      "status": "observed",
+      "source_id": "src-bag-2026-de-001-factory-a-quote",
+      "source_locator": {
+        "type": "xlsx",
+        "sheet": "Factory A Quote",
+        "cell": "B12"
+      },
+      "evidence_quote": "4",
+      "asserted_by": "SIMULATED_SOURCE"
+    },
+    {
+      "id": "fa-009",
+      "case_id": "BAG-2026-DE-001",
+      "field_path": "supplier_a.moq",
+      "value": {
+        "kind": "known",
+        "value": {
+          "amount": "1000",
+          "unit": "piece",
+          "color_split": "to_reconfirm"
+        }
+      },
+      "status": "observed",
+      "source_id": "src-bag-2026-de-001-factory-a-quote",
+      "source_locator": {
+        "type": "xlsx",
+        "sheet": "Factory A Quote",
+        "cell": "B14"
+      },
+      "evidence_quote": "1000",
+      "asserted_by": "SIMULATED_SOURCE"
+    },
+    {
+      "id": "fa-010",
+      "case_id": "BAG-2026-DE-001",
+      "field_path": "supplier_a.production_lead_days",
+      "value": {
+        "kind": "known",
+        "value": {
+          "amount": "28",
+          "unit": "calendar_day",
+          "condition": "after approved sample; estimate"
+        }
+      },
+      "status": "observed",
+      "source_id": "src-bag-2026-de-001-factory-a-quote",
+      "source_locator": {
+        "type": "xlsx",
+        "sheet": "Factory A Quote",
+        "cell": "B15"
+      },
+      "evidence_quote": "28",
+      "asserted_by": "SIMULATED_SOURCE"
+    },
+    {
+      "id": "fa-011",
+      "case_id": "BAG-2026-DE-001",
+      "field_path": "spec.packaging.type",
+      "value": {
+        "kind": "known",
+        "value": "custom_color_box"
+      },
+      "status": "observed",
+      "source_id": "src-bag-2026-de-001-change-color-box",
+      "source_locator": {
+        "type": "eml",
+        "body_quote": "custom printed color box"
+      },
+      "evidence_quote": "custom printed color box",
+      "asserted_by": "SIMULATED_SOURCE"
+    },
+    {
+      "id": "fa-012",
+      "case_id": "BAG-2026-DE-001",
+      "field_path": "supplier_a.cost.packaging",
+      "value": {
+        "kind": "known",
+        "value": {
+          "amount": "5.00",
+          "currency": "CNY",
+          "unit": "piece",
+          "type": "custom_color_box"
+        }
+      },
+      "status": "observed",
+      "source_id": "src-bag-2026-de-001-factory-a-color-box-update",
+      "source_locator": {
+        "type": "eml",
+        "body_quote": "custom printed color box is CNY 5.00 per piece"
+      },
+      "evidence_quote": "custom printed color box is CNY 5.00 per piece",
+      "asserted_by": "SIMULATED_SOURCE"
+    },
+    {
+      "id": "fa-013",
+      "case_id": "BAG-2026-DE-001",
+      "field_path": "spec.logo.width_mm",
+      "value": {
+        "kind": "known",
+        "value": {
+          "amount": "60",
+          "unit": "mm",
+          "change_requested": true
+        }
+      },
+      "status": "observed",
+      "source_id": "src-bag-2026-de-001-customer-conditional-confirmation",
+      "source_locator": {
+        "type": "eml",
+        "body_quote": "widen the logo to 60 mm"
+      },
+      "evidence_quote": "widen the logo to 60 mm",
+      "asserted_by": "SIMULATED_SOURCE"
+    },
+    {
+      "id": "fa-014",
+      "case_id": "BAG-2026-DE-001",
+      "field_path": "spec.sample_approval",
+      "value": {
+        "kind": "unknown",
+        "reason": "physical_sample_not_yet_approved"
+      },
+      "status": "unknown",
+      "source_id": "src-bag-2026-de-001-customer-unconditional-confirmation",
+      "source_locator": {
+        "type": "eml",
+        "body_quote": "final sample approval will follow"
+      },
+      "evidence_quote": null,
+      "asserted_by": "SIMULATED_SOURCE"
+    },
+    {
+      "id": "fa-015",
+      "case_id": "BAG-2026-DE-001",
+      "field_path": "supplier_a.custom_box_moq",
+      "value": {
+        "kind": "unknown",
+        "reason": "supplier_confirmation_pending"
+      },
+      "status": "unknown",
+      "source_id": "src-bag-2026-de-001-factory-a-conditions",
+      "source_locator": {
+        "type": "eml",
+        "body_quote": "not confirmed the custom color-box MOQ"
+      },
+      "evidence_quote": null,
+      "asserted_by": "SIMULATED_SOURCE"
+    },
+    {
+      "id": "fa-016",
+      "case_id": "BAG-2026-DE-001",
+      "field_path": "supplier_a.custom_box_lead_time_days",
+      "value": {
+        "kind": "unknown",
+        "reason": "supplier_confirmation_pending"
+      },
+      "status": "unknown",
+      "source_id": "src-bag-2026-de-001-factory-a-conditions",
+      "source_locator": {
+        "type": "eml",
+        "body_quote": "not confirmed the custom color-box MOQ or revised production schedule"
+      },
+      "evidence_quote": null,
+      "asserted_by": "SIMULATED_SOURCE"
+    }
+  ],
+  "resolutions": [
+    {
+      "field_path": "quantity.value",
+      "scope": "commercial_terms",
+      "status": "confirmed",
+      "assertion_id": "fa-001",
+      "confirmed_by": "SIMULATED_CUSTOMER",
+      "approved_evidence_id": "src-bag-2026-de-001-customer-unconditional-confirmation"
+    },
+    {
+      "field_path": "trade.incoterm",
+      "scope": "commercial_terms",
+      "status": "confirmed",
+      "assertion_id": "fa-002",
+      "confirmed_by": "SIMULATED_CUSTOMER",
+      "approved_evidence_id": "src-bag-2026-de-001-customer-unconditional-confirmation"
+    },
+    {
+      "field_path": "customer.arrival_target",
+      "scope": "customer_requirement",
+      "status": "observed",
+      "assertion_id": "fa-003",
+      "confirmed_by": null,
+      "approved_evidence_id": null
+    },
+    {
+      "field_path": "spec.packaging.type",
+      "scope": "customer_requirement",
+      "status": "confirmed",
+      "assertion_id": "fa-011",
+      "confirmed_by": "SIMULATED_CUSTOMER",
+      "approved_evidence_id": "src-bag-2026-de-001-customer-unconditional-confirmation"
+    },
+    {
+      "field_path": "spec.packaging.type",
+      "scope": "supplier_capability",
+      "status": "pending",
+      "assertion_id": "fa-011",
+      "confirmed_by": null,
+      "approved_evidence_id": null
+    },
+    {
+      "field_path": "spec.logo.width_mm",
+      "scope": "customer_requirement",
+      "status": "proposed",
+      "assertion_id": "fa-013",
+      "confirmed_by": null,
+      "approved_evidence_id": null
+    },
+    {
+      "field_path": "spec.sample_approval",
+      "scope": "production_release",
+      "status": "unknown",
+      "assertion_id": "fa-014",
+      "confirmed_by": null,
+      "approved_evidence_id": null
+    },
+    {
+      "field_path": "supplier_a.cost.packaging",
+      "scope": "supplier_quote",
+      "status": "observed",
+      "assertion_id": "fa-012",
+      "confirmed_by": null,
+      "approved_evidence_id": null
+    },
+    {
+      "field_path": "supplier_a.custom_box_lead_time_days",
+      "scope": "production_release",
+      "status": "unknown",
+      "assertion_id": "fa-016",
+      "confirmed_by": null,
+      "approved_evidence_id": null
+    }
+  ],
+  "expected": {
+    "currency": "USD",
+    "quantity": {
+      "amount": "3000",
+      "unit": "piece"
+    },
+    "method": "ceil_unit_price_to_cent_then_multiply_quantity",
+    "assumptions": {
+      "fx_cny_per_usd": "7.20",
+      "target_gross_margin": "0.20",
+      "local_allocation": "estimated demo input; not a universal FOB model"
+    },
+    "stage_snapshots": [
+      {
+        "id": "before-supplier-color-box-price",
+        "source_ids": [
+          "src-bag-2026-de-001-inquiry",
+          "src-bag-2026-de-001-backpack-reference",
+          "src-bag-2026-de-001-factory-a-quote",
+          "src-bag-2026-de-001-factory-b-quote",
+          "src-bag-2026-de-001-change-color-box"
+        ],
+        "quote_release": {
+          "decision": "deny",
+          "blocking_reasons": [
+            "custom color-box price is unknown"
+          ]
+        },
+        "active_cost_version": "cost-v1",
+        "active_quote_version": "quote-v1"
+      },
+      {
+        "id": "after-color-box-price-before-production-release",
+        "source_ids": [
+          "src-bag-2026-de-001-inquiry",
+          "src-bag-2026-de-001-backpack-reference",
+          "src-bag-2026-de-001-factory-a-quote",
+          "src-bag-2026-de-001-factory-b-quote",
+          "src-bag-2026-de-001-change-color-box",
+          "src-bag-2026-de-001-factory-a-color-box-update",
+          "src-bag-2026-de-001-customer-conditional-confirmation",
+          "src-bag-2026-de-001-customer-unconditional-confirmation",
+          "src-bag-2026-de-001-internal-commercial-approval-v1",
+          "src-bag-2026-de-001-internal-commercial-approval",
+          "src-bag-2026-de-001-factory-a-conditions",
+          "src-bag-2026-de-001-po-correct",
+          "src-bag-2026-de-001-po-conflict"
+        ],
+        "quote_release": {
+          "decision": "deny",
+          "blocking_reasons": [
+            "custom color-box MOQ not confirmed",
+            "custom color-box production schedule not confirmed"
+          ]
+        },
+        "active_cost_version": "cost-v2-draft",
+        "active_quote_version": "quote-v2-draft"
+      }
+    ],
+    "quote_math": {
+      "supplier_a_v1": {
+        "cost_cny_per_piece": "50.00",
+        "unit_usd": "8.69",
+        "total_usd": "26070.00"
+      },
+      "supplier_b": {
+        "cost_cny_per_piece": "52.00",
+        "unit_usd": "9.03",
+        "total_usd": "27090.00"
+      },
+      "supplier_a_v2": {
+        "cost_cny_per_piece": "53.00",
+        "unit_usd": "9.21",
+        "total_usd": "27630.00",
+        "delta_unit_usd": "0.52",
+        "delta_total_usd": "1560.00"
+      }
+    },
+    "po_diff": {
+      "against_version_id": "quote-v1",
+      "differences": [
+        {
+          "field": "quantity",
+          "approved": "3000 pieces",
+          "po": "3200 pieces"
+        },
+        {
+          "field": "unit_price",
+          "approved": "USD 8.69",
+          "po": "USD 9.21"
+        },
+        {
+          "field": "total",
+          "approved": "USD 26070.00",
+          "po": "USD 29472.00"
+        },
+        {
+          "field": "trade.incoterm.place",
+          "approved": "Ningbo",
+          "po": "Shanghai"
+        }
+      ],
+      "decision": "needs_review",
+      "pi_release": "blocked"
+    },
+    "artifacts": [
+      {
+        "id": "spec-v1",
+        "kind": "specification",
+        "version": 1,
+        "status": "draft",
+        "immutable": true,
+        "content": {
+          "packaging": "ordinary_paper_box",
+          "dimensions": {
+            "kind": "unknown",
+            "reason": "not_in_source_image"
+          },
+          "material_grade": {
+            "kind": "unknown",
+            "reason": "not_in_source_image"
+          }
+        },
+        "content_hash": "c422bf71c80ef21f6ca0a1a0314f0ebbcaee48b14710b213baafd14922606176"
+      },
+      {
+        "id": "spec-v2-draft",
+        "kind": "specification",
+        "version": 2,
+        "base_version_id": "spec-v1",
+        "status": "draft",
+        "immutable": true,
+        "content": {
+          "packaging": "custom_color_box",
+          "logo_width_mm": {
+            "kind": "unknown",
+            "reason": "60_mm_request_not_approved"
+          }
+        },
+        "content_hash": "ef119f3f2a178ff59f99ec2798c17b2894e3db351f68ff6d2ecf83b03c75f98a"
+      },
+      {
+        "id": "cost-v1",
+        "kind": "cost_sheet",
+        "version": 1,
+        "status": "released_simulated",
+        "immutable": true,
+        "cost_cny_per_piece": "50.00",
+        "content_hash": "1c6ed379fc3757e454f38f99ae1636938fe6abc1529dbbcf752feb6565bacea2"
+      },
+      {
+        "id": "cost-v2-draft",
+        "kind": "cost_sheet",
+        "version": 2,
+        "base_version_id": "cost-v1",
+        "status": "draft",
+        "immutable": true,
+        "cost_cny_per_piece": "53.00",
+        "content_hash": "b78d7740a91fb4ce5e5cb821dac03618fcfd5ba53901680476635b4720aad508"
+      },
+      {
+        "id": "quote-v1",
+        "kind": "quotation",
+        "version": 1,
+        "status": "released_simulated",
+        "immutable": true,
+        "unit_price_usd": "8.69",
+        "total_usd": "26070.00",
+        "content_hash": "41b441b5ed5bbd7be92a0057066935af6a6f758e756a8655c7b4ce38e77e83cf"
+      },
+      {
+        "id": "quote-v2-draft",
+        "kind": "quotation",
+        "version": 2,
+        "base_version_id": "quote-v1",
+        "status": "draft",
+        "immutable": true,
+        "unit_price_usd": "9.21",
+        "total_usd": "27630.00",
+        "content_hash": "28a6d19caced1ca3b6cab19de4749b009e1977c5d8dc68b93293e599a6aca232"
+      },
+      {
+        "id": "supplier-confirmation-draft-v2",
+        "kind": "supplier_confirmation_request",
+        "version": 1,
+        "status": "draft",
+        "immutable": true,
+        "content_hash": "91d77d393fa2fd17869811bae577401fcdc1271e1808ed9b36e9e2ce6be4dd86"
+      },
+      {
+        "id": "production-pack-v1-draft",
+        "kind": "production_pack",
+        "version": 1,
+        "status": "draft",
+        "immutable": true,
+        "content_hash": "250efb4d8e9b004a3a8805e76d8647dbc3cd5247d04e0cf36fe65c605f6e012d"
+      }
+    ],
+    "artifact_dependencies": [
+      {
+        "downstream_version_id": "cost-v1",
+        "upstream_version_id": "spec-v1",
+        "field_paths": [
+          "quantity",
+          "packaging"
+        ],
+        "dependency_kind": "calculation_input"
+      },
+      {
+        "downstream_version_id": "quote-v1",
+        "upstream_version_id": "cost-v1",
+        "field_paths": [
+          "cost_cny_per_piece"
+        ],
+        "dependency_kind": "calculation_input"
+      },
+      {
+        "downstream_version_id": "spec-v2-draft",
+        "upstream_version_id": "spec-v1",
+        "field_paths": [
+          "packaging",
+          "logo_width_mm"
+        ],
+        "dependency_kind": "change_base"
+      },
+      {
+        "downstream_version_id": "cost-v2-draft",
+        "upstream_version_id": "cost-v1",
+        "field_paths": [
+          "packaging_cost",
+          "total_cost"
+        ],
+        "dependency_kind": "superseding_draft"
+      },
+      {
+        "downstream_version_id": "quote-v2-draft",
+        "upstream_version_id": "cost-v2-draft",
+        "field_paths": [
+          "cost_cny_per_piece",
+          "unit_price"
+        ],
+        "dependency_kind": "calculation_input"
+      },
+      {
+        "downstream_version_id": "quote-v2-draft",
+        "upstream_version_id": "quote-v1",
+        "field_paths": [
+          "unit_price",
+          "total"
+        ],
+        "dependency_kind": "diff_base"
+      },
+      {
+        "downstream_version_id": "supplier-confirmation-draft-v2",
+        "upstream_version_id": "spec-v2-draft",
+        "field_paths": [
+          "packaging",
+          "custom_box_moq",
+          "production_schedule"
+        ],
+        "dependency_kind": "confirmation_scope"
+      },
+      {
+        "downstream_version_id": "production-pack-v1-draft",
+        "upstream_version_id": "quote-v2-draft",
+        "field_paths": [
+          "quantity",
+          "unit_price",
+          "trade_term"
+        ],
+        "dependency_kind": "commercial_input"
+      },
+      {
+        "downstream_version_id": "production-pack-v1-draft",
+        "upstream_version_id": "spec-v2-draft",
+        "field_paths": [
+          "packaging",
+          "sample_approval"
+        ],
+        "dependency_kind": "production_input"
+      }
+    ],
+    "diffs": [
+      {
+        "artifact_id": "spec-v2-draft",
+        "from_version": "spec-v1",
+        "changes": [
+          {
+            "path": "packaging",
+            "before": "ordinary_paper_box",
+            "after": "custom_color_box",
+            "status": "proposed"
+          },
+          {
+            "path": "logo_width_mm",
+            "before": {
+              "kind": "unknown"
+            },
+            "after": {
+              "kind": "unknown",
+              "request": "60 mm"
+            },
+            "status": "conditional_unapproved"
+          }
+        ]
+      },
+      {
+        "artifact_id": "cost-v2-draft",
+        "from_version": "cost-v1",
+        "changes": [
+          {
+            "path": "packaging_cost",
+            "before": "2.00 CNY/piece",
+            "after": "5.00 CNY/piece",
+            "status": "supplier_price_observed"
+          },
+          {
+            "path": "total_cost",
+            "before": "50.00 CNY/piece",
+            "after": "53.00 CNY/piece",
+            "status": "calculated"
+          }
+        ]
+      },
+      {
+        "artifact_id": "quote-v2-draft",
+        "from_version": "quote-v1",
+        "changes": [
+          {
+            "path": "unit_price",
+            "before": "8.69 USD/piece",
+            "after": "9.21 USD/piece",
+            "status": "pricing_approved_release_blocked"
+          },
+          {
+            "path": "total",
+            "before": "26070.00 USD",
+            "after": "27630.00 USD",
+            "status": "calculated"
+          }
+        ]
+      },
+      {
+        "artifact_id": "supplier-confirmation-draft-v2",
+        "from_version": null,
+        "changes": [
+          {
+            "path": "custom_box_moq",
+            "after": "request confirmation",
+            "status": "pending"
+          },
+          {
+            "path": "production_schedule",
+            "after": "request confirmation",
+            "status": "pending"
+          }
+        ]
+      }
+    ],
+    "approvals": [
+      {
+        "id": "approval-pricing-v1",
+        "target_version_id": "quote-v1",
+        "scope": "pricing_release",
+        "decision": "approved",
+        "actor": "SIMULATED_PRICING_MANAGER",
+        "evidence_source_id": "src-bag-2026-de-001-internal-commercial-approval-v1",
+        "target_version_hash": "41b441b5ed5bbd7be92a0057066935af6a6f758e756a8655c7b4ce38e77e83cf"
+      },
+      {
+        "id": "approval-pricing-v2",
+        "target_version_id": "quote-v2-draft",
+        "scope": "commercial_pricing_review",
+        "decision": "approved",
+        "actor": "SIMULATED_PRICING_MANAGER",
+        "evidence_source_id": "src-bag-2026-de-001-internal-commercial-approval",
+        "target_version_hash": "28a6d19caced1ca3b6cab19de4749b009e1977c5d8dc68b93293e599a6aca232"
+      },
+      {
+        "id": "approval-customer-terms-v2",
+        "target_version_id": "quote-v2-draft",
+        "scope": "customer_commercial_confirmation",
+        "decision": "confirmed",
+        "actor": "SIMULATED_CUSTOMER",
+        "evidence_source_id": "src-bag-2026-de-001-customer-unconditional-confirmation",
+        "target_version_hash": "28a6d19caced1ca3b6cab19de4749b009e1977c5d8dc68b93293e599a6aca232"
+      },
+      {
+        "id": "approval-sample-v2",
+        "target_version_id": "spec-v2-draft",
+        "scope": "spec_adoption",
+        "decision": "missing",
+        "actor": null,
+        "evidence_source_id": null,
+        "target_version_hash": "ef119f3f2a178ff59f99ec2798c17b2894e3db351f68ff6d2ecf83b03c75f98a"
+      },
+      {
+        "id": "approval-production-owner-v2",
+        "target_version_id": "production-pack-v1-draft",
+        "scope": "production_release",
+        "decision": "missing",
+        "actor": null,
+        "evidence_source_id": null,
+        "target_version_hash": "250efb4d8e9b004a3a8805e76d8647dbc3cd5247d04e0cf36fe65c605f6e012d"
+      }
+    ],
+    "gates": [
+      {
+        "name": "quote_release_v1",
+        "decision": "allow_for_pricing_scope",
+        "blocking_reasons": [],
+        "warnings": [
+          "45-day Hamburg target is a request, not a seller commitment"
+        ]
+      },
+      {
+        "name": "quote_release_v2",
+        "decision": "deny",
+        "blocking_reasons": [
+          "custom color-box MOQ not confirmed",
+          "custom color-box production schedule not confirmed"
+        ],
+        "warnings": [
+          "60 mm logo change is conditional and unapproved",
+          "Hamburg arrival date is not guaranteed"
+        ]
+      },
+      {
+        "name": "production_release_v2",
+        "decision": "deny",
+        "blocking_reasons": [
+          "physical sample approval missing",
+          "production owner confirmation missing",
+          "custom color-box MOQ and schedule not confirmed"
+        ]
+      },
+      {
+        "name": "external_send",
+        "decision": "deny",
+        "blocking_reasons": [
+          "no real mail connection",
+          "no external-send authorization"
+        ]
+      }
+    ],
+    "deliveries": [
+      {
+        "artifact_version_ids": [
+          "quote-v2-draft"
+        ],
+        "channel": "manual_export_only",
+        "status": "prepared",
+        "real_connection": false,
+        "sent_at": null,
+        "authorization_id": null,
+        "external_reference": null
+      }
+    ],
+    "export_snapshot": {
+      "case_id": "BAG-2026-DE-001",
+      "status": "draft_manifest_only",
+      "real_export_created": false,
+      "sent_at": null,
+      "quantity": {
+        "amount": "3000",
+        "unit": "piece"
+      },
+      "artifact_versions": [
+        {
+          "id": "spec-v2-draft",
+          "content_hash": "ef119f3f2a178ff59f99ec2798c17b2894e3db351f68ff6d2ecf83b03c75f98a"
+        },
+        {
+          "id": "cost-v2-draft",
+          "content_hash": "b78d7740a91fb4ce5e5cb821dac03618fcfd5ba53901680476635b4720aad508"
+        },
+        {
+          "id": "quote-v2-draft",
+          "content_hash": "28a6d19caced1ca3b6cab19de4749b009e1977c5d8dc68b93293e599a6aca232"
+        },
+        {
+          "id": "supplier-confirmation-draft-v2",
+          "content_hash": "91d77d393fa2fd17869811bae577401fcdc1271e1808ed9b36e9e2ce6be4dd86"
+        },
+        {
+          "id": "production-pack-v1-draft",
+          "content_hash": "250efb4d8e9b004a3a8805e76d8647dbc3cd5247d04e0cf36fe65c605f6e012d"
+        }
+      ],
+      "source_snapshots": [
+        {
+          "id": "src-bag-2026-de-001-inquiry",
+          "sha256": "4a5be87b2954941cfc7799af499b2307f376e9cb888ede8404e096035bc5d362"
+        },
+        {
+          "id": "src-bag-2026-de-001-backpack-reference",
+          "sha256": "1b5b6c63ff59c2655068984c8a636183ba05769ee2216d1110bf84dadfd508d5"
+        },
+        {
+          "id": "src-bag-2026-de-001-factory-a-quote",
+          "sha256": "1c5f30c00f2b86fd2df3859462508bbb96e85206589e80e26162468f40db37e3"
+        },
+        {
+          "id": "src-bag-2026-de-001-factory-b-quote",
+          "sha256": "0a6651818467b9b74b86fdce70d33fbfb1ddff744fd505d9f2c409b031471b8d"
+        },
+        {
+          "id": "src-bag-2026-de-001-change-color-box",
+          "sha256": "2c8250e795bc97e50fe022b61831a3bdcf77d4c174904ecddb8ec6a5ff89c498"
+        },
+        {
+          "id": "src-bag-2026-de-001-factory-a-color-box-update",
+          "sha256": "bc76e73021687bcb47e86fa9dd9e9c095de1bb80ea60d8266cce29371996d1be"
+        },
+        {
+          "id": "src-bag-2026-de-001-customer-conditional-confirmation",
+          "sha256": "f4c8ddd8be962c3c0c2add4742aad4a00bc0ad01d47bf7a821cc3ef9eb3a6c61"
+        },
+        {
+          "id": "src-bag-2026-de-001-customer-unconditional-confirmation",
+          "sha256": "a5be398621a177d714088a70fde43569e24786d4cd060cdb5bd267f22fcc0320"
+        },
+        {
+          "id": "src-bag-2026-de-001-internal-commercial-approval-v1",
+          "sha256": "ef59f5fa3205eb14a87b82c16f17fe998c16d570ca05e5e9b2ca513f520f9dba"
+        },
+        {
+          "id": "src-bag-2026-de-001-internal-commercial-approval",
+          "sha256": "acb97cd80b941eea54f782ec475c7f0c15be6139ba536eb60e149ce4914cc424"
+        },
+        {
+          "id": "src-bag-2026-de-001-factory-a-conditions",
+          "sha256": "ee272a15a856beb0e2370b79343b74a680a7fe274b933b702ab1df9747602cdb"
+        },
+        {
+          "id": "src-bag-2026-de-001-po-correct",
+          "sha256": "9dd189015c2152a2da0ab602f2981a8be60145c0893ba434b9c892fa0ef477ce"
+        },
+        {
+          "id": "src-bag-2026-de-001-po-conflict",
+          "sha256": "bcba8c9aec9bdb2cd4a47832cb4f6dac01da00cd1c1371fc62920d1d2bac1422"
+        }
+      ]
+    }
+  }
+}

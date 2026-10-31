@@ -1,0 +1,32 @@
+{
+  "raw_text": "Material | Spec | Qty | Unit | Price | CCY | Amount\nNylon | 600D | 2.50 | m | 12.00 | CNY | 30.00\nZipper | 20cm | 4 | pcs | 1.50 | CNY | 6.00\nTOTAL CNY 39.00",
+  "rows": [
+    {
+      "material_name": "Nylon",
+      "specification": "600D",
+      "quantity": "2.50",
+      "unit": "m",
+      "unit_price": "12.00",
+      "currency": "CNY",
+      "subtotal": "30.00",
+      "raw_text": "Nylon | 600D | 2.50 | m | 12.00 | CNY | 30.00",
+      "source_line": 1,
+      "uncertain_fields": []
+    },
+    {
+      "material_name": "Zipper",
+      "specification": "20cm",
+      "quantity": "4",
+      "unit": "pcs",
+      "unit_price": "1.50",
+      "currency": "CNY",
+      "subtotal": "6.00",
+      "raw_text": "Zipper | 20cm | 4 | pcs | 1.50 | CNY | 6.00",
+      "source_line": 2,
+      "uncertain_fields": []
+    }
+  ],
+  "table_total": "39.00",
+  "currency": "CNY",
+  "notes": []
+}

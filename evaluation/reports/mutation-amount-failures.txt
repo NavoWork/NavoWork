@@ -1,0 +1,48 @@
+E01 step=0 [AMOUNT_MISMATCH] quote must equal independent per-unit ceiling oracle
+E01 step=0 [AMOUNT_INCONSISTENT] unit × quantity differs from total
+E01 step=0 [FILE_CONTENT_MISMATCH] actual artifact quote differs from result/oracle
+E01 step=1 [AMOUNT_MISMATCH] quote must equal independent per-unit ceiling oracle
+E01 step=1 [AMOUNT_INCONSISTENT] unit × quantity differs from total
+E01 step=1 [FILE_CONTENT_MISMATCH] actual artifact quote differs from result/oracle
+E02b step=0 [AMOUNT_MISMATCH] quote must equal independent per-unit ceiling oracle
+E02b step=0 [AMOUNT_INCONSISTENT] unit × quantity differs from total
+E02b step=0 [FILE_CONTENT_MISMATCH] actual artifact quote differs from result/oracle
+E03 step=0 [AMOUNT_MISMATCH] quote must equal independent per-unit ceiling oracle
+E03 step=0 [AMOUNT_INCONSISTENT] unit × quantity differs from total
+E03 step=0 [FILE_CONTENT_MISMATCH] actual artifact quote differs from result/oracle
+E03 step=1 [AMOUNT_MISMATCH] quote must equal independent per-unit ceiling oracle
+E03 step=1 [AMOUNT_INCONSISTENT] unit × quantity differs from total
+E03 step=1 [FILE_CONTENT_MISMATCH] actual artifact quote differs from result/oracle
+E06 step=0 [AMOUNT_MISMATCH] quote must equal independent per-unit ceiling oracle
+E06 step=0 [AMOUNT_INCONSISTENT] unit × quantity differs from total
+E06 step=0 [FILE_CONTENT_MISMATCH] actual artifact quote differs from result/oracle
+E06 step=1 [AMOUNT_MISMATCH] quote must equal independent per-unit ceiling oracle
+E06 step=1 [AMOUNT_INCONSISTENT] unit × quantity differs from total
+E06 step=1 [FILE_CONTENT_MISMATCH] actual artifact quote differs from result/oracle
+E06 step=2 [AMOUNT_MISMATCH] quote must equal independent per-unit ceiling oracle
+E06 step=2 [AMOUNT_INCONSISTENT] unit × quantity differs from total
+E06 step=2 [FILE_CONTENT_MISMATCH] actual artifact quote differs from result/oracle
+E07 step=0 [AMOUNT_MISMATCH] quote must equal independent per-unit ceiling oracle
+E07 step=0 [AMOUNT_INCONSISTENT] unit × quantity differs from total
+E07 step=0 [FILE_CONTENT_MISMATCH] actual artifact quote differs from result/oracle
+E07 step=1 [AMOUNT_MISMATCH] quote must equal independent per-unit ceiling oracle
+E07 step=1 [AMOUNT_INCONSISTENT] unit × quantity differs from total
+E07 step=1 [FILE_CONTENT_MISMATCH] actual artifact quote differs from result/oracle
+E08 step=0 [AMOUNT_MISMATCH] quote must equal independent per-unit ceiling oracle
+E08 step=0 [AMOUNT_INCONSISTENT] unit × quantity differs from total
+E08 step=0 [FILE_CONTENT_MISMATCH] actual artifact quote differs from result/oracle
+E09 step=0 [AMOUNT_MISMATCH] quote must equal independent per-unit ceiling oracle
+E09 step=0 [AMOUNT_INCONSISTENT] unit × quantity differs from total
+E09 step=0 [FILE_CONTENT_MISMATCH] actual artifact quote differs from result/oracle
+E12 step=0 [AMOUNT_MISMATCH] quote must equal independent per-unit ceiling oracle
+E12 step=0 [AMOUNT_INCONSISTENT] unit × quantity differs from total
+E12 step=0 [FILE_CONTENT_MISMATCH] actual artifact quote differs from result/oracle
+PRECONDITION [FIXTURE_HASH_MISMATCH] test/inputs/BAG-2026-DE-001/factory-B-quote.pdf
+PRECONDITION [FIXTURE_HASH_MISMATCH] test/inputs/BAG-2026-DE-001/po-correct.pdf
+PRECONDITION [FIXTURE_HASH_MISMATCH] test/inputs/BAG-2026-DE-001/po-conflict.pdf
+PRECONDITION [FIXTURE_HASH_MISMATCH] test/inputs/BAG-2026-DE-002/supplier-incomplete.pdf
+PRECONDITION [FIXTURE_HASH_MISMATCH] test/inputs/BAG-2026-DE-003/supplier-reply.pdf
+PRECONDITION [FIXTURE_HASH_MISMATCH] test/core15/evidence/original-inquiry.eml
+PRECONDITION [FIXTURE_HASH_MISMATCH] test/core15/evidence/original-change-color-box.eml
+PRECONDITION [FIXTURE_HASH_MISMATCH] test/core15/evidence/original-customer-conditional-confirmation.eml
+NOT_ACCEPTED [MAIN_CHAIN_BLOCKED] Real Agent/Worker integration and independent model/visual evidence are pending.

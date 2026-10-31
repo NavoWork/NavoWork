@@ -1,0 +1,26 @@
+test_all_scenarios_positive_and_generated_variants (test_evaluation.EvaluationTests.test_all_scenarios_positive_and_generated_variants) ... ok
+test_artifact_cost_and_version_are_checked (test_evaluation.EvaluationTests.test_artifact_cost_and_version_are_checked) ... ok
+test_bad_citation_excerpt (test_evaluation.EvaluationTests.test_bad_citation_excerpt) ... ok
+test_content_tampering_even_with_recomputed_hash (test_evaluation.EvaluationTests.test_content_tampering_even_with_recomputed_hash) ... ok
+test_declared_fixture_hashes_audited_without_normalizing (test_evaluation.EvaluationTests.test_declared_fixture_hashes_audited_without_normalizing) ... ok
+test_each_mutant_hits_designated_invariant (test_evaluation.EvaluationTests.test_each_mutant_hits_designated_invariant) ... ok
+test_event_reordering_and_request_binding (test_evaluation.EvaluationTests.test_event_reordering_and_request_binding) ... ok
+test_foreign_source_bytes_never_staged (test_evaluation.EvaluationTests.test_foreign_source_bytes_never_staged) ... ok
+test_http_transport_materializes_bytes_and_binds_wire_hash (test_evaluation.EvaluationTests.test_http_transport_materializes_bytes_and_binds_wire_hash) ... ok
+test_independent_money_oracle (test_evaluation.EvaluationTests.test_independent_money_oracle) ... ok
+test_input_tampering_is_detected (test_evaluation.EvaluationTests.test_input_tampering_is_detected) ... ok
+test_missing_execution_classification_fails_protocol (test_evaluation.EvaluationTests.test_missing_execution_classification_fails_protocol) ... ok
+test_module_adapter_compatibility (test_evaluation.EvaluationTests.test_module_adapter_compatibility) ... ok
+test_no_oracle_or_future_evidence_in_request (test_evaluation.EvaluationTests.test_no_oracle_or_future_evidence_in_request) ... ok
+test_output_path_escape_and_missing_file (test_evaluation.EvaluationTests.test_output_path_escape_and_missing_file) ... ok
+test_read_only_backend_function_observations (test_evaluation.EvaluationTests.test_read_only_backend_function_observations) ... ok
+test_real_model_request_does_not_promote_offline_results (test_evaluation.EvaluationTests.test_real_model_request_does_not_promote_offline_results) ... ok
+test_stdio_cli_compatibility (test_evaluation.EvaluationTests.test_stdio_cli_compatibility) ... ok
+test_timeout_and_malformed_protocol_fail_closed (test_evaluation.EvaluationTests.test_timeout_and_malformed_protocol_fail_closed) ... ok
+test_unavailable_runtime_reports_blocked_and_not_accepted (test_evaluation.EvaluationTests.test_unavailable_runtime_reports_blocked_and_not_accepted) ... ok
+test_zip_scanner_reads_nested_members (test_evaluation.EvaluationTests.test_zip_scanner_reads_nested_members) ... ok
+
+----------------------------------------------------------------------
+Ran 21 tests in 6.576s
+
+OK

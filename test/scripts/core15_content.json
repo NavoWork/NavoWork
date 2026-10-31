@@ -1,0 +1,1621 @@
+{
+  "schema_version": "tradeworkbench-core15-content/v1",
+  "snapshot": {
+    "snapshot_id": "core15_closeout_2026-10-31",
+    "snapshot_at": "2026-10-31T12:00:00+08:00",
+    "case_id": "BAG-2026-DE-001",
+    "phase": "post-confirmation closeout snapshot; does not rewrite earlier blocked snapshots",
+    "customer": "Weber Outdoor GmbH (fictional)",
+    "contact": "Michael Weber (fictional)",
+    "seller": "Navo Demo Trading (fictional)",
+    "product": "WB-26 custom backpack, navy, 3,000 pieces",
+    "trade_term": "FOB Ningbo, Incoterms 2020",
+    "arrival_target": "Customer wish: arrive Hamburg within 45 days. This is not a seller commitment or confirmed transit plan.",
+    "simulation_notice": "All parties, records, approvals, specifications, measurements, prices and order references in this snapshot are simulated. No real signature, payment, supplier acceptance or production start is represented."
+  },
+  "categories": [
+    {
+      "id": 1,
+      "title_zh": "客户档案",
+      "title_en": "Customer Profile",
+      "filename": "01_customer_profile.pdf",
+      "sections": [
+        {
+          "title": "客户与联系信息",
+          "rows": [
+            [
+              "客户名称",
+              "Weber Outdoor GmbH（模拟）"
+            ],
+            [
+              "联系人",
+              "Michael Weber（模拟）"
+            ],
+            [
+              "电子邮件",
+              "m.weber@example.invalid"
+            ],
+            [
+              "业务性质",
+              "德国户外用品品牌，箱包 OEM/ODM 客户（模拟）"
+            ],
+            [
+              "卖方",
+              "Navo Demo Trading（模拟）"
+            ]
+          ]
+        },
+        {
+          "title": "当前交易上下文",
+          "rows": [
+            [
+              "Case",
+              "BAG-2026-DE-001；后续快照 core15_closeout"
+            ],
+            [
+              "产品",
+              "WB-26 定制背包，海军蓝"
+            ],
+            [
+              "数量",
+              "3,000 件"
+            ],
+            [
+              "贸易术语",
+              "FOB Ningbo, Incoterms 2020"
+            ],
+            [
+              "客户目标",
+              "希望尽可能在 45 天内抵达汉堡；未承诺"
+            ],
+            [
+              "客户状态",
+              "V3 样品与规格/包装范围已模拟确认；量产授权未确认"
+            ]
+          ]
+        }
+      ],
+      "document_id": "BAG-2026-DE-001-CORE15-01",
+      "status": "SIMULATED CUSTOMER PROFILE",
+      "evidence_ids": [
+        "src-bag-2026-de-001-inquiry",
+        "ev-closeout-customer-tech-0900"
+      ],
+      "output_format": "pdf"
+    },
+    {
+      "id": 2,
+      "title_zh": "客户询盘（RFQ）",
+      "title_en": "Customer Request for Quotation",
+      "filename": "02_customer_RFQ.pdf",
+      "sections": [
+        {
+          "title": "客户原始询盘",
+          "rows": [
+            [
+              "客户 / 联系人",
+              "Weber Outdoor GmbH / Michael Weber（模拟）"
+            ],
+            [
+              "来源 / 日期",
+              "既有 inquiry.eml / 2026-10-05；此页为原始询盘整理件"
+            ],
+            [
+              "采购产品",
+              "定制背包；海军蓝；参考图中的织标结构"
+            ],
+            [
+              "采购数量",
+              "3,000 pieces"
+            ],
+            [
+              "贸易要求",
+              "FOB Ningbo, Incoterms 2020"
+            ],
+            [
+              "到港目标",
+              "希望尽可能在 45 天内抵达 Hamburg；客户请求，非承诺"
+            ]
+          ]
+        },
+        {
+          "title": "询盘阶段信息边界",
+          "rows": [
+            [
+              "尺寸 / 面料等级",
+              "初始邮件和参考图未提供；Unknown，不根据图像猜测"
+            ],
+            [
+              "LOGO 尺寸",
+              "初始询盘未提供；后续技术确认在 2026-10-31 关闭"
+            ],
+            [
+              "包装细节",
+              "初始未明确；后续普通纸盒改定制彩盒另留变更证据"
+            ],
+            [
+              "原文摘录",
+              "Hello, we are interested in 3,000 custom backpacks. Please quote FOB Ningbo, Incoterms 2020."
+            ],
+            [
+              "后续处理",
+              "记录缺项，向客户澄清后再发工厂 RFQ；客户询盘与工厂询价是不同文件"
+            ]
+          ]
+        }
+      ],
+      "document_id": "BAG-2026-DE-001-CORE15-02",
+      "status": "CUSTOMER REQUEST / NOT A SELLER COMMITMENT",
+      "evidence_ids": [
+        "src-bag-2026-de-001-inquiry"
+      ],
+      "output_format": "pdf"
+    },
+    {
+      "id": 3,
+      "title_zh": "询盘评估表",
+      "title_en": "Inquiry Assessment",
+      "filename": "03_inquiry_assessment.pdf",
+      "sections": [
+        {
+          "title": "机会摘要",
+          "rows": [
+            [
+              "客户",
+              "Michael Weber / Weber Outdoor GmbH（模拟）"
+            ],
+            [
+              "需求",
+              "WB-26 海军蓝定制背包 3,000 件"
+            ],
+            [
+              "贸易术语",
+              "FOB Ningbo, Incoterms 2020"
+            ],
+            [
+              "价格基准",
+              "V3 USD 9.21/件，总额 USD 27,630.00；仅价格范围获模拟经理批准"
+            ]
+          ]
+        },
+        {
+          "title": "风险与下一步",
+          "rows": [
+            [
+              "技术范围",
+              "客户于 09:00 结束技术细节确认；工厂于 09:30 确认能力、成本、MOQ 和交期口径"
+            ],
+            [
+              "样品",
+              "S03 测量记录在公差内；客户 10:30 仅批准 S03 和 TechPack V3 样品/规格范围"
+            ],
+            [
+              "商务",
+              "Quotation V3 价格于 11:30 获得价格范围内部批准；PI 与销售合同仍为待签草稿"
+            ],
+            [
+              "生产",
+              "生产负责人确认未完成；订金到账未确认；不得显示已放行或已开工"
+            ],
+            [
+              "到港",
+              "45 天汉堡为客户愿望，尚无订舱/运输证据，不能承诺"
+            ]
+          ]
+        }
+      ],
+      "document_id": "BAG-2026-DE-001-CORE15-03",
+      "status": "SIMULATED ASSESSMENT",
+      "evidence_ids": [
+        "src-bag-2026-de-001-inquiry",
+        "ev-closeout-factory-confirmation-0930",
+        "ev-closeout-finance-1100"
+      ],
+      "output_format": "pdf"
+    },
+    {
+      "id": 4,
+      "title_zh": "产品需求确认表",
+      "title_en": "Requirement Confirmation Sheet",
+      "filename": "04_requirement_confirmation.pdf",
+      "sections": [
+        {
+          "title": "客户与订单需求",
+          "rows": [
+            [
+              "客户",
+              "Weber Outdoor GmbH / Michael Weber（模拟）"
+            ],
+            [
+              "款号",
+              "WB-26"
+            ],
+            [
+              "数量",
+              "3,000 件"
+            ],
+            [
+              "颜色",
+              "海军蓝"
+            ],
+            [
+              "贸易术语",
+              "FOB Ningbo, Incoterms 2020"
+            ],
+            [
+              "到港要求",
+              "45 天抵汉堡为愿望，不是卖方承诺"
+            ]
+          ]
+        },
+        {
+          "title": "已确认技术项目",
+          "rows": [
+            [
+              "使用尺寸",
+              "H44 x W30 x D14 cm；各方向 +/-1 cm"
+            ],
+            [
+              "主面料",
+              "600D polyester，PU backing；不含防水认证声明"
+            ],
+            [
+              "里布",
+              "210D"
+            ],
+            [
+              "拉链",
+              "无品牌 nylon #5"
+            ],
+            [
+              "织标",
+              "60 x 18 mm +/-1 mm；前片居中"
+            ],
+            [
+              "包装",
+              "46 x 33 x 8 cm 定制彩盒；5 件/外箱"
+            ]
+          ]
+        },
+        {
+          "title": "责任与状态",
+          "rows": [
+            [
+              "客户技术要求",
+              "由 09:00 模拟邮件记录"
+            ],
+            [
+              "工厂能力确认",
+              "由 09:30 模拟邮件记录"
+            ],
+            [
+              "样品批准",
+              "S03 与 V3 指定范围已批准；不构成量产批准"
+            ],
+            [
+              "内部生产负责人",
+              "待确认"
+            ],
+            [
+              "订金到账",
+              "未知/未确认"
+            ]
+          ]
+        }
+      ],
+      "document_id": "BAG-2026-DE-001-CORE15-04",
+      "status": "CUSTOMER TECHNICAL SCOPE RECORDED",
+      "evidence_ids": [
+        "ev-closeout-customer-tech-0900",
+        "ev-closeout-factory-confirmation-0930"
+      ],
+      "output_format": "pdf"
+    },
+    {
+      "id": 5,
+      "title_zh": "产品规格书（Tech Pack）",
+      "title_en": "Final Tech Pack V3",
+      "filename": "05_techpack_V3.pdf",
+      "sections": [
+        {
+          "title": "版本与适用范围",
+          "rows": [
+            [
+              "文档版本",
+              "TechPack V3；模拟关闭快照 2026-10-31"
+            ],
+            [
+              "Case / 款号",
+              "BAG-2026-DE-001 / WB-26"
+            ],
+            [
+              "样品关联",
+              "Sample S03"
+            ],
+            [
+              "来源",
+              "客户技术确认邮件、工厂 V3 确认邮件、样品测量记录；不从参考图片推断尺寸"
+            ]
+          ]
+        },
+        {
+          "title": "产品结构与材料",
+          "rows": [
+            [
+              "使用状态尺寸",
+              "高 44 x 宽 30 x 深 14 cm；公差 +/-1 cm"
+            ],
+            [
+              "外层",
+              "600D polyester，PU-backed；无防水认证"
+            ],
+            [
+              "里布",
+              "210D lining"
+            ],
+            [
+              "拉链",
+              "无品牌 nylon #5"
+            ],
+            [
+              "LOGO",
+              "织标 60 x 18 mm，公差 +/-1 mm；前片中心位置"
+            ],
+            [
+              "颜色",
+              "海军蓝"
+            ]
+          ]
+        },
+        {
+          "title": "样品记录",
+          "rows": [
+            [
+              "样品编号",
+              "S03（模拟）"
+            ],
+            [
+              "记录尺寸",
+              "H44.0 x W30.0 x D14.0 cm"
+            ],
+            [
+              "织标实测记录",
+              "60 x 18 mm；位置前片居中"
+            ],
+            [
+              "客户结论",
+              "批准 S03 与 TechPack V3 样品规格范围"
+            ],
+            [
+              "限制",
+              "仅一件演示样品记录，不代表量产批次检验或量产放行"
+            ]
+          ]
+        }
+      ],
+      "document_id": "BAG-2026-DE-001-CORE15-05",
+      "status": "TECHPACK V3 - SAMPLE SCOPE APPROVED",
+      "evidence_ids": [
+        "ev-closeout-customer-tech-0900",
+        "ev-closeout-factory-confirmation-0930",
+        "ev-closeout-sample-s03-1000",
+        "ev-closeout-customer-sample-1030"
+      ],
+      "output_format": "pdf"
+    },
+    {
+      "id": 6,
+      "title_zh": "包装与验货要求",
+      "title_en": "Packing and Inspection Requirements",
+      "filename": "06_packing_and_inspection.pdf",
+      "sections": [
+        {
+          "title": "包装规范",
+          "rows": [
+            [
+              "单件包装",
+              "背包折叠后装入定制彩盒 46 x 33 x 8 cm"
+            ],
+            [
+              "外箱装量",
+              "5 件/箱"
+            ],
+            [
+              "外箱尺寸",
+              "48 x 35 x 42 cm"
+            ],
+            [
+              "预计箱数",
+              "600 箱（3,000 件 / 5 件每箱）"
+            ],
+            [
+              "产品净重参考",
+              "0.65 kg/件；模拟参考值，非量产称重"
+            ],
+            [
+              "单箱净重参考",
+              "3.25 kg/箱；模拟参考值，非量产称重"
+            ],
+            [
+              "单箱毛重参考",
+              "4.70 kg/箱；模拟参考值，非量产称重"
+            ]
+          ]
+        },
+        {
+          "title": "检验范围与抽样约定",
+          "rows": [
+            [
+              "批量抽样",
+              "3,000 件批次抽 125 件（双方模拟约定）"
+            ],
+            [
+              "严重缺陷",
+              "允许 0"
+            ],
+            [
+              "主要缺陷",
+              "最多 7"
+            ],
+            [
+              "轻微缺陷",
+              "最多 10"
+            ],
+            [
+              "检查项目",
+              "尺寸、色差、缝线、拉链、织标位置/尺寸、装箱数量与包装状态"
+            ],
+            [
+              "标准说明",
+              "上述抽样数与缺陷限值为双方模拟项目约定，不声称符合 ISO/AQL 认证"
+            ]
+          ]
+        }
+      ],
+      "document_id": "BAG-2026-DE-001-CORE15-06",
+      "status": "SIMULATED PACKING AND QC AGREEMENT",
+      "evidence_ids": [
+        "ev-closeout-factory-confirmation-0930",
+        "ev-closeout-customer-sample-1030"
+      ],
+      "output_format": "pdf"
+    },
+    {
+      "id": 7,
+      "title_zh": "客户需求确认记录",
+      "title_en": "Customer Requirement Confirmation Record",
+      "filename": "07_customer_confirmation_record.pdf",
+      "sections": [
+        {
+          "title": "记录与证据",
+          "rows": [
+            [
+              "确认时间",
+              "2026-10-31 09:00 +08:00；模拟邮件"
+            ],
+            [
+              "来源",
+              "closeout-customer-technical-confirmation.eml"
+            ],
+            [
+              "客户",
+              "Michael Weber（虚构）"
+            ],
+            [
+              "涉及版本",
+              "WB-26 技术要求 / TechPack V3 输入"
+            ]
+          ]
+        },
+        {
+          "title": "确认结果",
+          "rows": [
+            [
+              "尺寸",
+              "使用状态 H44 x W30 x D14 cm +/-1 cm"
+            ],
+            [
+              "材料",
+              "600D polyester PU-backed；不要求或声称防水认证；210D 里布"
+            ],
+            [
+              "五金",
+              "无品牌 nylon #5 拉链"
+            ],
+            [
+              "织标",
+              "60 x 18 mm +/-1 mm，前片中心"
+            ],
+            [
+              "包装",
+              "折叠放入 46 x 33 x 8 cm 定制彩盒"
+            ],
+            [
+              "未包含的确认",
+              "该邮件关闭技术细节收集；不代替 S03 客户样品批准、报价批准或量产授权"
+            ],
+            [
+              "运输目标",
+              "45 天抵汉堡仍为客户愿望"
+            ]
+          ]
+        }
+      ],
+      "document_id": "BAG-2026-DE-001-CORE15-07",
+      "status": "CUSTOMER TECHNICAL CONFIRMATION RECORDED",
+      "evidence_ids": [
+        "ev-closeout-customer-tech-0900",
+        "ev-closeout-customer-sample-1030"
+      ],
+      "output_format": "pdf"
+    },
+    {
+      "id": 8,
+      "title_zh": "供应商报价单",
+      "title_en": "Supplier Quotation V3",
+      "filename": "08_supplier_quotation_V3.xlsx",
+      "sections": [
+        {
+          "title": "供应商与版本",
+          "rows": [
+            [
+              "供应商",
+              "Factory A（模拟）"
+            ],
+            [
+              "确认时间",
+              "2026-10-31 09:30 +08:00"
+            ],
+            [
+              "适用产品",
+              "WB-26，3,000 件，TechPack V3 / 60 mm LOGO"
+            ],
+            [
+              "模拟报价范围",
+              "单件成本组成及定制彩盒包装"
+            ]
+          ]
+        },
+        {
+          "title": "报价与供货条件",
+          "rows": [
+            [
+              "制造单价",
+              "CNY 44.00/件"
+            ],
+            [
+              "定制彩盒",
+              "CNY 5.00/件"
+            ],
+            [
+              "估算本地费用分摊",
+              "CNY 4.00/件；模拟估值"
+            ],
+            [
+              "演示单件成本基数",
+              "CNY 53.00/件"
+            ],
+            [
+              "订单 MOQ",
+              "3,000 件"
+            ],
+            [
+              "彩盒 MOQ",
+              "3,000 只"
+            ],
+            [
+              "生产交期",
+              "28 个日历日；从样品批准、订金到账和内部放行三项全部完成后起算"
+            ],
+            [
+              "到港承诺",
+              "未提供；不承诺 45 天抵汉堡"
+            ]
+          ]
+        }
+      ],
+      "document_id": "BAG-2026-DE-001-CORE15-08",
+      "status": "SUPPLIER CONFIRMATION RECORDED",
+      "evidence_ids": [
+        "ev-closeout-factory-confirmation-0930"
+      ],
+      "output_format": "xlsx"
+    },
+    {
+      "id": 9,
+      "title_zh": "产品成本核算表",
+      "title_en": "Cost Calculation",
+      "filename": "09_costing.xlsx",
+      "sections": [
+        {
+          "title": "WB-26 V3 单件成本（CNY）",
+          "rows": [
+            [
+              "制造成本",
+              "44.00"
+            ],
+            [
+              "定制彩盒",
+              "5.00"
+            ],
+            [
+              "估算本地费用分摊",
+              "4.00"
+            ],
+            [
+              "单件成本合计",
+              "53.00"
+            ]
+          ]
+        },
+        {
+          "title": "报价假设与结果",
+          "rows": [
+            [
+              "汇率",
+              "7.20 CNY/USD；模拟假设"
+            ],
+            [
+              "目标毛利率",
+              "20%；模拟假设，不是成本加成"
+            ],
+            [
+              "单件报价公式",
+              "ceil_cent((53.00 / 7.20) / (1 - 0.20))"
+            ],
+            [
+              "向上取整后单价",
+              "USD 9.21/件"
+            ],
+            [
+              "数量",
+              "3,000 件"
+            ],
+            [
+              "报价总额",
+              "USD 27,630.00"
+            ],
+            [
+              "订金金额参考",
+              "30% = USD 8,289.00；尚未支付"
+            ],
+            [
+              "尾款金额参考",
+              "70% = USD 19,341.00；尚未支付"
+            ]
+          ]
+        },
+        {
+          "title": "限制",
+          "rows": [
+            [
+              "费用口径",
+              "CNY 4.00/件为模拟本地费用估算；不是通用完整 FOB 成本模型"
+            ],
+            [
+              "舍入策略",
+              "先将单价向上舍入到 USD 0.01，再乘以件数"
+            ],
+            [
+              "到港日期",
+              "不在此成本表中承诺"
+            ]
+          ]
+        }
+      ],
+      "document_id": "BAG-2026-DE-001-CORE15-09",
+      "status": "SIMULATED COST BASIS",
+      "evidence_ids": [
+        "ev-closeout-factory-confirmation-0930",
+        "ev-closeout-finance-1100"
+      ],
+      "output_format": "xlsx"
+    },
+    {
+      "id": 10,
+      "title_zh": "客户报价单（Quotation）",
+      "title_en": "Customer Quotation V3",
+      "filename": "10_customer_quotation_V3.pdf",
+      "sections": [
+        {
+          "title": "报价信息",
+          "rows": [
+            [
+              "报价编号",
+              "QT-26031-003-V3（模拟）"
+            ],
+            [
+              "客户",
+              "Weber Outdoor GmbH（模拟）"
+            ],
+            [
+              "产品",
+              "WB-26 海军蓝定制背包"
+            ],
+            [
+              "数量",
+              "3,000 件"
+            ],
+            [
+              "单价",
+              "USD 9.21/件"
+            ],
+            [
+              "总额",
+              "USD 27,630.00"
+            ],
+            [
+              "贸易术语",
+              "FOB Ningbo, Incoterms 2020"
+            ]
+          ]
+        },
+        {
+          "title": "付款与报价范围",
+          "rows": [
+            [
+              "付款条款",
+              "30% 订金 USD 8,289.00；70% 余款 USD 19,341.00，按签署 PI/合同约定执行"
+            ],
+            [
+              "技术依据",
+              "TechPack V3；定制彩盒；客户批准样品 S03 的指定范围"
+            ],
+            [
+              "内部价格批准",
+              "2026-10-31 11:30 模拟经理按 Quotation V3 价格范围批准"
+            ],
+            [
+              "交付时间",
+              "工厂估计在样品批准、订金到账和内部放行后 28 个日历日生产；不包含或承诺到汉堡日期"
+            ],
+            [
+              "状态",
+              "价格范围已批准；本文件为演示报价，不含真实签字或真实发送记录"
+            ],
+            [
+              "报价有效期",
+              "截至 2026-11-30；超过有效期应重新核价"
+            ],
+            [
+              "MOQ",
+              "3,000 件 / 海军蓝单款；彩盒 MOQ 3,000 只"
+            ],
+            [
+              "余款触发条件",
+              "70% 余款按双方签署文件约定于提单副本核对后支付；无到账证据"
+            ],
+            [
+              "费用范围",
+              "含产品、V3 彩盒及估算宁波本地费用；不含海运、保险及目的国进口税费"
+            ]
+          ]
+        }
+      ],
+      "document_id": "BAG-2026-DE-001-CORE15-10",
+      "status": "PRICE APPROVED - NOT SENT",
+      "evidence_ids": [
+        "ev-closeout-customer-sample-1030",
+        "ev-closeout-finance-1100",
+        "ev-closeout-manager-approval-1130"
+      ],
+      "output_format": "pdf"
+    },
+    {
+      "id": 11,
+      "title_zh": "打样申请单",
+      "title_en": "Sample Request",
+      "filename": "11_sample_request.pdf",
+      "sections": [
+        {
+          "title": "申请信息",
+          "rows": [
+            [
+              "样品编号",
+              "S03（模拟样品）"
+            ],
+            [
+              "产品款号",
+              "WB-26"
+            ],
+            [
+              "客户",
+              "Weber Outdoor GmbH（模拟）"
+            ],
+            [
+              "样品规格版本",
+              "TechPack V3"
+            ],
+            [
+              "申请目的",
+              "验证材料、尺寸、60 x 18 mm 织标位置、拉链与彩盒包装"
+            ],
+            [
+              "申请编号 / 申请日期",
+              "SR-WB26-S03 / 2026-10-31 09:35 +08:00（模拟）"
+            ],
+            [
+              "申请人 / 接收方",
+              "模拟业务跟单员 / Factory A 样品房"
+            ],
+            [
+              "样品数量 / 用途",
+              "1 件，内部尺寸核对与客户样品评审；不计入量产数量"
+            ],
+            [
+              "样品费用与寄送",
+              "费用待核实；本演示仅提供记录，无快递寄件或实际交付声明"
+            ]
+          ]
+        },
+        {
+          "title": "制作要求",
+          "rows": [
+            [
+              "主尺寸",
+              "H44 x W30 x D14 cm +/-1 cm"
+            ],
+            [
+              "外层/里布",
+              "600D polyester PU-backed / 210D lining；无防水认证声明"
+            ],
+            [
+              "拉链",
+              "无品牌 nylon #5"
+            ],
+            [
+              "织标",
+              "60 x 18 mm +/-1 mm；前片居中"
+            ],
+            [
+              "单件包装",
+              "折叠放入 46 x 33 x 8 cm 定制彩盒"
+            ],
+            [
+              "样品评审边界",
+              "样品制作/确认不构成量产放行"
+            ]
+          ]
+        }
+      ],
+      "document_id": "BAG-2026-DE-001-CORE15-11",
+      "status": "SIMULATED SAMPLE REQUEST",
+      "evidence_ids": [
+        "ev-closeout-factory-confirmation-0930"
+      ],
+      "output_format": "pdf"
+    },
+    {
+      "id": 12,
+      "title_zh": "样品反馈及修改记录",
+      "title_en": "Sample Feedback and Revision Log",
+      "filename": "12_sample_feedback_revision.pdf",
+      "sections": [
+        {
+          "title": "历史反馈与修改关闭记录",
+          "rows": [
+            [
+              "R01 / 2026-10-19",
+              "客户提出普通纸盒改定制彩盒；此前包装版本不自动被覆盖"
+            ],
+            [
+              "R02 / 2026-10-22",
+              "客户条件式反馈要求织标加宽至 60 mm 并复核彩盒样；当时不构成批准"
+            ],
+            [
+              "R03 / 2026-10-31 09:00",
+              "客户补充 H44 x W30 x D14 cm、材料、60 x 18 mm LOGO，建立 TechPack V3"
+            ],
+            [
+              "修改执行与复核",
+              "Factory A 按 V3 形成 S03 模拟样品；10:00 记录尺寸和织标；10:30 客户限定范围批准"
+            ],
+            [
+              "未关闭业务事项",
+              "订金到账、内部生产放行与 PI/SC 签署保持待办，不用样品确认替代"
+            ]
+          ]
+        },
+        {
+          "title": "样品记录",
+          "rows": [
+            [
+              "样品",
+              "S03（模拟）"
+            ],
+            [
+              "内测时间",
+              "2026-10-31 10:00 +08:00"
+            ],
+            [
+              "记录来源",
+              "模拟内部样品测量邮件"
+            ],
+            [
+              "对应版本",
+              "TechPack V3"
+            ]
+          ]
+        },
+        {
+          "title": "检查与修订",
+          "rows": [
+            [
+              "尺寸记录",
+              "H44.0 x W30.0 x D14.0 cm；在 +/-1 cm 范围内"
+            ],
+            [
+              "织标记录",
+              "60 x 18 mm；前片中心位置"
+            ],
+            [
+              "材料核对",
+              "600D polyester PU-backed，210D lining，无品牌 nylon #5 zipper"
+            ],
+            [
+              "包装核对",
+              "V3 定制彩盒 46 x 33 x 8 cm"
+            ],
+            [
+              "修订状态",
+              "V3 已反映客户与工厂确认的技术要求；该样品记录未提出新增技术变更"
+            ],
+            [
+              "量产限制",
+              "单件样品记录不证明量产批次一致性，也不代表已开工"
+            ]
+          ]
+        }
+      ],
+      "document_id": "BAG-2026-DE-001-CORE15-12",
+      "status": "SIMULATED SAMPLE S03 REVIEW",
+      "evidence_ids": [
+        "ev-closeout-sample-s03-1000",
+        "src-bag-2026-de-001-change-color-box",
+        "src-bag-2026-de-001-customer-conditional-confirmation",
+        "ev-closeout-customer-tech-0900",
+        "ev-closeout-customer-sample-1030"
+      ],
+      "output_format": "pdf"
+    },
+    {
+      "id": 13,
+      "title_zh": "最终样品确认书",
+      "title_en": "Final Sample Confirmation",
+      "filename": "13_final_sample_confirmation.pdf",
+      "sections": [
+        {
+          "title": "确认记录",
+          "rows": [
+            [
+              "确认方",
+              "Michael Weber（模拟客户）"
+            ],
+            [
+              "确认时间",
+              "2026-10-31 10:30 +08:00"
+            ],
+            [
+              "样品",
+              "S03（模拟）"
+            ],
+            [
+              "对应技术包",
+              "TechPack V3"
+            ],
+            [
+              "来源",
+              "closeout-customer-sample-approval-s03.eml"
+            ],
+            [
+              "包装版本",
+              "TechPack V3 定制彩盒包装范围；证据为 2026-10-31 10:30 客户邮件"
+            ],
+            [
+              "审批证据",
+              "ev-closeout-customer-sample-1030；无真实签章"
+            ]
+          ]
+        },
+        {
+          "title": "批准范围",
+          "rows": [
+            [
+              "样品结论",
+              "客户批准 S03 与 TechPack V3 指定的样品规格和包装范围"
+            ],
+            [
+              "技术内容",
+              "WB-26，H44 x W30 x D14 cm +/-1 cm；600D polyester PU-backed；210D lining；无品牌 nylon #5；织标 60 x 18 mm +/-1 mm；V3 彩盒"
+            ],
+            [
+              "未批准事项",
+              "不构成量产放行、生产排期确认、订金到账或 45 天到港承诺"
+            ],
+            [
+              "未完成门禁",
+              "生产负责人确认待办；PI/SC 待签署；订金未确认到账"
+            ]
+          ]
+        }
+      ],
+      "document_id": "BAG-2026-DE-001-CORE15-13",
+      "status": "S03 APPROVED FOR SAMPLE SCOPE ONLY",
+      "evidence_ids": [
+        "ev-closeout-sample-s03-1000",
+        "ev-closeout-customer-sample-1030"
+      ],
+      "output_format": "pdf"
+    },
+    {
+      "id": 14,
+      "title_zh": "订单成交文件（PO / PI / SC）",
+      "title_en": "Order Closing Document Set",
+      "filename": "14_order_closing_bundle",
+      "sections": [
+        {
+          "title": "文件关系与共同字段",
+          "rows": [
+            [
+              "PO",
+              "DE-PO-2026-118-R2（虚构买方订单输入；无模拟真实签字）"
+            ],
+            [
+              "PI",
+              "PI-26031-003（DRAFT / 待签署）"
+            ],
+            [
+              "销售合同",
+              "SC-26031-003（DRAFT / 待签署）"
+            ],
+            [
+              "绑定版本",
+              "TechPack V3、Quotation V3、Sample S03"
+            ],
+            [
+              "数量与金额",
+              "3,000 件 x USD 9.21 = USD 27,630.00"
+            ],
+            [
+              "贸易术语",
+              "FOB Ningbo, Incoterms 2020"
+            ],
+            [
+              "付款拆分",
+              "30% USD 8,289.00；70% USD 19,341.00；两笔均未确认收付"
+            ],
+            [
+              "生产状态",
+              "未放行、未开工；生产负责人确认待办"
+            ]
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "document_id": "DE-PO-2026-118-R2",
+          "title_zh": "买方采购订单 R2",
+          "title_en": "Buyer Purchase Order R2",
+          "filename": "14a_PO_DE-PO-2026-118-R2.pdf",
+          "status": "simulated_customer_issued_input",
+          "sections": [
+            {
+              "title": "订单内容",
+              "rows": [
+                [
+                  "PO 编号",
+                  "DE-PO-2026-118-R2（虚构）"
+                ],
+                [
+                  "买方",
+                  "Weber Outdoor GmbH（模拟）"
+                ],
+                [
+                  "卖方",
+                  "Navo Demo Trading（模拟）"
+                ],
+                [
+                  "产品/版本",
+                  "WB-26 海军蓝背包 / TechPack V3 / Sample S03"
+                ],
+                [
+                  "数量与价格",
+                  "3,000 件；USD 9.21/件；总额 USD 27,630.00"
+                ],
+                [
+                  "贸易术语",
+                  "FOB Ningbo, Incoterms 2020"
+                ],
+                [
+                  "付款",
+                  "30% 订金 USD 8,289.00；70% 余款 USD 19,341.00"
+                ],
+                [
+                  "日期目标",
+                  "45 天抵汉堡为客户愿望，非卖方承诺"
+                ],
+                [
+                  "签署状态",
+                  "模拟订单输入；不含真实签名"
+                ],
+                [
+                  "报价 / 技术附件",
+                  "QT-26031-003-V3 / 最终订单技术附件 V3"
+                ],
+                [
+                  "包装范围",
+                  "V3 定制彩盒 46 x 33 x 8 cm；5 件/箱；600 箱"
+                ],
+                [
+                  "金额口径",
+                  "USD；不含海运、保险和目的国税费；无实际发运记录"
+                ],
+                [
+                  "修订说明",
+                  "R2 新增 TechPack V3 / S03 / 报价 V3 绑定；原 2026-10-30 PO 保留为早期输入，不被改写"
+                ]
+              ]
+            }
+          ],
+          "id": 1,
+          "evidence_ids": [
+            "ev-closeout-customer-sample-1030"
+          ],
+          "output_format": "pdf"
+        },
+        {
+          "document_id": "PI-26031-003",
+          "title_zh": "形式发票草稿",
+          "title_en": "Proforma Invoice Draft",
+          "filename": "14b_PI-26031-003.pdf",
+          "status": "draft_pending_signature",
+          "sections": [
+            {
+              "title": "形式发票",
+              "rows": [
+                [
+                  "PI 编号",
+                  "PI-26031-003（模拟）"
+                ],
+                [
+                  "对应 PO",
+                  "DE-PO-2026-118-R2"
+                ],
+                [
+                  "商业报价依据",
+                  "Quotation V3；USD 9.21/件，仅价格范围获模拟批准"
+                ],
+                [
+                  "技术/样品绑定",
+                  "TechPack V3 / Sample S03；样品批准不等于量产放行"
+                ],
+                [
+                  "产品与数量",
+                  "WB-26 海军蓝背包，3,000 件"
+                ],
+                [
+                  "单价/金额",
+                  "USD 9.21/件；USD 27,630.00"
+                ],
+                [
+                  "贸易术语",
+                  "FOB Ningbo, Incoterms 2020"
+                ],
+                [
+                  "订金",
+                  "30%；USD 8,289.00；未获到账证据"
+                ],
+                [
+                  "余款",
+                  "70%；USD 19,341.00；未获到账证据"
+                ],
+                [
+                  "状态",
+                  "DRAFT；等待双方签署与生产门禁；非已开票/已付款"
+                ],
+                [
+                  "报价 / 技术附件",
+                  "QT-26031-003-V3 / 最终订单技术附件 V3"
+                ],
+                [
+                  "包装范围",
+                  "V3 定制彩盒 46 x 33 x 8 cm；5 件/箱；600 箱"
+                ],
+                [
+                  "金额口径",
+                  "USD；不含海运、保险和目的国税费；无实际发运记录"
+                ],
+                [
+                  "买方 / 卖方",
+                  "Weber Outdoor GmbH / Navo Demo Trading（均模拟）"
+                ],
+                [
+                  "生产周期",
+                  "样品批准、订金到账、内部放行后约 28 个日历日；不构成保证船期"
+                ],
+                [
+                  "付款触发",
+                  "30% 双方确认订单后支付；70% 提单副本核对后支付；待合同签署生效"
+                ],
+                [
+                  "收款资料",
+                  "本测试包不提供真实银行账号；收款指令需独立核验"
+                ]
+              ]
+            }
+          ],
+          "id": 2,
+          "evidence_ids": [
+            "ev-closeout-customer-sample-1030",
+            "ev-closeout-manager-approval-1130"
+          ],
+          "output_format": "pdf"
+        },
+        {
+          "document_id": "SC-26031-003",
+          "title_zh": "销售合同草稿",
+          "title_en": "Sales Contract Draft",
+          "filename": "14c_SC-26031-003.pdf",
+          "status": "draft_pending_signature",
+          "sections": [
+            {
+              "title": "合同要点",
+              "rows": [
+                [
+                  "合同编号",
+                  "SC-26031-003（模拟）"
+                ],
+                [
+                  "订单关联",
+                  "DE-PO-2026-118-R2 / PI-26031-003"
+                ],
+                [
+                  "商业报价依据",
+                  "Quotation V3；USD 9.21/件"
+                ],
+                [
+                  "技术/样品绑定",
+                  "TechPack V3 / Sample S03；仅样品与技术范围获模拟客户批准"
+                ],
+                [
+                  "产品范围",
+                  "WB-26 海军蓝背包，TechPack V3，Sample S03"
+                ],
+                [
+                  "数量与金额",
+                  "3,000 件；USD 27,630.00"
+                ],
+                [
+                  "贸易术语",
+                  "FOB Ningbo, Incoterms 2020"
+                ],
+                [
+                  "付款安排",
+                  "30% 订金；70% 余款；实际收付均未知"
+                ],
+                [
+                  "生产排期条件",
+                  "样品批准、订金到账和内部放行全部完成后，工厂生产周期估计 28 个日历日"
+                ],
+                [
+                  "状态",
+                  "DRAFT；待签署；生产负责人仍未确认放行"
+                ],
+                [
+                  "报价 / 技术附件",
+                  "QT-26031-003-V3 / 最终订单技术附件 V3"
+                ],
+                [
+                  "包装范围",
+                  "V3 定制彩盒 46 x 33 x 8 cm；5 件/箱；600 箱"
+                ],
+                [
+                  "金额口径",
+                  "USD；不含海运、保险和目的国税费；无实际发运记录"
+                ]
+              ]
+            },
+            {
+              "title": "拟议合同条款（待双方审核签署）",
+              "rows": [
+                [
+                  "合同主体",
+                  "卖方 Navo Demo Trading；买方 Weber Outdoor GmbH；均为模拟主体"
+                ],
+                [
+                  "质量与验收",
+                  "以 TechPack V3、S03 封样记录和包装验货要求为质量基线；检验约定不替代实际批次 QC"
+                ],
+                [
+                  "交货与付款",
+                  "FOB Ningbo, Incoterms 2020；30% 订金及 70% 提单副本核对后余款；具体装运日期另行书面确认"
+                ],
+                [
+                  "变更管理",
+                  "规格、价格、数量或交期变更须双方书面确认，绑定新版本后生效，不自动覆盖已批准历史"
+                ],
+                [
+                  "不符处理",
+                  "买方收到货后 14 日内提出可核对的数量/外观异议并保留证据；潜在质量问题按书面补充条款协商"
+                ],
+                [
+                  "延迟与不可抗力",
+                  "受影响方及时书面通知并提供证据，双方协商修订计划；不得单方把客户到港希望写成保证"
+                ],
+                [
+                  "争议处理",
+                  "先友好协商 30 日；未解决的提交双方书面选定仲裁机构，适用法律、仲裁地及语言待签署前明确"
+                ],
+                [
+                  "生效与授权",
+                  "双方有权代表签署后生效；本 PDF 未签署、无真实签章，不代表已有法律承诺或开工授权"
+                ]
+              ]
+            }
+          ],
+          "id": 3,
+          "evidence_ids": [
+            "ev-closeout-customer-sample-1030",
+            "ev-closeout-manager-approval-1130"
+          ],
+          "output_format": "pdf"
+        }
+      ],
+      "document_id": "BAG-2026-DE-001-CORE15-14",
+      "status": "PO INPUT / PI AND SC DRAFTS",
+      "evidence_ids": [
+        "ev-closeout-customer-sample-1030",
+        "ev-closeout-manager-approval-1130"
+      ],
+      "output_format": "pdf"
+    },
+    {
+      "id": 15,
+      "title_zh": "最终订单技术附件",
+      "title_en": "Final Order Technical Annex V3",
+      "filename": "15_order_technical_annex_V3.pdf",
+      "sections": [
+        {
+          "title": "订单绑定",
+          "rows": [
+            [
+              "PO / PI / 合同",
+              "DE-PO-2026-118-R2 / PI-26031-003 / SC-26031-003"
+            ],
+            [
+              "技术版本",
+              "TechPack V3"
+            ],
+            [
+              "样品版本",
+              "S03；客户批准仅覆盖样品与指定规格/包装"
+            ],
+            [
+              "产品",
+              "WB-26 海军蓝背包，3,000 件"
+            ],
+            [
+              "价格引用",
+              "Quotation V3，USD 9.21/件，总额 USD 27,630.00"
+            ]
+          ]
+        },
+        {
+          "title": "量产技术要求",
+          "rows": [
+            [
+              "使用尺寸",
+              "H44 x W30 x D14 cm +/-1 cm"
+            ],
+            [
+              "外层",
+              "600D polyester，PU backing；无防水认证"
+            ],
+            [
+              "里布",
+              "210D"
+            ],
+            [
+              "拉链",
+              "无品牌 nylon #5"
+            ],
+            [
+              "织标",
+              "60 x 18 mm +/-1 mm；前片居中"
+            ],
+            [
+              "彩盒",
+              "46 x 33 x 8 cm；折叠装入"
+            ],
+            [
+              "外箱",
+              "5 件/箱；48 x 35 x 42 cm；总计 600 箱"
+            ],
+            [
+              "重量参考",
+              "0.65 kg/件产品净重；每箱净重 3.25 kg、毛重 4.70 kg；均为模拟参考值，非量产实测"
+            ]
+          ]
+        },
+        {
+          "title": "检验与放行状态",
+          "rows": [
+            [
+              "检验抽样",
+              "双方模拟约定 3,000 件批次抽 125 件；Critical 0 / Major <=7 / Minor <=10；非 ISO 声明"
+            ],
+            [
+              "关注项目",
+              "尺寸、色差、缝线、拉链、织标、装箱数量"
+            ],
+            [
+              "生产交期",
+              "样品批准、订金到账、内部放行全部完成后 28 个日历日；不是到港承诺"
+            ],
+            [
+              "生产负责人",
+              "待确认"
+            ],
+            [
+              "订金",
+              "待支付/到账确认"
+            ],
+            [
+              "生产放行",
+              "未放行；附件是订单技术基线草稿，不等于开工指令"
+            ]
+          ]
+        }
+      ],
+      "document_id": "BAG-2026-DE-001-CORE15-15",
+      "status": "ORDER ANNEX DRAFT - NOT RELEASED",
+      "evidence_ids": [
+        "ev-closeout-customer-tech-0900",
+        "ev-closeout-factory-confirmation-0930",
+        "ev-closeout-customer-sample-1030"
+      ],
+      "output_format": "pdf"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "src-bag-2026-de-001-inquiry",
+      "source_id": "src-bag-2026-de-001-inquiry",
+      "filename": "inquiry.eml",
+      "existing_source": true,
+      "simulated": true,
+      "from": "Michael Weber <m.weber@example.invalid>",
+      "to": "Navo Demo Trading <sales@navo-demo.invalid>",
+      "subject": "Custom backpack inquiry - 3,000 pcs",
+      "datetime": "2026-10-05T09:10:00+02:00",
+      "body": "Hello, we are interested in 3,000 custom backpacks. Please quote FOB Ningbo, Incoterms 2020. Our preferred arrival is Hamburg within 45 days if feasible; this is a request, not a delivery commitment. Please use our navy blue concept and woven logo shown in the attached reference. Please identify any open specifications. Regards, Michael Weber.\n\nSIMULATED SOURCE: all names, addresses and business terms are fictional. This entry references the existing inputs/BAG-2026-DE-001/inquiry.eml.",
+      "existing_path": "inputs/BAG-2026-DE-001/inquiry.eml",
+      "generate": true
+    },
+    {
+      "id": "ev-closeout-customer-tech-0900",
+      "source_id": "src-closeout-customer-tech-0900",
+      "filename": "closeout-customer-technical-confirmation.eml",
+      "simulated": true,
+      "message_id": "<core15-customer-tech-0900@demo.invalid>",
+      "from": "Michael Weber <m.weber@example.invalid>",
+      "to": "Navo Demo Trading <sales@navo-demo.invalid>",
+      "subject": "WB-26 technical details for closeout",
+      "scope": "customer_requirement; closes current technical detail collection, not sample or mass-production approval",
+      "body": "Hello,\n\nFor WB-26, please record the backpack body dimensions in use as H 44 x W 30 x D 14 cm, tolerance +/- 1 cm. The shell should be 600D polyester with a PU backing; this is not a request for or evidence of waterproof certification. Use 210D lining and an unbranded nylon #5 zipper. Place our woven logo at the front center, 60 x 18 mm, tolerance +/- 1 mm.\n\nThe backpack should fold into the custom color box. We are closing these technical details for the current sample review. Please keep the physical sample approval as a separate step. Our preference for arrival in Hamburg within 45 days remains a request only.\n\nRegards,\nMichael Weber\n\nSIMULATED DEMO EVIDENCE.",
+      "datetime": "2026-10-31T09:00:00+08:00",
+      "generate": true
+    },
+    {
+      "id": "ev-closeout-factory-confirmation-0930",
+      "source_id": "src-closeout-factory-confirmation-0930",
+      "filename": "closeout-factory-a-spec-cost-schedule-confirmation.eml",
+      "simulated": true,
+      "message_id": "<core15-factory-confirmation-0930@demo.invalid>",
+      "from": "Factory A Sales <quotes@factory-a.invalid>",
+      "to": "Navo Demo Trading <sales@navo-demo.invalid>",
+      "subject": "WB-26 V3 specification, price, MOQ and lead time",
+      "scope": "supplier_capability and supplier_quote confirmation for WB-26 V3",
+      "body": "Hello,\n\nFactory A confirms that we can make WB-26 to the technical details in the attached V3 specification: in-use size H44 x W30 x D14 cm +/- 1 cm, 600D polyester with PU backing, 210D lining, unbranded nylon #5 zipper, and a front-center woven logo at 60 x 18 mm +/- 1 mm. We confirm the custom color box as 46 x 33 x 8 cm and five packed pieces per outer carton, outer carton 48 x 35 x 42 cm.\n\nThe confirmed MOQ is 3,000 backpacks and the custom color-box MOQ is 3,000 boxes. Our manufacturing price is CNY 44.00 per piece including the 60 x 18 mm woven logo. The custom color box is CNY 5.00 per piece. Our factory subtotal is CNY 49.00 per piece, excluding the seller estimated local allocation of CNY 4.00; the resulting comparison basis is CNY 53.00. Offer FA-WB26-V3 is valid through 2026-11-30. Estimated production lead time is 28 calendar days after approved sample, deposit receipt, and internal release have all occurred. This is a production lead-time estimate, not an arrival-date commitment.\n\nRegards,\nFactory A Sales\n\nSIMULATED DEMO EVIDENCE.\nFor this simulated agreement the indicative product net weight is 0.65 kg per piece, carton product net weight 3.25 kg and indicative gross weight 4.70 kg. These are reference values, not weighed production-lot results. We accept the project sampling plan of 125 pieces from a 3,000-piece lot, with critical defects 0, major at most 7 and minor at most 10, checking dimensions, shade, stitching, zippers, labels and packing count. This is a project agreement, not an ISO certification.",
+      "datetime": "2026-10-31T09:30:00+08:00",
+      "generate": true
+    },
+    {
+      "id": "ev-closeout-sample-s03-1000",
+      "source_id": "src-closeout-sample-s03-1000",
+      "filename": "closeout-internal-sample-measurement-s03.eml",
+      "simulated": true,
+      "message_id": "<core15-sample-s03-1000@demo.invalid>",
+      "from": "Navo Demo Sample Coordinator <sample@navo-demo.invalid>",
+      "to": "Navo Demo Trading <operations@navo-demo.invalid>",
+      "subject": "Internal measurement record - sample S03",
+      "scope": "simulated internal sample measurement; not a production-lot inspection",
+      "body": "Sample S03 was measured for this simulated demo on 2026-10-31. Recorded in-use body size: H44.0 x W30.0 x D14.0 cm. Logo: 60 x 18 mm, front center. The sample has the 600D polyester shell with PU backing, 210D lining, unbranded nylon #5 zipper, and the V3 custom color box. The measured sample is within the stated dimensional and logo tolerances.\n\nThis record describes one demonstration sample only. It is not a production inspection, certification, or evidence that mass production has started.\n\nSIMULATED INTERNAL RECORD; no real inspector signature.",
+      "datetime": "2026-10-31T10:00:00+08:00",
+      "generate": true
+    },
+    {
+      "id": "ev-closeout-customer-sample-1030",
+      "source_id": "src-closeout-customer-sample-1030",
+      "filename": "closeout-customer-sample-approval-s03.eml",
+      "simulated": true,
+      "message_id": "<core15-customer-sample-1030@demo.invalid>",
+      "from": "Michael Weber <m.weber@example.invalid>",
+      "to": "Navo Demo Trading <sales@navo-demo.invalid>",
+      "subject": "Sample S03 and TechPack V3 review",
+      "scope": "customer approval of sample S03 and TechPack V3 packaging/specification only; not mass-production authorization",
+      "body": "Hello,\n\nWe reviewed the simulated sample record and images for sample S03 against TechPack V3. We approve sample S03 and the V3 packaging and specification for this sample-review scope. This approval does not authorize mass production, waive the production release steps, confirm receipt of any deposit, or convert the 45-day Hamburg wish into a delivery promise.\n\nRegards,\nMichael Weber\n\nSIMULATED DEMO EVIDENCE; no real customer signature.\nThe approved packing baseline is a 46 x 33 x 8 cm custom box, five pieces per 48 x 35 x 42 cm outer carton. We accept the agreed project sample plan of 125 pieces from 3,000 with critical 0, major at most 7 and minor at most 10; this approves the inspection requirements, not production-lot inspection results.",
+      "datetime": "2026-10-31T10:30:00+08:00",
+      "generate": true
+    },
+    {
+      "id": "ev-closeout-finance-1100",
+      "source_id": "src-closeout-finance-1100",
+      "filename": "closeout-finance-costing-basis.eml",
+      "simulated": true,
+      "message_id": "<core15-finance-1100@demo.invalid>",
+      "from": "Navo Demo Finance Reviewer <finance@navo-demo.invalid>",
+      "to": "Navo Demo Trading <sales@navo-demo.invalid>",
+      "subject": "WB-26 costing assumptions checked",
+      "scope": "internal costing-basis confirmation for the simulated quotation; not payment or shipment confirmation",
+      "body": "I checked the demo costing basis for 3,000 WB-26 pieces: manufacturing CNY 44.00 per piece, custom color box CNY 5.00 per piece, and estimated local allocation CNY 4.00 per piece, totaling CNY 53.00 per piece. Use the demo exchange rate CNY 7.20 per USD and target gross margin 20%. Round the unit selling price upward to USD 0.01 before multiplying by quantity.\n\nThe CNY 4.00 local allocation is a simulated estimate. This check does not represent a bank rate, a payment received, or a universal FOB cost model.\n\nSIMULATED INTERNAL REVIEW; no real finance signature.",
+      "datetime": "2026-10-31T11:00:00+08:00",
+      "generate": true
+    },
+    {
+      "id": "ev-closeout-manager-approval-1130",
+      "source_id": "src-closeout-manager-approval-1130",
+      "filename": "closeout-manager-quotation-v3-price-approval.eml",
+      "simulated": true,
+      "message_id": "<core15-manager-approval-1130@demo.invalid>",
+      "from": "Navo Demo Pricing Manager <approvals@navo-demo.invalid>",
+      "to": "Navo Demo Trading <sales@navo-demo.invalid>",
+      "subject": "Price-scope approval - WB-26 Quotation V3",
+      "scope": "internal approval of Quotation V3 price only; version-bound; excludes production release and external sending",
+      "body": "I approve the price shown in Quotation V3 for 3,000 WB-26 backpacks at USD 9.21 per piece, total USD 27,630.00, based on the costing assumptions checked by Finance. This approval applies only to the price and total in Quotation V3. It does not authorize mass production, sign PI or the sales contract, authorize external transmission, or confirm receipt of the deposit.\n\nSIMULATED INTERNAL APPROVAL; no real manager signature.",
+      "datetime": "2026-10-31T11:30:00+08:00",
+      "generate": true
+    },
+    {
+      "id": "src-bag-2026-de-001-change-color-box",
+      "filename": "change-color-box.eml",
+      "existing_path": "inputs/BAG-2026-DE-001/change-color-box.eml",
+      "generate": false
+    },
+    {
+      "id": "src-bag-2026-de-001-customer-conditional-confirmation",
+      "filename": "customer-conditional-confirmation.eml",
+      "existing_path": "inputs/BAG-2026-DE-001/customer-conditional-confirmation.eml",
+      "generate": false
+    }
+  ],
+  "calculation": {
+    "currency_inputs": "CNY",
+    "cost_components_per_piece": [
+      [
+        "Manufacturing",
+        "44.00"
+      ],
+      [
+        "Custom color box",
+        "5.00"
+      ],
+      [
+        "Estimated local allocation",
+        "4.00"
+      ]
+    ],
+    "unit_cost_cny": "53.00",
+    "fx_cny_per_usd": "7.20",
+    "target_gross_margin": "0.20",
+    "formula": "ceil_cent((53.00 / 7.20) / (1 - 0.20))",
+    "rounding": "ROUND_UP to USD 0.01 per unit before multiplying quantity",
+    "unit_price_usd": "9.21",
+    "quantity_pieces": "3000",
+    "total_usd": "27630.00",
+    "deposit_percent": "0.30",
+    "deposit_usd": "8289.00",
+    "balance_percent": "0.70",
+    "balance_usd": "19341.00"
+  }
+}

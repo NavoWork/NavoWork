@@ -8,7 +8,7 @@
 
 ```powershell
 python -m venv backend/.venv
-backend/.venv/Scripts/python.exe -m pip install -e 'backend[test]'
+backend/.venv/Scripts/python.exe -m pip install -e agent-kit -e 'backend[test]'
 npm ci
 Copy-Item backend/.env.example backend/.env
 python dev.py
@@ -34,13 +34,17 @@ backend/.venv/Scripts/python.exe demo/advance.py --case de_a --step quote
 ## 验证
 
 ```powershell
-backend/.venv/Scripts/python.exe -m pytest -q
+backend/.venv/Scripts/python.exe -m pytest backend/tests agent-kit/tests -q
 npm run typecheck
 npm run test
 npm run build
 ```
 
 可在 `backend/.env` 设置 `MODEL_API_KEY` 和 `MODEL_NAME` 启用模型抽取；未配置时用有限规则提取，未知字段保持待确认。正式商业批准、外部确认和生产放行由服务端门禁控制，草稿下载不表示已发送或已开工。演示账号和默认密钥仅用于本机演示，不可公开部署。
+
+新增文件工具执行链见 [agent-kit/README.md](agent-kit/README.md)。设置 `AGENT_FILE_TOOLS=1` 后，对话报价/变更目标使用真实模型工具调用，读取已上传的 Case 资料及本次显式引用的画板附件，返回真实规格 DOCX、成本 XLSX、客户报价 XLSX/PDF。汇率和毛利可在对话中明确提供，例如“汇率7.20，毛利20%”。缺价先生成草稿，再通过现有澄清机制补证继续。此模式无模型配置时明确失败；确定性离线回放不代表真实 Agent 或浏览器集成已验收。
+
+文件工具无模型场景的真实浏览器检查：在 `fontend/` 执行 `npm run test:e2e -- --config=playwright.file-tools.config.ts`。该检查会使用独立临时业务存储、上传实际 XLSX，并验证 API/Worker/页面明确失败及刷新后的文件保存；它不替代真实模型报价主线。
 
 ## 开发与文档
 
@@ -52,3 +56,7 @@ npm run build
 - [新版前端适配：架构、实际节点链路与接口 v1.1](doc/Frontend_Backend_Adaptation_v1.1.md)
 - [后端开发计划](后端开发计划.md)
 - [前端接口说明](fontend/docs/INTEGRATION.md)
+- [文件 Agent 验证记录](agent-kit/docs/verification.md)
+- [BOM 图片候选模块](extensions/bom-vision/README.md)
+- [样品与订单 Skills](extensions/order-skills/README.md)
+- [独立评测入口](evaluation/README.md)

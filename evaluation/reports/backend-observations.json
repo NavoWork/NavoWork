@@ -1,0 +1,94 @@
+{
+  "schema": "navowork-backend-observations/1",
+  "status": "completed",
+  "repository_head": "4e34ce0958912fc3326358589a520cbf38c5103e",
+  "execution_layer": "offline_backend_function_probe",
+  "simulated_inputs": true,
+  "model_executed": false,
+  "backend_service_executed": false,
+  "file_visual_review": "not_performed",
+  "product_acceptance": "not_accepted",
+  "source_references": [
+    {
+      "file": "backend/app/agent.py",
+      "function": "price_quote",
+      "line": 75,
+      "sha256": "887f220e082ba9c975430b0a8c79c6fe00b5fb9d7d5b9b11c5bb6584a92bff98"
+    },
+    {
+      "file": "backend/app/agent.py",
+      "function": "extract_without_model",
+      "line": 94,
+      "sha256": "887f220e082ba9c975430b0a8c79c6fe00b5fb9d7d5b9b11c5bb6584a92bff98"
+    },
+    {
+      "file": "backend/app/agent.py",
+      "function": "understand_node",
+      "line": 121,
+      "sha256": "887f220e082ba9c975430b0a8c79c6fe00b5fb9d7d5b9b11c5bb6584a92bff98"
+    },
+    {
+      "file": "backend/app/agent.py",
+      "function": "draft_node",
+      "line": 168,
+      "sha256": "887f220e082ba9c975430b0a8c79c6fe00b5fb9d7d5b9b11c5bb6584a92bff98"
+    },
+    {
+      "file": "backend/app/worker.py",
+      "function": "build_revision",
+      "line": 55,
+      "sha256": "f3ae56f31d7eecbfe7e297652ce4d690e625e3c7d10bfe0dcf26f2ea1374f204"
+    },
+    {
+      "file": "backend/app/exports.py",
+      "function": "export_artifact",
+      "line": 129,
+      "sha256": "4aac419930d7cf58e2ea94cfa9e4848eab8471612f4f4cdae4f99f1047601d81"
+    }
+  ],
+  "observations": [
+    {
+      "id": "BACKEND-AMOUNT",
+      "status": "observed",
+      "scope": "build_revision pure function with inconsistent input state",
+      "actual": {
+        "requirements_quantity": 3200,
+        "quote_quantity": 3000,
+        "subtotal_minor": 2607000
+      },
+      "limit": "No API or Worker end-to-end path was run; this proves the function does not reconcile these quantities, not that a live request reaches this state."
+    },
+    {
+      "id": "BACKEND-STALE",
+      "status": "observed",
+      "scope": "understand_node pure function, model extraction disabled",
+      "actual": {
+        "updated_source_quantity": 4800,
+        "prior_quantity": 3000,
+        "result_quantity": 3000
+      },
+      "limit": "Function-level stale field retention; file/version tool integration was not exercised."
+    },
+    {
+      "id": "BACKEND-RAW-EXPORT",
+      "status": "observed",
+      "scope": "draft_node spec referenceExcerpts → export_artifact HTML, in-memory store_blob",
+      "actual": {
+        "internal_source_excerpt_retained": true,
+        "rendered_sha256": "cf172f5e3b69b6363f20196be4a3718cbbb362fd9838944c1c599a72dfc1ef4b",
+        "format": "html"
+      },
+      "limit": "Generic artifact export retains internal excerpts. No customer audience/package route was exercised; do not label this a reproduced customer package leak."
+    },
+    {
+      "id": "BACKEND-FALSE-SUCCESS",
+      "status": "not_tested",
+      "limit": "No live tool/runtime supplied. Only the intentionally defective adapter demonstrates evaluator detection."
+    },
+    {
+      "id": "BACKEND-CUSTOMER-PACKAGE",
+      "status": "not_tested",
+      "limit": "Actual audience-controlled customer package endpoint not provided; mutation test is not a backend reproduction."
+    }
+  ]
+}

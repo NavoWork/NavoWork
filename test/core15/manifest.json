@@ -1,0 +1,270 @@
+{
+  "schema_version": "tradeworkbench-core15/v1",
+  "case_id": "BAG-2026-DE-001",
+  "snapshot": "core15_closeout_2026-10-31",
+  "simulation_only": true,
+  "previous_snapshot_preserved": "test/cases/BAG-2026-DE-001.json",
+  "versions": {
+    "tech_pack": "V3",
+    "quotation": "V3",
+    "sample": "S03",
+    "po": "DE-PO-2026-118-R2",
+    "pi": "PI-26031-003",
+    "sc": "SC-26031-003",
+    "technical_annex": "V3"
+  },
+  "commercial": {
+    "quantity_pcs": 3000,
+    "unit_price_usd": "9.21",
+    "total_usd": "27630.00",
+    "deposit_due_usd": "8289.00",
+    "balance_due_usd": "19341.00",
+    "deposit_received": null
+  },
+  "gates": {
+    "sample_approval": "approved_simulated_S03_only",
+    "price_approval": "approved_simulated_V3_price_only",
+    "external_send": "not_connected",
+    "order_execution": "blocked_pending_contract_signature",
+    "production_release": "blocked",
+    "production_blockers": [
+      "PI/SC not signed",
+      "deposit receipt not evidenced",
+      "internal production release approval missing"
+    ]
+  },
+  "categories": [
+    {
+      "id": 1,
+      "name_zh": "客户档案",
+      "name_en": "Customer Profile",
+      "files": [
+        "01_customer_profile.pdf"
+      ]
+    },
+    {
+      "id": 2,
+      "name_zh": "客户询盘（RFQ）",
+      "name_en": "Customer Request for Quotation",
+      "files": [
+        "02_customer_RFQ.pdf"
+      ]
+    },
+    {
+      "id": 3,
+      "name_zh": "询盘评估表",
+      "name_en": "Inquiry Assessment",
+      "files": [
+        "03_inquiry_assessment.pdf"
+      ]
+    },
+    {
+      "id": 4,
+      "name_zh": "产品需求确认表",
+      "name_en": "Requirement Confirmation Sheet",
+      "files": [
+        "04_requirement_confirmation.pdf"
+      ]
+    },
+    {
+      "id": 5,
+      "name_zh": "产品规格书（Tech Pack）",
+      "name_en": "Final Tech Pack V3",
+      "files": [
+        "05_techpack_V3.pdf"
+      ]
+    },
+    {
+      "id": 6,
+      "name_zh": "包装与验货要求",
+      "name_en": "Packing and Inspection Requirements",
+      "files": [
+        "06_packing_and_inspection.pdf"
+      ]
+    },
+    {
+      "id": 7,
+      "name_zh": "客户需求确认记录",
+      "name_en": "Customer Requirement Confirmation Record",
+      "files": [
+        "07_customer_confirmation_record.pdf"
+      ]
+    },
+    {
+      "id": 8,
+      "name_zh": "供应商报价单",
+      "name_en": "Supplier Quotation V3",
+      "files": [
+        "08_supplier_quotation_V3.xlsx"
+      ]
+    },
+    {
+      "id": 9,
+      "name_zh": "产品成本核算表",
+      "name_en": "Cost Calculation",
+      "files": [
+        "09_costing.xlsx"
+      ]
+    },
+    {
+      "id": 10,
+      "name_zh": "客户报价单（Quotation）",
+      "name_en": "Customer Quotation V3",
+      "files": [
+        "10_customer_quotation_V3.pdf"
+      ]
+    },
+    {
+      "id": 11,
+      "name_zh": "打样申请单",
+      "name_en": "Sample Request",
+      "files": [
+        "11_sample_request.pdf"
+      ]
+    },
+    {
+      "id": 12,
+      "name_zh": "样品反馈及修改记录",
+      "name_en": "Sample Feedback and Revision Log",
+      "files": [
+        "12_sample_feedback_revision.pdf"
+      ]
+    },
+    {
+      "id": 13,
+      "name_zh": "最终样品确认书",
+      "name_en": "Final Sample Confirmation",
+      "files": [
+        "13_final_sample_confirmation.pdf"
+      ]
+    },
+    {
+      "id": 14,
+      "name_zh": "订单成交文件（PO / PI / SC）",
+      "name_en": "Order Closing Document Set",
+      "files": [
+        "14a_PO_DE-PO-2026-118-R2.pdf",
+        "14b_PI-26031-003.pdf",
+        "14c_SC-26031-003.pdf"
+      ]
+    },
+    {
+      "id": 15,
+      "name_zh": "最终订单技术附件",
+      "name_en": "Final Order Technical Annex V3",
+      "files": [
+        "15_order_technical_annex_V3.pdf"
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "id": "src-bag-2026-de-001-inquiry",
+      "path": "evidence/original-inquiry.eml",
+      "original_path": "inputs/BAG-2026-DE-001/inquiry.eml",
+      "sha256": "4a5be87b2954941cfc7799af499b2307f376e9cb888ede8404e096035bc5d362",
+      "existing_source": true
+    },
+    {
+      "id": "ev-closeout-customer-tech-0900",
+      "alias": "E01",
+      "source_id": "src-closeout-customer-tech-0900",
+      "path": "evidence/closeout-customer-technical-confirmation.eml",
+      "sha256": "138965ab47a8c4e86bbdeeefcd9a04583e2f2df971a230d66665c537e8dab991",
+      "datetime": "2026-10-31T09:00:00+08:00",
+      "scope": "customer_requirement; closes current technical detail collection, not sample or mass-production approval"
+    },
+    {
+      "id": "ev-closeout-factory-confirmation-0930",
+      "alias": "E02",
+      "source_id": "src-closeout-factory-confirmation-0930",
+      "path": "evidence/closeout-factory-a-spec-cost-schedule-confirmation.eml",
+      "sha256": "1fad71a960cd34b0a83a83b6d84e7fd032430495a04095ae07058345ccab2903",
+      "datetime": "2026-10-31T09:30:00+08:00",
+      "scope": "supplier_capability and supplier_quote confirmation for WB-26 V3"
+    },
+    {
+      "id": "ev-closeout-sample-s03-1000",
+      "alias": "E03",
+      "source_id": "src-closeout-sample-s03-1000",
+      "path": "evidence/closeout-internal-sample-measurement-s03.eml",
+      "sha256": "b2bfcdae34ce466eedd5b2ef26dd01c6f1a5fd15a60e3f7365910eefb1414bb6",
+      "datetime": "2026-10-31T10:00:00+08:00",
+      "scope": "simulated internal sample measurement; not a production-lot inspection"
+    },
+    {
+      "id": "ev-closeout-customer-sample-1030",
+      "alias": "E04",
+      "source_id": "src-closeout-customer-sample-1030",
+      "path": "evidence/closeout-customer-sample-approval-s03.eml",
+      "sha256": "2c3735d78da9b9226a109c7981e96751f53158b84c08d2e8eff73e47e422a482",
+      "datetime": "2026-10-31T10:30:00+08:00",
+      "scope": "customer approval of sample S03 and TechPack V3 packaging/specification only; not mass-production authorization"
+    },
+    {
+      "id": "ev-closeout-finance-1100",
+      "alias": "E05",
+      "source_id": "src-closeout-finance-1100",
+      "path": "evidence/closeout-finance-costing-basis.eml",
+      "sha256": "42459538ee6d774a1cab217eb0936c6bf60ec62547544692db23671cc850d55c",
+      "datetime": "2026-10-31T11:00:00+08:00",
+      "scope": "internal costing-basis confirmation for the simulated quotation; not payment or shipment confirmation"
+    },
+    {
+      "id": "ev-closeout-manager-approval-1130",
+      "alias": "E06",
+      "source_id": "src-closeout-manager-approval-1130",
+      "path": "evidence/closeout-manager-quotation-v3-price-approval.eml",
+      "sha256": "0999a9b95f70c1bab6eb89b2ff0d97e7c7d0c93ef9343b324c876e3fd177b112",
+      "datetime": "2026-10-31T11:30:00+08:00",
+      "scope": "internal approval of Quotation V3 price only; version-bound; excludes production release and external sending"
+    },
+    {
+      "id": "src-bag-2026-de-001-change-color-box",
+      "path": "evidence/original-change-color-box.eml",
+      "original_path": "inputs/BAG-2026-DE-001/change-color-box.eml",
+      "sha256": "2c8250e795bc97e50fe022b61831a3bdcf77d4c174904ecddb8ec6a5ff89c498",
+      "existing_source": true
+    },
+    {
+      "id": "src-bag-2026-de-001-customer-conditional-confirmation",
+      "path": "evidence/original-customer-conditional-confirmation.eml",
+      "original_path": "inputs/BAG-2026-DE-001/customer-conditional-confirmation.eml",
+      "sha256": "f4c8ddd8be962c3c0c2add4742aad4a00bc0ad01d47bf7a821cc3ef9eb3a6c61",
+      "existing_source": true
+    }
+  ],
+  "artifact_hashes": {
+    "01_customer_profile.pdf": "a74309c14cf6ad9cbf0c6694a3f0fabf0f2c7435bac2693cb125206e6e7d7906",
+    "02_customer_RFQ.pdf": "31300bf1a81b4dd5ac43b15563c131d16235a21eb8e01bf4ea1feba018c7c4df",
+    "03_inquiry_assessment.pdf": "9c3c8ba34b5108f0a54686e176067b2e9a557b9af54f438ae2b019e6d80b94f9",
+    "04_requirement_confirmation.pdf": "3f998fc292e3c8877a59f6247b8fa76eda664dda4b53a760c8139223fd48b951",
+    "05_techpack_V3.pdf": "66835b3579c51ea190199ea5b75e8e7284b4b555c30686241f954f03d7a9eec6",
+    "06_packing_and_inspection.pdf": "1d2b65da88dd83640d1faff658f65f2fcf818c0f415ed313db3e95c5acc73989",
+    "07_customer_confirmation_record.pdf": "6341e39eb5e611552e97dde6a3461641962d2dbe87e8f6729e057f11284629a4",
+    "08_supplier_quotation_V3.xlsx": "3170d6fd97b4556ec266778546abb0d294e809892523c33e456658563e0d4f8d",
+    "09_costing.xlsx": "779692c9d6681c2e7a53203b4a5245f7117b75299c414fe920e7c87f7ed59683",
+    "10_customer_quotation_V3.pdf": "fbb2959623cfc35c56995cad9bce79a36ede0190c7b0bb02b470d8dcafdaac63",
+    "11_sample_request.pdf": "cc72b5fc4a4b3b8cb6cda07601293957f14ccd98f417a8df5cd2237881b12711",
+    "12_sample_feedback_revision.pdf": "bfc6325594fcec7e2dd62d6072e4330a9d51d49d2ff74dabe5663363e6ca6c04",
+    "13_final_sample_confirmation.pdf": "66785143395cdd895e281e895587b78b830eb8ca182a4e94806666d0ac1b6b8b",
+    "14a_PO_DE-PO-2026-118-R2.pdf": "2cc59e4b0c8894a85ce1208065872b7865ede7ec8863a89b63280b1c1447a694",
+    "14b_PI-26031-003.pdf": "20edee8d768fb050b8ce232733286f9f8a873120800cbf08d2842dff14f55807",
+    "14c_SC-26031-003.pdf": "133ce35d3b2986cfb83c6bb125774c356e6a2fd0811a394d5cbc4d8ba0a54637",
+    "15_order_technical_annex_V3.pdf": "d5dea900cbf13cbb4d097d587b9d5df3c784227a3d170ed974025122b9394eb1"
+  },
+  "approval_bindings": [
+    {
+      "scope": "sample_S03_and_TechPack_V3",
+      "evidence_id": "ev-closeout-customer-sample-1030",
+      "target_file": "13_final_sample_confirmation.pdf",
+      "sha256": "66785143395cdd895e281e895587b78b830eb8ca182a4e94806666d0ac1b6b8b"
+    },
+    {
+      "scope": "Quotation_V3_price_only",
+      "evidence_id": "ev-closeout-manager-approval-1130",
+      "target_file": "10_customer_quotation_V3.pdf",
+      "sha256": "fbb2959623cfc35c56995cad9bce79a36ede0190c7b0bb02b470d8dcafdaac63"
+    }
+  ]
+}

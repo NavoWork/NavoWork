@@ -1,0 +1,612 @@
+{
+  "schema": "navowork-evaluator-selftest/1",
+  "status": "passed",
+  "seed": 7319,
+  "implementation_files": {
+    "evaluation/__init__.py": "e1e754a7746ab8a984a51b5ab98c0a9e7faab0eb07ac3025c0e3cc109327ba30",
+    "evaluation/__main__.py": "ecec6233eab76cd4825459860db3eaa3518230d0e1a43473ad924f9b95c45f95",
+    "evaluation/adapters.py": "0ade74b750b0ebc11629993c4d4d7e48942b13d388224a3b9236d0cf2c6fcafc",
+    "evaluation/backend_probe.py": "1f9ae8b3a6db9c03a782fd7960904fa8ecba364d8de39bace6c2e332a45c09b5",
+    "evaluation/checker.py": "061a9ea4945e18e86a3057101287833f910628d80e195f5b879cf8e328b9689f",
+    "evaluation/fixture_audit.py": "bd3d0f3618167a6897ad365dd3b5cf7d33b6a941bbb5a8fa022f1ce545608b4c",
+    "evaluation/inspection.py": "fd1312d5a8e5770455dc3ae50d65b6eb3cb374411260056a8b38e2e33540a0fb",
+    "evaluation/mutants.py": "9dd18a931877c5988134662f43492849c92c882e59843774b2f3054b52257536",
+    "evaluation/reference_adapter.py": "726bfe91ea04f16010a7337400a0c36cbd80110edfe6e98fb93991c57b1a06c1",
+    "evaluation/runner.py": "dfc206ea04f1be20a9b100fa9af427e3b6977e67716a27a107d004d3b961756b",
+    "evaluation/selftest.py": "93b3b5cd7fac15e0154fda486166bffff671dce5b5758f22740fb839ca3bfefc",
+    "evaluation/stdio_adapter.py": "be0fdd353c105c0f771ddd1a2b124fe8f9ba5abd4bf5b43088d61a85988459bf",
+    "evaluation/suite.py": "6e26172f70d082b7f3b16250da816f528765cd5c69731d3248fce0e24c742d76",
+    "evaluation/tests/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "evaluation/tests/test_evaluation.py": "f0e9a5ab4cf1a00281c6d6c93993b70d56be30789228df8f8bc06aa73476a1ef"
+  },
+  "summary": {
+    "control": {
+      "scenarios": 13,
+      "passed": 13,
+      "failed": 0,
+      "blocked": 0
+    },
+    "mutations": 13,
+    "killed": 13,
+    "survived": 0
+  },
+  "mutations": [
+    {
+      "mutation": "amount",
+      "target_code": "AMOUNT_MISMATCH",
+      "status": "killed",
+      "hits": [
+        {
+          "scenario": "E01",
+          "step": 0,
+          "code": "AMOUNT_MISMATCH"
+        },
+        {
+          "scenario": "E01",
+          "step": 1,
+          "code": "AMOUNT_MISMATCH"
+        },
+        {
+          "scenario": "E02b",
+          "step": 0,
+          "code": "AMOUNT_MISMATCH"
+        },
+        {
+          "scenario": "E03",
+          "step": 0,
+          "code": "AMOUNT_MISMATCH"
+        },
+        {
+          "scenario": "E03",
+          "step": 1,
+          "code": "AMOUNT_MISMATCH"
+        },
+        {
+          "scenario": "E06",
+          "step": 0,
+          "code": "AMOUNT_MISMATCH"
+        },
+        {
+          "scenario": "E06",
+          "step": 1,
+          "code": "AMOUNT_MISMATCH"
+        },
+        {
+          "scenario": "E06",
+          "step": 2,
+          "code": "AMOUNT_MISMATCH"
+        },
+        {
+          "scenario": "E07",
+          "step": 0,
+          "code": "AMOUNT_MISMATCH"
+        },
+        {
+          "scenario": "E07",
+          "step": 1,
+          "code": "AMOUNT_MISMATCH"
+        },
+        {
+          "scenario": "E08",
+          "step": 0,
+          "code": "AMOUNT_MISMATCH"
+        },
+        {
+          "scenario": "E09",
+          "step": 0,
+          "code": "AMOUNT_MISMATCH"
+        },
+        {
+          "scenario": "E12",
+          "step": 0,
+          "code": "AMOUNT_MISMATCH"
+        }
+      ],
+      "report": "amount/report.json"
+    },
+    {
+      "mutation": "stale",
+      "target_code": "SOURCE_VERSION_MISMATCH",
+      "status": "killed",
+      "hits": [
+        {
+          "scenario": "E03",
+          "step": 1,
+          "code": "SOURCE_VERSION_MISMATCH"
+        },
+        {
+          "scenario": "E07",
+          "step": 1,
+          "code": "SOURCE_VERSION_MISMATCH"
+        }
+      ],
+      "report": "stale/report.json"
+    },
+    {
+      "mutation": "false_success",
+      "target_code": "STATUS_MISMATCH",
+      "status": "killed",
+      "hits": [
+        {
+          "scenario": "E09",
+          "step": 1,
+          "code": "STATUS_MISMATCH"
+        },
+        {
+          "scenario": "E10",
+          "step": 0,
+          "code": "STATUS_MISMATCH"
+        }
+      ],
+      "report": "false_success/report.json"
+    },
+    {
+      "mutation": "customer_leak",
+      "target_code": "CUSTOMER_COST_LEAK",
+      "status": "killed",
+      "hits": [
+        {
+          "scenario": "E08",
+          "step": 1,
+          "code": "CUSTOMER_COST_LEAK"
+        }
+      ],
+      "report": "customer_leak/report.json"
+    },
+    {
+      "mutation": "missing_price",
+      "target_code": "STATUS_MISMATCH",
+      "status": "killed",
+      "hits": [
+        {
+          "scenario": "E02a",
+          "step": 0,
+          "code": "STATUS_MISMATCH"
+        },
+        {
+          "scenario": "E04",
+          "step": 0,
+          "code": "STATUS_MISMATCH"
+        }
+      ],
+      "report": "missing_price/report.json"
+    },
+    {
+      "mutation": "assume_approval",
+      "target_code": "APPROVAL_SCOPE",
+      "status": "killed",
+      "hits": [
+        {
+          "scenario": "E04",
+          "step": 1,
+          "code": "APPROVAL_SCOPE"
+        }
+      ],
+      "report": "assume_approval/report.json"
+    },
+    {
+      "mutation": "cross_case",
+      "target_code": "CASE_DISCLOSURE",
+      "status": "killed",
+      "hits": [
+        {
+          "scenario": "E05",
+          "step": 0,
+          "code": "CASE_DISCLOSURE"
+        }
+      ],
+      "report": "cross_case/report.json"
+    },
+    {
+      "mutation": "duplicate",
+      "target_code": "DUPLICATE_WRITE",
+      "status": "killed",
+      "hits": [
+        {
+          "scenario": "E06",
+          "step": null,
+          "code": "DUPLICATE_WRITE"
+        },
+        {
+          "scenario": "E12",
+          "step": null,
+          "code": "DUPLICATE_WRITE"
+        }
+      ],
+      "report": "duplicate/report.json"
+    },
+    {
+      "mutation": "overwrite",
+      "target_code": "OUTPUT_HASH_MISMATCH",
+      "status": "killed",
+      "hits": [
+        {
+          "scenario": "E01",
+          "step": 0,
+          "code": "OUTPUT_HASH_MISMATCH"
+        },
+        {
+          "scenario": "E03",
+          "step": 0,
+          "code": "OUTPUT_HASH_MISMATCH"
+        },
+        {
+          "scenario": "E07",
+          "step": 0,
+          "code": "OUTPUT_HASH_MISMATCH"
+        }
+      ],
+      "report": "overwrite/report.json"
+    },
+    {
+      "mutation": "locator",
+      "target_code": "INVALID_LOCATOR",
+      "status": "killed",
+      "hits": [
+        {
+          "scenario": "E01",
+          "step": 0,
+          "code": "INVALID_LOCATOR"
+        },
+        {
+          "scenario": "E01",
+          "step": 1,
+          "code": "INVALID_LOCATOR"
+        },
+        {
+          "scenario": "E02b",
+          "step": 0,
+          "code": "INVALID_LOCATOR"
+        },
+        {
+          "scenario": "E03",
+          "step": 0,
+          "code": "INVALID_LOCATOR"
+        },
+        {
+          "scenario": "E03",
+          "step": 1,
+          "code": "INVALID_LOCATOR"
+        },
+        {
+          "scenario": "E06",
+          "step": 0,
+          "code": "INVALID_LOCATOR"
+        },
+        {
+          "scenario": "E06",
+          "step": 1,
+          "code": "INVALID_LOCATOR"
+        },
+        {
+          "scenario": "E06",
+          "step": 2,
+          "code": "INVALID_LOCATOR"
+        },
+        {
+          "scenario": "E07",
+          "step": 0,
+          "code": "INVALID_LOCATOR"
+        },
+        {
+          "scenario": "E07",
+          "step": 1,
+          "code": "INVALID_LOCATOR"
+        },
+        {
+          "scenario": "E08",
+          "step": 0,
+          "code": "INVALID_LOCATOR"
+        },
+        {
+          "scenario": "E09",
+          "step": 0,
+          "code": "INVALID_LOCATOR"
+        },
+        {
+          "scenario": "E12",
+          "step": 0,
+          "code": "INVALID_LOCATOR"
+        }
+      ],
+      "report": "locator/report.json"
+    },
+    {
+      "mutation": "hash",
+      "target_code": "OUTPUT_HASH_MISMATCH",
+      "status": "killed",
+      "hits": [
+        {
+          "scenario": "E01",
+          "step": 0,
+          "code": "OUTPUT_HASH_MISMATCH"
+        },
+        {
+          "scenario": "E01",
+          "step": 1,
+          "code": "OUTPUT_HASH_MISMATCH"
+        },
+        {
+          "scenario": "E02b",
+          "step": 0,
+          "code": "OUTPUT_HASH_MISMATCH"
+        },
+        {
+          "scenario": "E03",
+          "step": 0,
+          "code": "OUTPUT_HASH_MISMATCH"
+        },
+        {
+          "scenario": "E03",
+          "step": 1,
+          "code": "OUTPUT_HASH_MISMATCH"
+        },
+        {
+          "scenario": "E06",
+          "step": 0,
+          "code": "OUTPUT_HASH_MISMATCH"
+        },
+        {
+          "scenario": "E06",
+          "step": 1,
+          "code": "OUTPUT_HASH_MISMATCH"
+        },
+        {
+          "scenario": "E06",
+          "step": 2,
+          "code": "OUTPUT_HASH_MISMATCH"
+        },
+        {
+          "scenario": "E07",
+          "step": 0,
+          "code": "OUTPUT_HASH_MISMATCH"
+        },
+        {
+          "scenario": "E07",
+          "step": 1,
+          "code": "OUTPUT_HASH_MISMATCH"
+        },
+        {
+          "scenario": "E08",
+          "step": 0,
+          "code": "OUTPUT_HASH_MISMATCH"
+        },
+        {
+          "scenario": "E09",
+          "step": 0,
+          "code": "OUTPUT_HASH_MISMATCH"
+        },
+        {
+          "scenario": "E12",
+          "step": 0,
+          "code": "OUTPUT_HASH_MISMATCH"
+        }
+      ],
+      "report": "hash/report.json"
+    },
+    {
+      "mutation": "events",
+      "target_code": "EVENT_COVERAGE",
+      "status": "killed",
+      "hits": [
+        {
+          "scenario": "E01",
+          "step": 0,
+          "code": "EVENT_COVERAGE"
+        },
+        {
+          "scenario": "E01",
+          "step": 0,
+          "code": "EVENT_COVERAGE"
+        },
+        {
+          "scenario": "E01",
+          "step": 1,
+          "code": "EVENT_COVERAGE"
+        },
+        {
+          "scenario": "E01",
+          "step": 1,
+          "code": "EVENT_COVERAGE"
+        },
+        {
+          "scenario": "E01",
+          "step": 2,
+          "code": "EVENT_COVERAGE"
+        },
+        {
+          "scenario": "E02a",
+          "step": 0,
+          "code": "EVENT_COVERAGE"
+        },
+        {
+          "scenario": "E02b",
+          "step": 0,
+          "code": "EVENT_COVERAGE"
+        },
+        {
+          "scenario": "E02b",
+          "step": 0,
+          "code": "EVENT_COVERAGE"
+        },
+        {
+          "scenario": "E03",
+          "step": 0,
+          "code": "EVENT_COVERAGE"
+        },
+        {
+          "scenario": "E03",
+          "step": 0,
+          "code": "EVENT_COVERAGE"
+        },
+        {
+          "scenario": "E03",
+          "step": 1,
+          "code": "EVENT_COVERAGE"
+        },
+        {
+          "scenario": "E03",
+          "step": 1,
+          "code": "EVENT_COVERAGE"
+        },
+        {
+          "scenario": "E04",
+          "step": 0,
+          "code": "EVENT_COVERAGE"
+        },
+        {
+          "scenario": "E04",
+          "step": 1,
+          "code": "EVENT_COVERAGE"
+        },
+        {
+          "scenario": "E06",
+          "step": 0,
+          "code": "EVENT_COVERAGE"
+        },
+        {
+          "scenario": "E06",
+          "step": 0,
+          "code": "EVENT_COVERAGE"
+        },
+        {
+          "scenario": "E07",
+          "step": 0,
+          "code": "EVENT_COVERAGE"
+        },
+        {
+          "scenario": "E07",
+          "step": 0,
+          "code": "EVENT_COVERAGE"
+        },
+        {
+          "scenario": "E07",
+          "step": 1,
+          "code": "EVENT_COVERAGE"
+        },
+        {
+          "scenario": "E07",
+          "step": 1,
+          "code": "EVENT_COVERAGE"
+        },
+        {
+          "scenario": "E08",
+          "step": 0,
+          "code": "EVENT_COVERAGE"
+        },
+        {
+          "scenario": "E08",
+          "step": 0,
+          "code": "EVENT_COVERAGE"
+        },
+        {
+          "scenario": "E09",
+          "step": 0,
+          "code": "EVENT_COVERAGE"
+        },
+        {
+          "scenario": "E09",
+          "step": 0,
+          "code": "EVENT_COVERAGE"
+        },
+        {
+          "scenario": "E10",
+          "step": 0,
+          "code": "EVENT_COVERAGE"
+        },
+        {
+          "scenario": "E11",
+          "step": 0,
+          "code": "EVENT_COVERAGE"
+        },
+        {
+          "scenario": "E12",
+          "step": 0,
+          "code": "EVENT_COVERAGE"
+        },
+        {
+          "scenario": "E12",
+          "step": 0,
+          "code": "EVENT_COVERAGE"
+        }
+      ],
+      "report": "events/report.json"
+    },
+    {
+      "mutation": "key_conflict",
+      "target_code": "STATUS_MISMATCH",
+      "status": "killed",
+      "hits": [
+        {
+          "scenario": "E12",
+          "step": 1,
+          "code": "STATUS_MISMATCH"
+        }
+      ],
+      "report": "key_conflict/report.json"
+    }
+  ],
+  "declared_fixture_integrity": {
+    "status": "failed",
+    "files_checked": 43,
+    "mismatches": [
+      {
+        "path": "test/inputs/BAG-2026-DE-001/factory-B-quote.pdf",
+        "declared_sha256": "0a6651818467b9b74b86fdce70d33fbfb1ddff744fd505d9f2c409b031471b8d",
+        "actual_sha256": "341999b783b5a41adee705fe484cb30bc5a2f7dc25a0072e2e47a8c19b464cc4",
+        "lf_normalized_matches_declared": true
+      },
+      {
+        "path": "test/inputs/BAG-2026-DE-001/po-correct.pdf",
+        "declared_sha256": "9dd189015c2152a2da0ab602f2981a8be60145c0893ba434b9c892fa0ef477ce",
+        "actual_sha256": "d1cce1cc7701894d1f88a909e6034475e4bfc9af2187e6b253ebd115d81bfefa",
+        "lf_normalized_matches_declared": true
+      },
+      {
+        "path": "test/inputs/BAG-2026-DE-001/po-conflict.pdf",
+        "declared_sha256": "bcba8c9aec9bdb2cd4a47832cb4f6dac01da00cd1c1371fc62920d1d2bac1422",
+        "actual_sha256": "78c4e2e055cd71338ffd2adfb8632882ab04e2da8433da53649ea5b1f208e42a",
+        "lf_normalized_matches_declared": true
+      },
+      {
+        "path": "test/inputs/BAG-2026-DE-002/supplier-incomplete.pdf",
+        "declared_sha256": "6e1c305ec000a0c45b09fa369becc0ae02a4e4abb6c594af5e2bcbdc2d2d37ef",
+        "actual_sha256": "5742e605492ad6f2613d0ee1cf1c7a987d3a52189a54c3b1e130074ce9113add",
+        "lf_normalized_matches_declared": true
+      },
+      {
+        "path": "test/inputs/BAG-2026-DE-003/supplier-reply.pdf",
+        "declared_sha256": "13ec42211e7111f63f895795ce95a3c9ebf8b4746ddd6b39709d535a87b0fccf",
+        "actual_sha256": "5da0a7be03a4b9772581a08a48b0201764b3d6180450f7ab5974be3b864c6f17",
+        "lf_normalized_matches_declared": true
+      },
+      {
+        "path": "test/core15/evidence/original-inquiry.eml",
+        "declared_sha256": "4a5be87b2954941cfc7799af499b2307f376e9cb888ede8404e096035bc5d362",
+        "actual_sha256": "9259dad214dd7f254cddd6dbf66e51a60104226f98aa4ee224757b190917ae2e",
+        "lf_normalized_matches_declared": false
+      },
+      {
+        "path": "test/core15/evidence/original-change-color-box.eml",
+        "declared_sha256": "2c8250e795bc97e50fe022b61831a3bdcf77d4c174904ecddb8ec6a5ff89c498",
+        "actual_sha256": "6e03c866d96e6d9e20d28c138e3d0515bba51b6022b15e1b717c2cc641e7aca6",
+        "lf_normalized_matches_declared": false
+      },
+      {
+        "path": "test/core15/evidence/original-customer-conditional-confirmation.eml",
+        "declared_sha256": "f4c8ddd8be962c3c0c2add4742aad4a00bc0ad01d47bf7a821cc3ef9eb3a6c61",
+        "actual_sha256": "a7e6faf27a38c010c9234888c8b5a5cbe4c66b8e0804611a47abe2827e649536",
+        "lf_normalized_matches_declared": false
+      }
+    ],
+    "policy": "Never normalize, repair or reseal test/ in this harness. Scenario checks bind actual raw bytes; declared-fixture integrity is a separate acceptance precondition.",
+    "core15_evidence_used_as_agent_input": false
+  },
+  "layers": {
+    "offline": "executed",
+    "real_model": "not_executed",
+    "file_visual": "not_performed"
+  },
+  "product_acceptance": "not_accepted",
+  "main_chain_integration": "blocked"
+}
