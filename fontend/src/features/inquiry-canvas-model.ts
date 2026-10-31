@@ -148,7 +148,7 @@ export function revisionDocuments(
       kind: 'original',
       folder: 'inquiry',
       text: `${inquiry.customerContext ? `来源：${channelLabels[inquiry.customerContext.channel]}\n邮箱：${inquiry.customerContext.email || '待补充'}\n\n` : ''}${inquiry.originalText}`,
-      caption: `${inquiry.customer}${inquiry.customerContext?.simulation ? ' · 模拟客户' : ''}`,
+      caption: `${inquiry.customer}`,
     },
     {
       id: 'conversation',

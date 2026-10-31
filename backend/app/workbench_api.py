@@ -163,6 +163,8 @@ def _record(db: Session, case: Case, user: User, body: dict) -> dict:
         note=str(body.get("note") or "")[:2000],
         details={"verificationBasis": body.get("verificationBasis"), "amountUsd": body.get("amountUsd")} if scope == "payment_verification" else {},
     )
+    from .workbench import next_stage_action
+    case.payload = encode({**decode(case.payload), "nextAction": next_stage_action(stage_state(db, case))})
     touch(case)
     db.commit()
     return approval

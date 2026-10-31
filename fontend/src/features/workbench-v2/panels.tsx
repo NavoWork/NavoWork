@@ -395,7 +395,7 @@ export function SamplePanel({ data, onAgent, onConfirm, busy }: { data: Workbenc
         <>
           <div className="wbv2-quote-head">
             <div><span>样品编号</span><strong>{content.sampleRef || '—'}</strong><small>{content.type || '—'} · 第 {content.round || 1} 轮</small></div>
-            <div><span>规格版本</span><strong>{content.specVersionId ? content.specVersionId.split('_v').pop() : '—'}</strong></div>
+            <div><span>规格版本</span><strong>{content.specVersionId ? `V${content.specVersionId.split('_v').pop()}` : '—'}</strong></div>
             <div><span>费用</span><strong>{content.feeUsd ? `$${content.feeUsd}` : '—'}</strong><small>{content.courierUsd ? `快递 $${content.courierUsd}` : ''}</small></div>
             <div><span>快递</span><strong>{content.courier || '—'}</strong><small>{content.tracking || ''}</small></div>
           </div>
@@ -459,6 +459,7 @@ export function OrderPanel({ data, onAgent, onConfirm, busy }: { data: Workbench
                 <dl className="wbv2-dl">
                   <div><dt>PI 号</dt><dd>{pi.number || '—'}</dd></div>
                   <div><dt>卖方</dt><dd>{pi.seller || '—'}</dd></div>
+                  <div><dt>银行</dt><dd>{pi.bank || '—'}</dd></div>
                   <div><dt>HS 编码</dt><dd>{pi.hsCode || '—'}</dd></div>
                   <div><dt>原产地</dt><dd>{pi.origin || '—'}</dd></div>
                   <div><dt>收货人</dt><dd>{pi.consignee || '—'}</dd></div>
@@ -504,7 +505,7 @@ export function OrderPanel({ data, onAgent, onConfirm, busy }: { data: Workbench
                     <td>{row.ratio ? `${Number(row.ratio) * 100}%` : '—'}</td>
                     <td>{money(row.amountUsd)}</td>
                     <td>{row.due || '—'}</td>
-                    <td><Pill tone={row.status === 'verified' ? 'green' : 'amber'}>{row.status === 'verified' ? '已核验' : '待核验'}</Pill></td>
+                    <td><Pill tone={paid || row.status === 'verified' ? 'green' : 'amber'}>{paid || row.status === 'verified' ? '已核验' : '待核验'}</Pill></td>
                   </tr>
                 ))}
               </tbody>
@@ -546,10 +547,10 @@ export function ProductionPanel({ data, onAgent, onConfirm, onRelease, busy, onS
         ) : (
           <>
             <div className="wbv2-quote-head">
-              <div><span>规格版本</span><strong>{content.specVersionId ? content.specVersionId.split('_v').pop() : '—'}</strong></div>
-              <div><span>样品版本</span><strong>{content.sampleVersionId ? content.sampleVersionId.split('_v').pop() : '—'}</strong></div>
-              <div><span>订单版本</span><strong>{content.orderVersionId ? content.orderVersionId.split('_v').pop() : '—'}</strong></div>
-              <div><span>验货标准</span><strong>{qc.standard || '—'}</strong></div>
+              <div><span>规格版本</span><strong>{content.specVersionId ? `V${content.specVersionId.split('_v').pop()}` : '—'}</strong></div>
+              <div><span>样品版本</span><strong>{content.sampleVersionId ? `V${content.sampleVersionId.split('_v').pop()}` : '—'}</strong></div>
+              <div><span>订单版本</span><strong>{content.orderVersionId ? `V${content.orderVersionId.split('_v').pop()}` : '—'}</strong></div>
+              <div><span>验货标准</span><strong title={String(qc.standard || '')}>{String(qc.standard || '—').split(/[（(]/)[0].slice(0, 28)}</strong></div>
             </div>
             <div className="wbv2-split">
               <div>

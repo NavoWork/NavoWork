@@ -641,7 +641,7 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
                   </select>
                 </label>
                 <p className="preferences-note">
-                  用于检查错误提示和重试路径。关闭弹窗后执行对应操作；模拟故障不会调用真实模型。
+                  用于检查错误提示和重试路径。关闭弹窗后执行对应操作；故障注入不会调用真实模型。
                 </p>
               </>
             )}

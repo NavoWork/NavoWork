@@ -265,7 +265,7 @@ Agent 没有批准、核验、放行工具。以下动作仅通过 UI/API 由人
 
 ## 9. 演示
 
-`demo/seed_fresh.py` 只导入：客户原文、客户背景、知识库、公司资产、供应商报价原件（可选）。不创建 Revision、Artifact、Approval、Payment、Production 记录。演示路径：
+`demo/seed.py` 只导入：客户原文、客户背景、知识库、公司资产、供应商报价原件（可选）。不创建 Revision、Artifact、Approval、Payment、Production 记录。演示路径：
 
 `导入询盘 → 生成需求 → 录入供应商报价 → 核价报价 → 打样 → 订单/付款 → 生产资料与放行`。
 

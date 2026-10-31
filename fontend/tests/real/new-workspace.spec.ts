@@ -8,35 +8,65 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByRole('navigation', { name: '主导航' })).toBeVisible();
 });
 
-test('new home opens the server canvas; notes, files and AI results survive reload', async ({ page }, info) => {
-  await page.getByRole('button', { name: /德国客户 · 定制背包/ }).first().click();
-  await expect(page).toHaveURL(/\/inquiries\/inq_demo_bag/);
-  const work = page.locator('.inquiry-mount:not([hidden])');
-  await expect(work.locator('.react-flow__node[data-id="original"]')).toBeVisible();
-  await work.getByLabel('新建资料', { exact: true }).click();
-  await work.getByRole('button', { name: '新建笔记', exact: true }).click();
-  await work.getByLabel('笔记标题').fill('服务端跟进笔记');
-  await work.getByLabel('编辑工作笔记').fill('周一复核包装和交期');
-  await expect(work.getByRole('status').filter({ hasText: '已保存到服务端' })).toBeVisible();
+test('new inquiry opens the node workbench and only generates the requested node', async ({
+  page,
+}, info) => {
+  const base = '/api/v1/workspaces/ws_demo';
+  const created = await page.request.post(`${base}/inquiries`, {
+    data: {
+      title: '浏览器联调 · 通勤背包',
+      customer: 'Browser Buyer',
+      originalText: 'Please quote 3,000 custom backpacks, FOB Ningbo, delivery to Hamburg.',
+      destination: 'Hamburg, Germany',
+      customerContext: { channel: 'email', email: 'buyer@example.test' },
+    },
+  });
+  expect(created.ok()).toBeTruthy();
+  const inquiry = await created.json();
+  const path = `${base}/inquiries/${inquiry.id}`;
+  await page.goto(`/inquiries/${inquiry.id}`);
+  const work = page.locator('.wbv2');
+  await expect(work).toBeVisible();
+  await expect(work.locator('.wbv2-stage')).toHaveCount(6);
+  await expect(work.getByText('Browser Buyer', { exact: true }).first()).toBeVisible();
+  await expect(work.getByText('Agent 尚未完成询盘评估')).toHaveCount(0);
+
+  const spec = await page.request.put(`${path}/workbench/artifacts/spec`, {
+    data: {
+      baseVersion: 0,
+      content: {
+        fields: {
+          product: 'custom commuter backpack',
+          quantity: '3000',
+          dimensions: '30 x 45 x 15 cm',
+          fabric: '600D recycled polyester',
+          logo: 'embroidered logo 60 x 25 mm',
+          packaging: 'recycled polybag + hangtag',
+          inspection: 'AQL 2.5',
+          destination: 'Hamburg, Germany',
+          incoterm: 'FOB',
+          incotermsVersion: '2020',
+          namedPlace: 'Ningbo',
+        },
+      },
+    },
+  });
+  expect(spec.ok()).toBeTruthy();
   await page.reload();
-  await expect(work.getByLabel('编辑工作笔记')).toHaveValue('周一复核包装和交期');
-  await work.getByLabel('导入询盘文件').setInputFiles({ name: 'supplier-note.txt', mimeType: 'text/plain', buffer: Buffer.from('Keep this attachment on the server.') });
-  await expect(work.locator('.ic-card-file')).toContainText('Keep this attachment');
-  await expect(work.getByRole('status').filter({ hasText: '已保存到服务端' })).toBeVisible();
-  await page.reload();
-  await expect(work.locator('.ic-card-file')).toContainText('Keep this attachment');
-  await work.getByLabel('补充要求或客户反馈').fill('请分析客户需求并列出待确认项');
-  await work.getByRole('button', { name: '开始处理', exact: true }).click();
-  await expect(work.getByRole('button', { name: '添加到画板', exact: true })).toBeEnabled({ timeout: 30000 });
-  await work.getByRole('button', { name: '添加到画板', exact: true }).click();
-  await expect(work.getByRole('button', { name: '已添加到画板', exact: true })).toBeVisible();
-  await page.reload();
-  await expect(work.locator('.ic-card-result')).toContainText('V1');
-  await page.screenshot({ path: info.outputPath('server-canvas.png'), fullPage: true });
-  expect(await work.locator('.react-flow').evaluate(el => el.getBoundingClientRect().height)).toBeGreaterThan(300);
+  await work.locator('.wbv2-stage').nth(1).click();
+  await expect(work.getByLabel('产品')).toHaveValue('custom commuter backpack');
+  await expect(work.getByLabel('验货标准')).toHaveValue('AQL 2.5');
+  await page.screenshot({ path: info.outputPath('workbench-v2.png'), fullPage: true });
+
+  const state = await (await page.request.get(`${path}/workbench`)).json();
+  expect(state.case.currentRevision).toBe(1);
+  expect(Object.keys(state.artifacts)).toEqual(['spec']);
+  expect(state.stages.find((stage: { key: string }) => stage.key === 'costing').status).toBe(
+    'empty',
+  );
 });
 
-test('Wiki, personal assets and favorites are persisted; market shows actual server capabilities', async ({ page }) => {
+test('Wiki, assets, favorites and the skill market are persisted', async ({ page }) => {
   await page.getByRole('button', { name: '知识库', exact: true }).click();
   await page.getByRole('button', { name: '新建文档' }).click();
   let dialog = page.getByRole('dialog');
@@ -45,13 +75,22 @@ test('Wiki, personal assets and favorites are persisted; market shows actual ser
   await dialog.getByRole('button', { name: '创建文档' }).click();
   await expect(page.locator('.wiki-row').filter({ hasText: '服务端知识测试' })).toBeVisible();
   await page.getByRole('button', { name: '收藏 服务端知识测试', exact: true }).click();
-  await expect(page.getByRole('button', { name: '取消收藏 服务端知识测试', exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: '取消收藏 服务端知识测试', exact: true }),
+  ).toBeVisible();
   await page.reload();
-  await expect(page.getByRole('button', { name: '取消收藏 服务端知识测试', exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: '取消收藏 服务端知识测试', exact: true }),
+  ).toBeVisible();
+
   await page.getByRole('button', { name: '资产库', exact: true }).click();
   await page.getByRole('button', { name: '添加文件', exact: true }).click();
   dialog = page.getByRole('dialog');
-  await dialog.getByLabel('资产文件').setInputFiles({ name: 'personal-proof.txt', mimeType: 'text/plain', buffer: Buffer.from('A persisted personal file') });
+  await dialog.getByLabel('资产文件').setInputFiles({
+    name: 'personal-proof.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('A persisted personal file'),
+  });
   await dialog.getByRole('button', { name: '添加 1 个文件' }).click();
   await expect(page.getByText('personal-proof.txt', { exact: true }).first()).toBeVisible();
   await page.reload();
@@ -61,41 +100,38 @@ test('Wiki, personal assets and favorites are persisted; market shows actual ser
   await page.getByRole('dialog').getByRole('button', { name: '下载文件' }).click();
   expect((await download).suggestedFilename()).toBe('personal-proof.txt');
   await page.keyboard.press('Escape');
+
   await page.getByRole('button', { name: '技能市场', exact: true }).click();
-  await expect(page.getByText('询盘需求分析', { exact: true })).toBeVisible();
+  await expect(page.getByText('客户与询盘评估', { exact: true })).toBeVisible();
   await page.getByRole('tab', { name: /插件/ }).click();
-  await expect(page.getByText('物流连接器', { exact: true })).toBeVisible();
+  await expect(page.getByText('邮件连接器', { exact: true })).toBeVisible();
   await expect(page.getByText('规划中').first()).toBeVisible();
 });
 
-test('quote clarification resumes the same persisted task from the new chat', async ({ page }) => {
+test('workbench keeps downstream nodes empty until the user advances them', async ({ page }) => {
   const base = '/api/v1/workspaces/ws_demo';
-  const inquiry = await (await page.request.post(`${base}/inquiries`, { data: { title: '报价澄清联调', customer: 'Buyer', originalText: 'Please quote 3000 backpacks to Hamburg.' } })).json();
+  const inquiry = await (
+    await page.request.post(`${base}/inquiries`, {
+      data: {
+        title: '空白项目',
+        customer: 'Empty Buyer',
+        originalText: 'We may need some bags. Please advise.',
+      },
+    })
+  ).json();
   const path = `${base}/inquiries/${inquiry.id}`;
   await page.goto(`/inquiries/${inquiry.id}`);
-  const work = page.locator('.inquiry-mount:not([hidden])');
-  await work.getByLabel('补充要求或客户反馈').fill('请核算报价');
-  await work.getByRole('button', { name: '开始处理', exact: true }).click();
-  await expect(work.getByText('需要补充一些信息', { exact: true })).toBeVisible({ timeout: 30000 });
-  const pending = (await (await page.request.get(path)).json()).pendingRunId;
-  await page.reload();
-  await expect(work.getByText('需要补充一些信息', { exact: true })).toBeVisible();
-  const evidence = await (await page.request.post(`${path}/evidence`, { data: { sourceRole: 'supplier_quote', title: '原件', text: 'Backpack CNY44 + packing CNY2' } })).json();
-  const offer = await (await page.request.post(`${path}/supplier-offers`, { data: { supplier: '恢复联调工厂', evidenceSourceId: evidence.id, baseCny: '44', packagingCny: '2', localCny: '4', moq: 1000 } })).json();
-  await work.getByText('引用知识与核价条件', { exact: true }).click();
-  await work.getByRole('button', { name: '刷新报价列表' }).click();
-  await expect(work.getByLabel('供应商报价', { exact: true }).locator(`option[value="${offer.id}"]`)).toBeAttached();
-  await work.getByLabel('供应商报价', { exact: true }).selectOption(offer.id);
-  await work.getByLabel('汇率（CNY/USD）').fill('7.2');
-  await work.getByLabel('毛利率（%）').fill('20');
-  await work.getByLabel('数量', { exact: true }).fill('3000');
-  await work.getByLabel('补充要求或客户反馈').fill('已核对成本，请继续计算');
-  await work.getByRole('button', { name: '开始处理', exact: true }).click();
-  await expect(work.getByRole('button', { name: '添加到画板', exact: true })).toBeEnabled({ timeout: 30000 });
-  const run = await (await page.request.get(`${base}/runs/${pending}`)).json();
-  expect(run.status).toBe('succeeded');
-  const revisions = await (await page.request.get(`${path}/revisions`)).json();
-  expect(revisions.items).toHaveLength(1);
-  expect(revisions.items[0].runId).toBe(pending);
-  expect(revisions.items[0].quote.unitPriceMinor).toBe(869);
+  const work = page.locator('.wbv2');
+  await expect(work).toBeVisible();
+  const state = await (await page.request.get(`${path}/workbench`)).json();
+  expect(state.case.currentRevision).toBe(0);
+  expect(state.artifacts).toEqual({});
+  expect(state.stages.find((stage: { key: string }) => stage.key === 'requirements').status).toBe(
+    'empty',
+  );
+  await work.locator('.wbv2-stage').nth(1).click();
+  await expect(work.getByText('尚未生成规格')).toBeVisible();
+  await work.locator('.wbv2-stage').nth(2).click();
+  await expect(work.getByText('尚未生成客户报价')).toBeVisible();
+  await expect(work.getByPlaceholder('告诉 Agent 下一步要完成什么…')).toBeVisible();
 });

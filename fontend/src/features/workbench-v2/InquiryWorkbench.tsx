@@ -338,8 +338,8 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
           )}
 
           {data.approvals.length > 0 && (
-            <section className="wbv2-card wbv2-audit">
-              <header className="wbv2-card-head"><div><span className="wbv2-eyebrow">AUDIT</span><h2>确认记录</h2></div></header>
+            <details className="wbv2-card wbv2-audit">
+              <summary>确认记录 · {data.approvals.length} 项<ChevronDown size={14} /></summary>
               <div className="wbv2-approval-list">
                 {data.approvals.slice().reverse().map((item) => (
                   <div key={item.id}>
@@ -349,7 +349,7 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
                   </div>
                 ))}
               </div>
-            </section>
+            </details>
           )}
         </main>
 

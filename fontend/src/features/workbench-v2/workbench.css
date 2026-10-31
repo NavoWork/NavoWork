@@ -456,3 +456,9 @@
 .wbv2-source-item label { flex: 1; border-bottom: 0 !important; }
 .wbv2-source-item .wbv2-text-button { padding: 0 10px; }
 .wbv2-source-preview { max-height: 220px; overflow: auto; margin: 0; padding: 12px; border: 1px solid var(--navo-color-border-subtle); border-radius: 8px; background: var(--navo-color-surface-muted); font: 11px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--navo-color-text-secondary); white-space: pre-wrap; }
+.wbv2-audit { padding: 0; overflow: hidden; }
+.wbv2-audit > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding: 13px 18px; font-size: 11.5px; font-weight: 600; color: var(--navo-color-text-secondary); }
+.wbv2-audit > summary::-webkit-details-marker { display: none; }
+.wbv2-audit > summary svg { transition: transform 140ms ease; color: var(--navo-color-text-muted); }
+.wbv2-audit[open] > summary svg { transform: rotate(180deg); }
+.wbv2-audit .wbv2-approval-list { padding: 0 18px 10px; }

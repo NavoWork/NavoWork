@@ -141,6 +141,7 @@ def test_new_inquiry_advances_node_by_node(client):
     final = client.get(path + "/workbench").json()
     assert final["gate"]["status"] == "passed", final["gate"]
     assert final["stages"][5]["status"] == "confirmed"
+    assert final["nextAction"] == "完成当前业务"
 
 
 def test_manual_edit_creates_new_revision_and_rejects_stale(client):

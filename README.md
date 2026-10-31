@@ -1,6 +1,6 @@
 # NavoWork
 
-包袋出口业务工作台。前端为 React/Vite，后端为 FastAPI + SQLAlchemy/SQLite，任务由独立 LangGraph Worker 处理。当前可运行的核心流程：询盘建档、证据和候选事实、规格与询价/核价/报价草稿、成果版本和导出、任意业务变更的节点影响与候选修订、样品/订单/付款保障记录和生产资料门禁。生产进度、真实物流和银行数据仍需外部资料接入。
+包袋出口业务工作台。前端为 React/Vite，后端为 FastAPI + SQLAlchemy/SQLite，任务由独立 LangGraph Worker 处理。当前主链路：新询盘 → 客户与询盘评估 → 箱包 Tech Pack/BOM → 多供应商核价与客户报价 → 打样 → PO/PI 与付款保障 → 生产资料与验货放行。Agent 通过受控工具读写节点成果，并检索知识库和公司资产；批准、付款核验和放行由人执行。
 
 ## 本地启动（Windows）
 
@@ -55,21 +55,13 @@ npm run build
 
 可在 `backend/.env` 设置 `MODEL_API_KEY`、`MODEL_NAME` 和 `MODEL_BASE_URL` 启用 Agent 工具调用；未配置时不会伪造执行结果。正式商业批准、外部确认、付款核验和生产放行由服务端门禁控制，草稿下载不表示已发送或已开工。演示账号和默认密钥仅用于本机演示，不可公开部署。
 
-新增文件工具执行链见 [agent-kit/README.md](agent-kit/README.md)。设置 `AGENT_FILE_TOOLS=1` 后，对话报价/变更目标使用真实模型工具调用，读取已上传的 Case 资料及本次显式引用的画板附件，返回真实规格 DOCX、成本 XLSX、客户报价 XLSX/PDF。汇率和毛利可在对话中明确提供，例如“汇率7.20，毛利20%”。缺价先生成草稿，再通过现有澄清机制补证继续。此模式无模型配置时明确失败；确定性离线回放不代表真实 Agent 或浏览器集成已验收。
-
-文件工具无模型场景的真实浏览器检查：在 `fontend/` 执行 `npm run test:e2e -- --config=playwright.file-tools.config.ts`。该检查会使用独立临时业务存储、上传实际 XLSX，并验证 API/Worker/页面明确失败及刷新后的文件保存；它不替代真实模型报价主线。
-
 ## 开发与文档
 
 根目录 npm workspaces 只包含 `fontend/`。直接执行 `npm run dev` 时，前端会连接 `http://127.0.0.1:8000` 的 API；使用 `python dev.py` 可同时启动全部服务。需要体验原有纯前端合成数据模式时，在 `fontend/.env.local` 写入 `VITE_API_MODE=mock`，再启动前端。单独运行现有 Mock 浏览器回归用 `npm run test:e2e`；真实前后端浏览器联调用 `npm run test:e2e -- --config=playwright.real.config.ts`（在 `fontend/` 目录）。Windows 测试默认使用已安装的 Edge，可用 `PLAYWRIGHT_BROWSER_PATH` 指定其他浏览器。
 
+- [Workbench v2 契约：阶段、成果、工具与 Skill](doc/18-workbench-v2-contract.md)
 - [产品需求](doc/TradeWorkbench_PRD_v1.0.md)
 - [后端设计](doc/TradeWorkbench_Backend_Design_v1.0.md)
 - [Agent 节点图](doc/TradeWorkbench_Agent_Node_Graph_v1.0.md)
-- [新版前端适配：架构、实际节点链路与接口 v1.1](doc/Frontend_Backend_Adaptation_v1.1.md)
-- [后端开发计划](后端开发计划.md)
 - [前端接口说明](fontend/docs/INTEGRATION.md)
-- [文件 Agent 验证记录](agent-kit/docs/verification.md)
-- [BOM 图片候选模块](extensions/bom-vision/README.md)
-- [样品与订单 Skills](extensions/order-skills/README.md)
 - [独立评测入口](evaluation/README.md)

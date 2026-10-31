@@ -350,6 +350,8 @@ def stage_state(db: Session, case: Case) -> list[dict]:
                 artifacts.append(assessment["itemId"])
             context = decode(case.payload).get("customerContext") or {}
             profile_data = {**context, **((profile or {}).get("profile") or {})}
+            if not profile_data.get("company"):
+                profile_data["company"] = decode(case.payload).get("customer")
             assessment_data = (assessment or {}).get("content") or {}
             missing = [
                 label
@@ -476,6 +478,8 @@ def _customer_context(case: Case, profile: dict | None) -> dict:
 def next_stage_action(stages: list[dict]) -> str:
     priority = {"blocked": 0, "draft": 1, "empty": 2, "ready": 3, "confirmed": 4, "locked": 5}
     core = [stage for stage in stages if stage["key"] in ("inquiry", "requirements", "costing", "sample", "order", "production")]
+    if core and all(stage["status"] == "confirmed" for stage in core if stage["key"] != "inquiry"):
+        return "完成当前业务"
     ordered = sorted(core, key=lambda stage: (priority.get(stage["status"], 9), core.index(stage)))
     for stage in ordered:
         if stage["status"] not in ("confirmed", "locked"):

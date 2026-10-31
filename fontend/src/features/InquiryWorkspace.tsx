@@ -664,7 +664,7 @@ export function InquiryWorkspace({
                 <FileText size={16} />
                 <div>
                   <strong>客户原始询盘</strong>
-                  <small>{channelLabels[inquiry.customerContext?.channel || 'unknown']}{inquiry.customerContext?.email ? ` · ${inquiry.customerContext.email}` : ''}{inquiry.customerContext?.simulation ? ' · 模拟客户' : ''}</small>
+                  <small>{channelLabels[inquiry.customerContext?.channel || 'unknown']}{inquiry.customerContext?.email ? ` · ${inquiry.customerContext.email}` : ''}</small>
                   <p>
                     {inquiry.originalText.slice(0, 110)}
                     {inquiry.originalText.length > 110 ? '…' : ''}
