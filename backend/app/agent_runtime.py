@@ -18,7 +18,7 @@ from .agent_tools import SKILLS, WorkbenchToolbox, tool_schemas
 from .core import create_item, decode, encode, items, now, uid
 from .db import SessionLocal
 from .models import Case, Job, Run, User, WorkItem
-from .workbench import finalize_agent_run, latest_artifacts
+from .workbench import commit_revision, finalize_agent_run, latest_artifacts
 
 NODE_SKILL = {
     "inquiry": "inquiry-assessment",
@@ -169,7 +169,7 @@ def _artifact_signature(db, case: Case) -> dict[str, int]:
     return {kind: value["version"] for kind, value in latest_artifacts(db, case).items()}
 
 
-def _mark_waiting(item_id: str, generation: int, questions: list[dict], summary: str) -> None:
+def _mark_waiting(item_id: str, generation: int, questions: list[dict], summary: str, artifacts_changed: bool = False) -> None:
     with SessionLocal() as db:
         db.execute(text("BEGIN IMMEDIATE"))
         work = db.get(WorkItem, item_id)
@@ -178,6 +178,11 @@ def _mark_waiting(item_id: str, generation: int, questions: list[dict], summary:
             return
         job = db.get(Job, run.job_id)
         case = db.get(Case, run.case_id)
+        if artifacts_changed:
+            revision = commit_revision(db, case, summary, node=decode(job.payload).get("agentNode"), run_id=run.id, job_id=job.id)
+            if revision:
+                run.base_revision = revision["number"]
+                run.output_revision = revision["number"]
         data = decode(run.payload)
         data["clarification"] = {"questions": questions}
         run.payload = encode(data)
@@ -286,7 +291,10 @@ def execute_agent_work(item_id: str, generation: int) -> None:
                 if update.get("__interrupt__"):
                     value = update["__interrupt__"][0].value
                     questions = value.get("questions", []) if isinstance(value, dict) else []
-                    _mark_waiting(item_id, generation, questions, "需要补充信息后继续。")
+                    with SessionLocal() as db:
+                        case_row = db.get(Case, run.case_id)
+                        changed = _artifact_signature(db, case_row) != before
+                    _mark_waiting(item_id, generation, questions, "需要补充信息后继续。", changed)
                     return
             state = graph.get_state(config).values
         except Exception as exc:

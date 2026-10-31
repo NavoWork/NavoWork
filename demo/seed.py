@@ -32,6 +32,7 @@ from app.core import WORKSPACE_ID, bootstrap, create_item, decode, encode, item_
 from app.db import Base, SessionLocal, engine  # noqa: E402
 from app.models import Case, CaseAccess, Item, User, now  # noqa: E402
 from app.sop_api import _extract_file  # noqa: E402
+from app.workbench import next_stage_action, stage_state  # noqa: E402
 
 PACK = ROOT / "demo/workbench_v2"
 
@@ -263,6 +264,7 @@ def seed(email: str | None = None):
             for file_key, filename, role, title in scenario["files"]:
                 evidence(db, case, file_key, filename, role, title)
             db.flush()
+            case.payload = encode({**decode(case.payload), "nextAction": next_stage_action(stage_state(db, case))})
         db.commit()
     print("Workbench v2 seed complete. No revisions, artifacts or approvals were created.")
     for key, scenario in CASES.items():

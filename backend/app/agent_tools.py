@@ -395,7 +395,8 @@ class WorkbenchToolbox:
             data = {
                 "case": {"id": case.id, "title": decode(case.payload).get("title"), "customer": decode(case.payload).get("customer"), "originalText": (decode(case.payload).get("originalText") or "")[:6000], "destination": decode(case.payload).get("destination"), "currentRevision": case.current_revision, "nextAction": decode(case.payload).get("nextAction")},
                 "customerProfile": (profile or {}).get("profile"),
-                "stages": [{"key": s["key"], "status": s["status"], "summary": s["summary"], "missing": s["missing"]} for s in stages],
+                "customerContext": decode(case.payload).get("customerContext"),
+                "stages": [{"key": s["key"], "status": s["status"], "summary": s["summary"], "missing": s["missing"], "nextAction": s["nextAction"]} for s in stages],
                 "artifacts": artifacts,
                 "evidence": [{"id": row.id, "title": item_view(row).get("title"), "sourceRole": item_view(row).get("sourceRole")} for row in items(db, "evidence", case_id=case.id)],
                 "knowledge": knowledge,
@@ -498,6 +499,8 @@ class WorkbenchToolbox:
     def tool_update_customer_profile(self, args: UpdateCustomerProfileArgs):
         with self._tx(write=True) as (db, case, user, run, job):
             patch = {key: value for key, value in args.model_dump().items() if key not in ("summary", "checks", "risks", "missing") and value is not None}
+            if "source_ref" in patch:
+                patch["sourceRef"] = patch.pop("source_ref")
             profile = save_customer_profile(db, case, patch, run_id=run.id)
             context = decode(case.payload).get("customerContext") or {}
             context.update({key: value for key, value in patch.items() if value is not None})

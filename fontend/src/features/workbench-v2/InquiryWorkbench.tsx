@@ -80,7 +80,10 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
   const location = useLocation();
   const active = location.pathname === `/inquiries/${encodeURIComponent(inquiryId)}`;
   const qc = useQueryClient();
-  const [stage, setStage] = useState('inquiry');
+  const stagePrefKey = `easywork:wb-stage:${scope}`;
+  const [stage, setStage] = useState(() => {
+    try { return localStorage.getItem(stagePrefKey) || 'inquiry'; } catch { return 'inquiry'; }
+  });
   const [runId, setRunId] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>();
@@ -131,13 +134,19 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
 
   useEffect(() => {
     if (!data || stageInitialized.current) return;
+    const saved = CORE_STAGES.includes(stage) ? stage : '';
     const next =
       data.stages.find((item) => CORE_STAGES.includes(item.key) && ['draft', 'ready', 'blocked'].includes(item.status)) ||
       data.stages.find((item) => CORE_STAGES.includes(item.key) && item.status !== 'confirmed');
-    if (next) setStage(next.key);
+    if (saved && data.stages.some((item) => item.key === saved)) setStage(saved);
+    else if (next) setStage(next.key);
     stageInitialized.current = true;
     if (!selectedEvidence.length) setSelectedEvidence(data.evidence.map((item) => item.id));
-  }, [data, selectedEvidence.length]);
+  }, [data, selectedEvidence.length, stage]);
+
+  useEffect(() => {
+    try { localStorage.setItem(`easywork:wb-stage:${scope}`, stage); } catch { /* preference only */ }
+  }, [scope, stage]);
 
   useEffect(() => {
     if (!run.data) return;
@@ -189,7 +198,7 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
     void operate(async () => {
       const result = await api.post<Run>(`${path}/runs`, {
         replyToRunId: run.data!.id,
-        baseRevision: data.case.currentRevision,
+        baseRevision: run.data!.baseRevision,
         answers,
       });
       setRunId(result.id);

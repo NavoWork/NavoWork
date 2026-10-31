@@ -360,7 +360,7 @@ def stage_state(db: Session, case: Case) -> list[dict]:
                     ("来源渠道", profile_data.get("channel")),
                     ("联系方式", profile_data.get("email")),
                 )
-                if not value
+                if not value or value == "unknown"
             ]
             summary = " · ".join(part for part in (profile_data.get("company"), profile_data.get("country")) if part)
             status = _status("draft" if profile or assessment or context else "empty", missing, False)
@@ -471,7 +471,7 @@ def _customer_context(case: Case, profile: dict | None) -> dict:
         "website": data.get("website") or current.get("website"),
         "linkedin": data.get("linkedin") or current.get("linkedin"),
         "business": data.get("business") or current.get("business"),
-        "sourceRef": data.get("sourceRef") or current.get("sourceRef"),
+        "sourceRef": data.get("sourceRef") or data.get("source_ref") or current.get("sourceRef"),
         "summary": data.get("summary") or current.get("summary"),
         "checks": data.get("checks") or current.get("checks") or [],
     }

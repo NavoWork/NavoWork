@@ -8,6 +8,7 @@ from pathlib import Path
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.types import Command
 from sqlalchemy import select, text
+from sqlalchemy.exc import OperationalError
 
 from .agent import build_graph
 from .core import create_item, decode, encode, item_view, items, uid
@@ -41,18 +42,23 @@ def run_view(run: Run) -> dict:
 
 
 def claim_work(owner: str) -> tuple[str, int] | None:
-    with engine.connect() as conn:
-        conn.exec_driver_sql("BEGIN IMMEDIATE")
-        current = now()
-        row = conn.execute(text("SELECT w.id,w.lease_generation FROM work_items w JOIN runs r ON r.id=w.run_id WHERE ((w.status='queued' AND w.available_at<=:current) OR (w.status='running' AND w.lease_expires_at<:current)) AND r.status IN ('queued','running') ORDER BY w.available_at,w.id LIMIT 1"), {"current": current}).first()
-        if not row:
+    try:
+        with engine.connect() as conn:
+            conn.exec_driver_sql("BEGIN IMMEDIATE")
+            current = now()
+            row = conn.execute(text("SELECT w.id,w.lease_generation FROM work_items w JOIN runs r ON r.id=w.run_id WHERE ((w.status='queued' AND w.available_at<=:current) OR (w.status='running' AND w.lease_expires_at<:current)) AND r.status IN ('queued','running') ORDER BY w.available_at,w.id LIMIT 1"), {"current": current}).first()
+            if not row:
+                conn.commit()
+                return None
+            generation = row.lease_generation + 1
+            lease = (datetime.now(timezone.utc) + timedelta(minutes=30)).isoformat(timespec="seconds").replace("+00:00", "Z")
+            conn.execute(text("UPDATE work_items SET status='running',lease_owner=:owner,lease_expires_at=:lease,lease_generation=:generation,attempts=attempts+1 WHERE id=:id"), {"owner": owner, "lease": lease, "generation": generation, "id": row.id})
             conn.commit()
-            return None
-        generation = row.lease_generation + 1
-        lease = (datetime.now(timezone.utc) + timedelta(minutes=30)).isoformat(timespec="seconds").replace("+00:00", "Z")
-        conn.execute(text("UPDATE work_items SET status='running',lease_owner=:owner,lease_expires_at=:lease,lease_generation=:generation,attempts=attempts+1 WHERE id=:id"), {"owner": owner, "lease": lease, "generation": generation, "id": row.id})
-        conn.commit()
-        return row.id, generation
+            return row.id, generation
+    except OperationalError:
+        # The API creates tables on startup; a worker launched in parallel may
+        # observe the database a moment before that. Retry on the next tick.
+        return None
 
 
 def build_revision(case: Case, run: Run, state: dict, previous: dict | None = None) -> dict:
