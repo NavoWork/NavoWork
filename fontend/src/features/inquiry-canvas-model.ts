@@ -1,8 +1,10 @@
 import { openDB } from 'idb';
 import type { Inquiry, Locale, Message, Revision, Source } from '../api/types';
 import { channelLabels } from './CustomerContextCard';
+import type { BusinessArtifact } from './BusinessArtifact';
 
 export type DocumentKind =
+  | 'artifact'
   | 'original'
   | 'conversation'
   | 'requirements'
@@ -26,6 +28,7 @@ export interface WorkspaceDocument {
   folder: string;
   text: string;
   caption: string;
+  artifact?: BusinessArtifact;
   source?: Source;
   file?: WorkspaceFile;
   revision?: Revision;
@@ -59,6 +62,7 @@ export interface CanvasState {
 export const defaultFolders = [
   { id: 'inquiry', title: '客户询盘' },
   { id: 'analysis', title: '需求与方案' },
+  { id: 'business', title: '业务成果' },
   { id: 'replies', title: '客户回复' },
   { id: 'materials', title: '资料与附件' },
   { id: 'notes', title: '工作笔记' },
@@ -148,7 +152,7 @@ export function revisionDocuments(
       kind: 'original',
       folder: 'inquiry',
       text: `${inquiry.customerContext ? `来源：${channelLabels[inquiry.customerContext.channel]}\n邮箱：${inquiry.customerContext.email || '待补充'}\n\n` : ''}${inquiry.originalText}`,
-      caption: `${inquiry.customer}${inquiry.customerContext?.simulation ? ' · 模拟客户' : ''}`,
+      caption: inquiry.customer,
     },
     {
       id: 'conversation',

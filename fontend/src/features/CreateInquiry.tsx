@@ -70,7 +70,7 @@ export function CreateInquiry({
     >
       <form className="form-stack" onSubmit={submit}>
         <p className="preferences-note">
-          从客户原文或工作目标开始。客户与工作名称可以稍后整理，原始内容会独立保留。
+          保存客户来件，再与 Agent 一起推进下一步。
         </p>
         <label className="field">
           询盘名称{' '}
@@ -104,7 +104,7 @@ export function CreateInquiry({
             onChange={(e) => setOriginalText(e.target.value)}
             placeholder="粘贴客户的原始邮件、聊天或询盘内容…"
           />
-          <small>{originalText.length.toLocaleString()} / 20,000 · 不会替换为演示案例</small>
+          <small>{originalText.length.toLocaleString()} / 20,000</small>
         </label>
         <label className="field">询盘来源<select value={channel} disabled={pending} onChange={e => setChannel(e.target.value as CustomerContext['channel'])}>{Object.entries(channelLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
         <label className="field">客户邮箱（选填）<input type="email" maxLength={254} disabled={pending} value={email} onChange={e => setEmail(e.target.value)} /></label>

@@ -120,7 +120,18 @@ export interface Revision {
   createdAt: string;
   changeSummary: string[];
 }
+export interface AgentToolCall {
+  id: string;
+  name: string;
+  label?: string;
+  status: 'running' | 'succeeded' | 'failed';
+  summary?: string;
+  startedAt?: string;
+  finishedAt?: string;
+}
 export interface Run {
+  toolCalls?: AgentToolCall[];
+  loadedSkills?: string[];
   fileOutputs?: { file_id: string; name: string; sha256: string; downloadUrl: string }[];
   agentVerification?: { liveExecuted: boolean; mode: string } | null;
   completedPhases?: string[];

@@ -1,4 +1,4 @@
-SIMULATED / 产品规格原件 - 未登记系统批准
+产品规格原件 - 未登记系统批准
 {
   "product": "backpack",
   "sku": "BP-DE-3000",

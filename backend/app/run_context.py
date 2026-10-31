@@ -19,6 +19,8 @@ def route_intent(action, instruction):
         return "confirm_requirements"
     if action not in ("analyze", "revise"):
         return action
+    # Excluded later stages are constraints, not requests to execute those stages.
+    instruction = re.sub(r"(?:不要|不需要|无需|不必|不生成|不制作|不推进|先不|暂不|勿|do\s+not|don't)[^，。；;\n]*", "", instruction, flags=re.I)
     if re.search(r"变更|改为|改成|修改包装|change\s+(?:the\s+)?(?:material|quantity|packaging)", instruction, re.I):
         return "apply_change"
     if re.search(r"核价|核算|计算.*报价|生成.*报价|准备.*报价|calculate.*(?:cost|price)|prepare.*quot", instruction, re.I):
@@ -105,7 +107,7 @@ def resume_run(request, db, user, case, body, marker):
         fail("REVISION_CONFLICT", "任务或业务版本已更新，请刷新", 409)
     job = db.get(Job, run.job_id)
     payload = decode(job.payload)
-    if job.kind == "prepare_quote" and not payload.get("agentFileTools"):
+    if job.kind == "prepare_quote" and not payload.get("agentFileTools") and not payload.get("businessAgent"):
         require_capability(db, "costing")
     answers = body.get("answers")
     questions = decode(run.payload).get("clarification", {}).get("questions", [])
@@ -113,7 +115,7 @@ def resume_run(request, db, user, case, body, marker):
     if not isinstance(answers, list) or len(answers) != len(expected) or any(not isinstance(a, dict) or not isinstance(a.get("value"), str) or not a["value"].strip() or len(a["value"]) > 20000 for a in answers) or {a.get("questionId") for a in answers} != expected:
         fail("INVALID_INPUT", "请逐项填写当前任务的澄清答案")
     resume = {"text": "\n".join(a["value"].strip() for a in answers)}
-    if job.kind == "prepare_quote" and not payload.get("agentFileTools"):
+    if job.kind == "prepare_quote" and not payload.get("agentFileTools") and not payload.get("businessAgent"):
         row = db.get(Item, str(body.get("selectedSupplierOfferId", "")))
         if not row or row.kind != "supplier_offer" or row.case_id != case.id:
             fail("SUPPLIER_EVIDENCE_REQUIRED", "请选择当前询盘的供应商报价", 422)

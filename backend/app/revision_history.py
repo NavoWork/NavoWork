@@ -14,7 +14,7 @@ NODE_FIELDS = {
 NODE_ARTIFACTS = {
     "requirements": {"spec"}, "risks": set(), "reply": set(), "customer": set(),
     "quote": {"rfq", "comparison", "cost", "quotation"},
-    "sample": {"sample"}, "order": {"pi"}, "production": {"production", "ta", "qc"},
+    "sample": {"sample", "sample_feedback"}, "order": {"po_check", "pi"}, "production": {"production", "ta", "qc"},
 }
 
 

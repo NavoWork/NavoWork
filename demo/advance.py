@@ -30,7 +30,7 @@ PREFIX = "/api/v1/workspaces/ws_demo"
 
 
 class Demo:
-    def __init__(self, client, batch="competition", case="de_a", tick=None):
+    def __init__(self, client, batch="intake", case="de_a", tick=None):
         self.client, self.tick = client, tick
         self.case_id = f"inq_{batch}_{case}"
         self.path = f"{PREFIX}/inquiries/{self.case_id}"
@@ -65,7 +65,7 @@ class Demo:
         if old and old["content"] == content:
             return old
         if old:
-            return self.post(f"/artifacts/{old['id']}/versions", {"baseVersion": old["version"], "content": content, "reason": "演示操作者依据模拟原件维护草稿"})
+            return self.post(f"/artifacts/{old['id']}/versions", {"baseVersion": old["version"], "content": content, "reason": "依据当前来源维护草稿"})
         return self.post("/artifacts", {"kind": kind, "title": title or kind, "content": content})
 
     def evidence(self, key):
@@ -83,7 +83,7 @@ class Demo:
         if existing:
             return existing
         source_offer = next(o for o in PACK["offers"] if o["key"] == key)
-        return self.post("/supplier-offers", {**source_offer, "evidenceSourceId": source, "notes": "模拟原件字段；localCny 为演示内部费用假设"})
+        return self.post("/supplier-offers", {**source_offer, "evidenceSourceId": source, "notes": "供应商原件字段；localCny 为内部国内费用分摊"})
 
     def wait(self, run):
         deadline = time.monotonic() + 90
@@ -243,7 +243,7 @@ class Demo:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--batch", default="competition")
+    parser.add_argument("--batch", default="intake")
     parser.add_argument("--case", choices=["de_a", "de_b", "de_c"], default="de_a")
     parser.add_argument("--step", choices=["quote", "change", "order", "check", "approve", "release"], required=True)
     parser.add_argument("--url", default="http://127.0.0.1:8000")

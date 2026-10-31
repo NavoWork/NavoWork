@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Check, Sparkles, Square, TriangleAlert } from 'lucide-react';
+import { Check, LoaderCircle, Sparkles, Square, TriangleAlert } from 'lucide-react';
 import type { Run } from '../api/types';
 import { StatusBadge } from '../components/ui';
 import './inquiry-run.css';
+
+const skillNames: Record<string, string> = { requirements: '需求解析', costing: '成本核价', changes: '变更管理', inquiry: '询盘评估', 'prepare-quotation': '报价准备', 'revise-related-files': '文件联动修订', 'sample-feedback': '样品反馈', 'po-check': '订单核对', 'pi-prepare': 'PI 编制' };
+const toolNames: Record<string, string> = { get_case: '读取询盘', read_case: '读取询盘', get_context: '读取业务上下文', search_knowledge: '检索知识库', read_knowledge: '查阅业务知识', search_assets: '检索资产库', read_asset: '读取资产文件', attach_asset: '引用资产资料', list_artifacts: '查看业务成果', read_artifact: '读取业务文档', update_artifact: '更新业务文档', create_artifact: '生成业务文档', update_requirements: '更新客户需求', calculate_quote: '核算报价', save_artifact: '保存业务成果', search_evidence: '查找原件', read_evidence: '读取原件', load_skill: '加载业务技能' };
 
 const phases = [
   {
@@ -117,7 +120,9 @@ export function InquiryRunActivity({ run }: { run: Run }) {
           {queued ? '已收到你的要求，即将开始梳理本轮任务。' : phase.detail}
         </p>
       )}
-      <ol className="iw-run-steps" aria-label="处理阶段">
+      {!!run.loadedSkills?.length && <div className="iw-loaded-skills" aria-label="本次使用的技能">{run.loadedSkills.map(skill => <span key={skill}>{skillNames[skill] || skill}</span>)}</div>}
+      {!!run.toolCalls?.length && <ol className="iw-tool-calls" aria-label="Agent 工具调用">{run.toolCalls.map(call => { const Icon = call.status === 'succeeded' ? Check : call.status === 'failed' ? TriangleAlert : LoaderCircle; return <li key={call.id} className={`tool-${call.status}`}><div><Icon size={13} /><strong>{call.label || toolNames[call.name] || call.name.replaceAll('_', ' ')}</strong><span>{{ running: '执行中', succeeded: '完成', failed: '未完成' }[call.status]}</span></div>{call.summary && <p>{call.summary}</p>}</li>; })}</ol>}
+      {!run.toolCalls?.length && <ol className="iw-run-steps" aria-label="处理阶段">
         {phases.map((step, index) => {
           const complete = run.completedPhases ? run.completedPhases.includes(step.id) : run.status === 'succeeded' || (!queued && index < phaseIndex);
           const skipped = run.status === 'succeeded' && !complete;
@@ -136,7 +141,7 @@ export function InquiryRunActivity({ run }: { run: Run }) {
             </li>
           );
         })}
-      </ol>
+      </ol>}
     </>
   );
 }

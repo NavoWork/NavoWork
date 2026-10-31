@@ -279,11 +279,12 @@ def canvas_file(db, user, case, file_id):
 
 
 def skill_market(db):
-    enabled = {item_view(r)["id"]: item_view(r)["enabled"] for r in items(db, "capability")}
-    return {"items": [
-        {"id": "requirements", "tab": "skills", "name": "询盘需求分析", "description": "提取包袋规格、生成需求草稿与缺项清单。", "category": "外贸", "tags": ["LangGraph", "人工复核"], "includes": ["需求分析", "澄清与恢复", "固定输入版本"], "status": "available" if enabled.get("agent", True) else "disabled"},
-        {"id": "costing", "tab": "skills", "name": "供应商核价", "description": "使用供应商原件和明确成本条件计算报价草稿。", "category": "外贸", "tags": ["确定性计算"], "includes": ["成本核算", "报价草稿"], "status": "available" if enabled.get("agent", True) and enabled.get("costing", True) else "disabled"},
-        {"id": "changes", "tab": "skills", "name": "SOP 变更分析", "description": "定位受影响的流程节点，生成待复核版本。", "category": "外贸", "tags": ["版本追踪"], "includes": ["影响分析", "节点维护"], "status": "available" if enabled.get("agent", True) else "disabled"},
-        {"id": "logistics", "tab": "plugins", "name": "物流连接器", "description": "尚未接入物流服务，当前不执行运单查询。", "category": "连接器", "tags": ["规划中"], "includes": [], "status": "planned"},
-        {"id": "bags", "tab": "suites", "name": "包袋外贸工作流", "description": "询盘、需求、报价、样品、订单与生产资料草稿。", "category": "业务套件", "tags": ["SQLite", "LangGraph"], "includes": ["询盘画板", "知识与资产库", "业务审批工作台"], "status": "available" if enabled.get("agent", True) else "disabled"}
-    ]}
+    from .settings_api import settings_values
+    config = settings_values(db)
+    catalog = [{"id": skill["id"], "tab": "skills", "name": skill["name"],
+                "description": skill["description"], "category": "外贸", "tags": ["按需执行", "版本留档"],
+                "includes": [skill["description"]], "tools": skill["tools"],
+                "status": "available" if config["agent"]["enabled"] and skill["enabled"] else "disabled"}
+               for skill in config["skills"]]
+    catalog.append({"id": "bags", "tab": "suites", "name": "包袋外贸工作流", "description": "从询盘出发，逐步完成规格、核价、样品、订单与交付准备。", "category": "业务套件", "tags": ["七个业务阶段"], "includes": ["客户询盘", "产品规格", "成本与报价", "打样确认", "订单合同", "生产准备", "验货与交付"], "status": "available" if config["agent"]["enabled"] else "disabled"})
+    return {"items": catalog}

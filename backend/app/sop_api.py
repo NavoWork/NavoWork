@@ -42,6 +42,18 @@ def _extract_file(data: bytes, filename: str) -> str:
     ext = Path(filename).suffix.lower()
     if ext in (".txt", ".eml", ".csv", ".md"):
         return data.decode("utf-8-sig", errors="replace")[:50000]
+    if ext == ".docx":
+        try:
+            from zipfile import ZipFile
+            from xml.etree import ElementTree
+            with ZipFile(io.BytesIO(data)) as archive:
+                if archive.getinfo("word/document.xml").file_size > 5 * 1024 * 1024:
+                    return ""
+                document = ElementTree.fromstring(archive.read("word/document.xml"))
+            namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+            return "\n".join("".join(p.itertext()) for p in document.findall(".//w:p", namespace))[:50000]
+        except Exception:
+            return ""
     if ext == ".pdf":
         try:
             from pypdf import PdfReader
@@ -131,6 +143,9 @@ def sop_case_routes(request: Request, db: Session, user: User, case: Case, tail:
     if not tail:
         fail("NOT_FOUND", "接口不存在", 404)
     method, group = request.method, tail[0]
+    if group == "message-suggestions" and method == "GET" and len(tail) == 1:
+        from .message_suggestions import next_messages
+        return next_messages(db, case)
     if group == "node-generations" and method == "POST" and len(tail) == 1:
         from .main import create_run
         kinds = {"customer": "qualify_inquiry", "requirements": "confirm_requirements", "risks": "confirm_requirements", "quote": "prepare_quote", "reply": "confirm_requirements", "sample": "manage_sample", "order": "confirm_order", "production": "prepare_production"}
@@ -185,12 +200,13 @@ def sop_case_routes(request: Request, db: Session, user: User, case: Case, tail:
         stages = [
             ("qualify_inquiry", bool(items(db, "customer_profile", case_id=case.id)) or bool(revisions)),
             ("confirm_requirements", "spec" in kinds),
-            ("prepare_quote", "quotation" in kinds),
-            ("manage_sample", bool(items(db, "sample", case_id=case.id))),
-            ("confirm_order", bool(items(db, "order_confirmation", case_id=case.id))),
-            ("prepare_production", bool(items(db, "production_pack", case_id=case.id))),
-            ("manage_shipment", False),
-            ("reconcile_payment", False),
+            ("prepare_quote", bool(kinds & {"cost", "comparison", "quotation"})),
+            ("manage_sample", bool(kinds & {"sample", "sample_feedback"}) or bool(items(db, "sample", case_id=case.id))),
+            ("confirm_order", bool(kinds & {"pi", "po_check"}) or bool(items(db, "order_confirmation", case_id=case.id))),
+            ("prepare_production", bool(kinds & {"production", "ta"}) or bool(items(db, "production_pack", case_id=case.id))),
+            ("inspect_quality", "qc" in kinds),
+            ("manage_shipment", "shipment" in kinds),
+            ("reconcile_payment", "payment" in kinds),
         ]
         return {"caseId": case.id, "currentRevision": case.current_revision, "stages": [{"kind": kind, "status": "needs_review" if present else "not_started"} for kind, present in stages], "openChangeCount": len(open_changes), "productionRelease": {"status": "blocked" if release_reasons else "ready_for_manual_release", "missing": release_reasons}}
     if group == "evidence":
@@ -260,7 +276,7 @@ def sop_case_routes(request: Request, db: Session, user: User, case: Case, tail:
             if method == "GET":
                 return _list(db, case, "artifact")
             kind = str(body.get("kind") or "")
-            if kind not in ("spec", "rfq", "comparison", "cost", "quotation", "sample", "pi", "production", "ta", "qc", "shipment", "payment", "followup"):
+            if kind not in ("spec", "rfq", "comparison", "cost", "quotation", "sample", "sample_feedback", "po_check", "pi", "production", "ta", "qc", "shipment", "payment", "followup"):
                 fail("INVALID_INPUT", "成果类型不支持")
             if any(decode(i.payload).get("kind") == kind for i in items(db, "artifact", case_id=case.id)):
                 fail("ARTIFACT_CONFLICT", "该成果已有版本，请编辑最新版本", 409)

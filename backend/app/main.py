@@ -346,6 +346,10 @@ def create_run(request: Request, db: Session, user: User, case: Case, body: dict
     action = str(body.get("action") or kind or "analyze")
     interactive = kind is None
     kind = kind or route_intent(action, str(body.get("instruction", "")))
+    from .agent_files import enabled as file_tools_enabled, confirmed_facts
+    from .business_agent import configured as business_agent_configured
+    file_tools = file_tools_enabled() and interactive and kind in ("prepare_quote", "apply_change", "confirm_requirements")
+    business_agent = business_agent_configured() and not file_tools
     allowed = {"qualify_inquiry", "confirm_requirements", "prepare_quote", "manage_sample", "confirm_order", "prepare_production", "manage_shipment", "reconcile_payment", "handle_aftersales", "apply_change", "follow_up"}
     if kind not in allowed:
         fail("INVALID_INPUT", "未知任务类型")
@@ -356,7 +360,7 @@ def create_run(request: Request, db: Session, user: User, case: Case, body: dict
     selected_offer_id = body.get("selectedSupplierOfferId")
     if kind == "prepare_quote":
         require_capability(db, "costing")
-    if kind == "prepare_quote" and not selected_offer_id and not interactive:
+    if kind == "prepare_quote" and not selected_offer_id and not interactive and not business_agent:
         fail("SUPPLIER_EVIDENCE_REQUIRED", "报价任务须选择已绑定原件的供应商报价", 422)
     if kind == "prepare_quote" and selected_offer_id:
         offer_row = db.get(Item, str(selected_offer_id))
@@ -367,7 +371,7 @@ def create_run(request: Request, db: Session, user: User, case: Case, body: dict
         calculated = price_quote(cost_inputs)
         if calculated and calculated["quantity"] < offer["moq"]:
             fail("INVALID_INPUT", "询价数量低于供应商起订量")
-        if not calculated and not interactive:
+        if not calculated and not interactive and not business_agent:
             fail("INVALID_INPUT", "请补齐有效的汇率、毛利率和数量")
     if not isinstance(body.get("inputRefs") or [], list):
         fail("INVALID_INPUT", "输入来源必须是列表")
@@ -381,10 +385,6 @@ def create_run(request: Request, db: Session, user: User, case: Case, body: dict
         from .revision_history import NODE_FIELDS
         if generation_target not in NODE_FIELDS:
             fail("INVALID_INPUT", "未知生成节点")
-    from .agent_files import enabled as file_tools_enabled, confirmed_facts
-    file_tools = file_tools_enabled() and interactive and kind in ("prepare_quote", "apply_change", "confirm_requirements")
-    from .business_agent import configured as business_agent_configured
-    business_agent = business_agent_configured() and not file_tools
     if business_agent:
         from .settings_api import settings_values
         if not settings_values(db).get("agent", {}).get("enabled", True):

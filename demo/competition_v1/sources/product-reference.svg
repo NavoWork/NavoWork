@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1000" height="680" viewBox="0 0 1000 680">
 <rect width="1000" height="680" fill="#f3f5f8"/><g font-family="Arial" fill="#172b4d">
-<text x="55" y="65" font-size="30">BP-DE-3000 / simulated product drawing</text>
+<text x="55" y="65" font-size="30">BP-DE-3000 / product specification drawing</text>
 <text x="55" y="102" font-size="17">Requested dimensions. Not a photograph or measurement certificate.</text>
 <path d="M390 195 C390 145 610 145 610 195" fill="none" stroke="#56647b" stroke-width="20"/>
 <rect x="320" y="190" width="360" height="370" rx="65" fill="#263449"/>

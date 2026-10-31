@@ -1,4 +1,5 @@
 import pytest
+from pathlib import Path
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -10,6 +11,9 @@ def isolated_backend(tmp_path_factory):
         patch.setenv("APP_ENV", "demo")
         patch.setenv("MODEL_API_KEY", "")
         from app.main import app
+        from app.db import engine
+        if not engine.url.database or Path(engine.url.database).resolve() != (root / "test.sqlite3").resolve():
+            raise RuntimeError("Refusing to run database tests outside the isolated test database. Do not import app modules during test collection.")
         yield app
 
 

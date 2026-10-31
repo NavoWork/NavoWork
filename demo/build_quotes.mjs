@@ -1,6 +1,10 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { Workbook, SpreadsheetFile } from '@oai/artifact-tool';
+import { createRequire } from 'node:module';
+const runtimeModules = process.env.CODEX_NODE_MODULES;
+if (!runtimeModules) throw new Error('Set CODEX_NODE_MODULES to the bundled runtime node_modules directory.');
+const require = createRequire(path.join(runtimeModules, '__runtime__.cjs'));
+const { Workbook, SpreadsheetFile } = require('@oai/artifact-tool');
 
 const root = path.resolve('demo/competition_v1');
 const pack = JSON.parse(await fs.readFile(path.join(root, 'pack.json'), 'utf8'));
@@ -14,9 +18,9 @@ for (const sheet of [summary, ...sources]) {
   sheet.getRange('A1:K25').format.rowHeight = 25;
   sheet.getRange('A1:K25').format.columnWidth = 17;
 }
-summary.getRange('A2').values = [['Simulated quotation comparison']];
+summary.getRange('A2').values = [['Supplier quotation comparison']];
 summary.getRange('A2').format.font.size = 16;
-summary.getRange('A3').values = [['Competition fixtures. PRD section 6; local costs, FX and margins are internal assumptions.']];
+summary.getRange('A3').values = [['Local costs, exchange rates and margins are internal costing inputs.']];
 summary.getRange('A5:K5').values = [['Offer', 'Base CNY/pc', 'Pack CNY/pc', 'Local CNY/pc', 'Cost CNY/pc', 'CNY/USD', 'Margin', 'USD/pc', 'Quantity', 'Goods USD', 'Lead days']];
 summary.getRange('A5:K5').format.fill = '#253858';
 summary.getRange('A5:K5').format.font.color = '#ffffff';
@@ -24,7 +28,7 @@ summary.getRange('A5:K5').format.font.bold = true;
 summary.getRange('A6:A9').format.columnWidth = 22;
 for (const [index, offer] of pack.offers.entries()) {
   const sheet = sources[index];
-  sheet.getRange('A2').values = [[`${offer.sheet} / simulated source quote`]];
+  sheet.getRange('A2').values = [[`${offer.sheet} / supplier quotation`]];
   sheet.getRange('A2').format.font.size = 16;
   sheet.getRange('A4:B4').values = [['Supplier field', 'Quoted value']];
   sheet.getRange('A4:B4').format.fill = '#253858';
@@ -37,7 +41,7 @@ for (const [index, offer] of pack.offers.entries()) {
     ['Packaging', offer.key === 'a2' ? 'CMYK color box, CB-02' : offer.key === 'mx1' ? 'Paper band' : 'Plain kraft box'],
     ['Starts after', 'Final sample/artwork + payment conditions'],
     ['Currency / scope', 'CNY / factory and packaging, no sea freight'],
-    ['Approval status', 'Simulated supplier statement; requires human review'],
+    ['Approval status', 'Supplier quotation; pending commercial review'],
   ];
   sheet.getRange('A4:A15').format.columnWidth = 30;
   sheet.getRange('B4:B15').format.columnWidth = 62;
@@ -48,7 +52,7 @@ for (const [index, offer] of pack.offers.entries()) {
   summary.getRange(`B${r}:C${r}`).formulas = [[`='${sheet.name}'!B6`, `='${sheet.name}'!B7`]];
   summary.getRange(`E${r}`).formulas = [[`=SUM(B${r}:D${r})`]];
   summary.getRange(`H${r}`).formulas = [[`=ROUNDUP(E${r}/F${r}/(1-G${r}),2)`]];
-  summary.getRange(`J${r}`).formulas = [[`=H${r}*I${r}`]];
+  summary.getRange(`J${r}`).formulas = [[`=ROUND(H${r}*I${r},2)`]];
   summary.getRange(`K${r}`).formulas = [[`='${sheet.name}'!B9`]];
 }
 summary.getRange('B6:F9').setNumberFormat('0.00');

@@ -289,3 +289,5 @@
     gap: 14px;
   }
 }
+
+.market-skill-control { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; margin: 12px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: 12px; color: var(--muted); }

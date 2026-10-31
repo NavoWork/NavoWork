@@ -25,6 +25,10 @@ def local_env() -> dict[str, str]:
             key, value = line.split("=", 1)
             env.setdefault(key.strip(), value.strip().strip('"').strip("'"))
     env.setdefault("APP_ENV", "demo")
+    source_paths = [str(BACKEND), str(ROOT / "agent-kit" / "src")]
+    if env.get("PYTHONPATH"):
+        source_paths.append(env["PYTHONPATH"])
+    env["PYTHONPATH"] = os.pathsep.join(source_paths)
     env["VITE_API_MODE"] = "real"
     return env
 
@@ -34,19 +38,22 @@ def main() -> int:
         print("先运行：python -m venv backend/.venv；backend/.venv/Scripts/python -m pip install -e agent-kit -e 'backend[test]'；npm ci")
         return 1
     env = local_env()
+    api_port = str(int(env.get("APP_API_PORT", "8000")))
+    ui_port = str(int(env.get("APP_UI_PORT", "5173")))
+    env["API_PROXY_TARGET"] = f"http://127.0.0.1:{api_port}"
     subprocess.run([str(PYTHON), "-m", "alembic", "upgrade", "head"], cwd=BACKEND, env=env, check=True)
     npm = "npm.cmd" if os.name == "nt" else "npm"
     commands = [
-        ("API", [str(PYTHON), "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"], BACKEND),
+        ("API", [str(PYTHON), "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", api_port], BACKEND),
         ("Worker", [str(PYTHON), "-m", "app.worker"], BACKEND),
-        ("UI", [npm, "run", "dev"], ROOT),
+        ("UI", [npm, "run", "dev", "--", "--port", ui_port], ROOT),
     ]
     children: list[subprocess.Popen] = []
     try:
         for label, command, directory in commands:
             children.append(subprocess.Popen(command, cwd=directory, env=env))
             print(f"{label} started (PID {children[-1].pid})", flush=True)
-        print("打开 http://127.0.0.1:5173；按 Ctrl+C 停止全部服务。", flush=True)
+        print(f"打开 http://127.0.0.1:{ui_port}；按 Ctrl+C 停止全部服务。", flush=True)
         while all(child.poll() is None for child in children):
             time.sleep(0.5)
         return 1

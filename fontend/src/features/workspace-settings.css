@@ -1,0 +1,18 @@
+.ws-settings { color: var(--ink); }
+.ws-section { padding: 0 0 22px; margin-bottom: 22px; border-bottom: 1px solid var(--line); }
+.ws-section h3 { display: flex; align-items: center; gap: 9px; margin: 0 0 16px; font-size: 14px; }
+.ws-section h3 svg { color: var(--muted); }
+.ws-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px; }
+.ws-full { grid-column: 1 / -1; }
+.ws-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ws-note { color: var(--muted); font-size: 12px; margin: 12px 0 0; }
+.ws-agent-summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.ws-agent-summary strong { display: block; font-weight: 600; }
+.ws-agent-summary span { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; margin-top: 4px; }
+.ws-switch { display: flex; align-items: center; gap: 8px; white-space: nowrap; font-size: 12px; }
+.ws-switch input { accent-color: var(--green); }
+.ws-skill-tags { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 15px; }
+.ws-skill-tags span { padding: 4px 9px; background: var(--soft); border: 1px solid var(--line); border-radius: 6px; font-size: 11px; }
+.ws-footer { display: flex; align-items: center; gap: 10px; }
+.ws-footer > span { display: flex; align-items: center; gap: 5px; flex: 1; color: var(--green); font-size: 12px; }
+@media (max-width: 600px) { .ws-form-grid, .ws-three { grid-template-columns: 1fr; } .ws-agent-summary { align-items: flex-start; flex-direction: column; } }

@@ -19,8 +19,8 @@ NODE_ARTIFACTS = {
     "extract_bag_requirements": {"spec"}, "draft_spec_pack": {"spec"},
     "build_supplier_rfq": {"rfq"}, "normalize_quotes": {"comparison"},
     "calculate_cost": {"cost"}, "draft_quotation": {"quotation"},
-    "plan_sample": {"sample"}, "sample_approval_gate": {"sample"},
-    "compare_po_to_baseline": {"pi"}, "draft_contract_or_pi": {"pi"},
+    "plan_sample": {"sample"}, "sample_approval_gate": {"sample", "sample_feedback"},
+    "compare_po_to_baseline": {"po_check", "pi"}, "draft_contract_or_pi": {"pi"},
     "prepare_production_pack": {"production"},
 }
 
@@ -36,6 +36,8 @@ def run_view(run: Run) -> dict:
     value["completedPhases"] = decode(run.payload).get("completedPhases", [])
     value["fileOutputs"] = decode(run.payload).get("fileOutputs", [])
     value["agentVerification"] = decode(run.payload).get("agentVerification")
+    value["toolCalls"] = decode(run.payload).get("toolCalls", [])
+    value["loadedSkills"] = decode(run.payload).get("loadedSkills", [])
     return value
 
 
@@ -260,6 +262,10 @@ def work_once(graph, owner: str = "worker-local") -> bool:
             job.status = "running"
             db.commit()
             payload = decode(job.payload)
+            if payload.get("businessAgent"):
+                from .business_agent import execute_business_work
+                execute_business_work(item_id, generation)
+                return True
             if payload.get("agentFileTools"):
                 from .file_worker import execute_file_work
                 execute_file_work(item_id, generation)

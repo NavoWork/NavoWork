@@ -32,13 +32,13 @@ interface MockDB extends DBSchema {
   state: { key: string; value: State };
 }
 const database = () =>
-  openDB<MockDB>('easywork-mock-v1', 1, {
+  openDB<MockDB>('navowork-intake-v2', 1, {
     upgrade(db) {
       db.createObjectStore('state');
     },
   });
-const initial = (): State => ({
-  ...seed(),
+const initial = (withHistory = false): State => ({
+  ...seed(withHistory),
   draftHistory: {},
   runs: {},
   imports: {},
@@ -1012,6 +1012,6 @@ export async function mockRequest(path: string, options: RequestOptions = {}): P
 export async function resetMockForTests() {
   fault = 'none';
   const db = await database();
-  await db.put('state', initial(), 'main');
+  await db.put('state', initial(true), 'main');
   db.close();
 }

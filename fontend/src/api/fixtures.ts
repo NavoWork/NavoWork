@@ -10,7 +10,7 @@ import type {
 } from './types';
 export const demoSession: Session = {
   user: { id: 'user_demo', name: 'Alex', role: 'admin' },
-  workspace: { id: 'ws_demo', name: 'Navowork 示例工作空间' },
+  workspace: { id: 'ws_demo', name: 'NavoWork 工作空间' },
 };
 export const sources: Source[] = [
   {
@@ -21,7 +21,7 @@ export const sources: Source[] = [
     kind: 'product',
     status: 'published',
     content:
-      '合成测试资料，不可对客使用。SKU BAG-STOCK；MOQ 100 件；库存 800 件，记录于 2026-10-31；付款条件满足后 3 天出库，运输时间未确认。',
+      'SKU BAG-STOCK；MOQ 100 件；库存 800 件，记录于 2026-10-31；付款条件满足后 3 天出库，运输时间未确认。',
     editVersion: 1,
     updatedAt: '2026-10-31T02:00:00Z',
   },
@@ -33,7 +33,7 @@ export const sources: Source[] = [
     kind: 'price',
     status: 'published',
     content:
-      '合成测试价表。BAG-STOCK：USD 1.80/件；测试商家政策有效期 7 天；不含运费、税费；最终总额未知。',
+      'BAG-STOCK：USD 1.80/件；报价有效期 7 天；不含运费、税费；最终总额未知。',
     editVersion: 1,
     updatedAt: '2026-10-31T02:00:00Z',
   },
@@ -45,7 +45,7 @@ export const sources: Source[] = [
     kind: 'knowledge',
     status: 'published',
     content:
-      '# 交付规则\n\n出库时间不等于到货时间。运输时间、认证证据、运费、税费未确认时必须明确披露，不得承诺。\n\n本资料为合成演示数据。',
+      '# 交付规则\n\n出库时间不等于到货时间。运输时间、认证证据、运费、税费未确认时必须明确披露，不得承诺。',
     editVersion: 1,
     updatedAt: '2026-10-31T02:00:00Z',
   },
@@ -67,7 +67,7 @@ const common = {
   metadataVersion: 1,
   activeRunId: null,
 };
-export const inquiries: Inquiry[] = [
+const historicalInquiries: Inquiry[] = [
   {
     ...common,
     requestedLocales: [...common.requestedLocales],
@@ -130,6 +130,17 @@ export const inquiries: Inquiry[] = [
     updatedAt: '2026-10-30T08:35:00Z',
   },
 ];
+// Every new workspace starts from the received inquiry. Completed records are
+// retained only as explicit contract-test fixtures below.
+export const inquiries: Inquiry[] = historicalInquiries.map((inquiry) => ({
+  ...inquiry,
+  businessStatus: 'todo',
+  currentRevision: 0,
+  waiting: undefined,
+  closeReason: undefined,
+  nextAction: '整理客户需求，确认规格与交付缺项',
+}));
+
 export function sampleRevision(inquiryId: string, number: number, quantity = 300): Revision {
   const amount = quantity === 600 ? 108000 : 54000;
   return {
@@ -260,22 +271,23 @@ export const capabilities: Capability[] = [
 export const assets: Asset[] = [
   {
     id: 'asset_sample',
-    title: '帆布袋资料说明（示例）',
-    name: '帆布袋资料说明（示例）',
+    title: '帆布袋资料说明',
+    name: '帆布袋资料说明',
     version: 1,
     skuScope: ['BAG-STOCK'],
     locale: 'zh-CN',
     mediaType: 'application/pdf',
-    source: '合成演示素材，非真实产品摄影或认证证据',
+    source: '产品资料',
     size: 24600,
     createdAt: '2026-10-31T02:00:00Z',
   },
 ];
-export function seed() {
+export function seed(withHistory = false) {
+  const initialInquiries = withHistory ? historicalInquiries : inquiries;
   const revisions: Record<string, Revision[]> = {};
   const drafts: Record<string, Draft> = {};
   const messages: Record<string, Message[]> = {};
-  for (const i of inquiries) {
+  for (const i of initialInquiries) {
     revisions[i.id] = Array.from({ length: i.currentRevision }, (_, n) => {
       const r = sampleRevision(i.id, n + 1);
       if (i.id === 'inq_mx026' && n === 0) {
@@ -315,7 +327,7 @@ export function seed() {
   }
   return {
     session: null as Session | null,
-    inquiries: structuredClone(inquiries),
+    inquiries: structuredClone(initialInquiries),
     revisions,
     drafts,
     messages,

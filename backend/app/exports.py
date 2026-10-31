@@ -13,6 +13,19 @@ from .core import create_item, decode, encode, fail, item_view, items, require_c
 from .models import Blob, Case, Item, User, now
 
 
+def customer_document_content(content):
+    """Customer quotations must not export internal costs or supplier selections."""
+    internal = {"unitCostCny", "costInputs", "cost", "costs", "costBreakdown", "margin", "targetMargin", "exchangeRate",
+                "formula", "baseCny", "packagingCny", "localCny", "selectedSupplierOfferId", "supplierOffers",
+                "supplier", "supplierName", "sourceRefs", "evidenceRefs", "sourceVersionIds", "inputRefs",
+                "jobId", "runId", "caseId", "unitPriceMinor", "goodsSubtotalMinor", "baseVersion"}
+    if isinstance(content, dict):
+        return {key: customer_document_content(value) for key, value in content.items() if key not in internal}
+    if isinstance(content, list):
+        return [customer_document_content(value) for value in content]
+    return content
+
+
 def _manifest(db: Session, case: Case, body: dict):
     if body.get("bundleId"):
         bundle = db.get(Item, body["bundleId"])
@@ -140,6 +153,8 @@ def export_artifact(db: Session, case: Case, artifact: Item, fmt: str):
     content = value.get("content") or {}
     if not isinstance(content, dict):
         fail("INVALID_INPUT", "成果内容必须是结构化对象")
+    if value.get("kind") in ("quotation", "pi"):
+        content = customer_document_content(content)
     rows = [(str(key), json.dumps(cell, ensure_ascii=False) if isinstance(cell, (dict, list)) else str(cell) if cell is not None else "待确认") for key, cell in content.items()]
     if fmt == "html":
         table = "".join(f"<tr><th>{html.escape(key)}</th><td>{html.escape(cell)}</td></tr>" for key, cell in rows)

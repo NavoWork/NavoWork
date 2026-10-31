@@ -736,7 +736,7 @@ function ImportDialog({
         </p>
       )}
       <div className="library-dialog-footer">
-        <span>{mode === 'real' ? '上传后保存到服务端；多文件按顺序上传' : '仅在当前页面演示，离开后恢复示例内容'}</span>
+        <span>{mode === 'real' ? '支持多文件上传' : '当前页面资料'}</span>
         <button
           className="button button-primary"
           disabled={!files.length || busy}

@@ -1,7 +1,8 @@
 import { useId, useRef, useState, type KeyboardEvent } from 'react';
 import { ArrowRight, Check, Layers3, Puzzle, Search, Sparkles, X } from 'lucide-react';
 import { EmptyState, ErrorNotice, Loading, Modal } from '../components/ui';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { WorkspaceConfiguration } from './WorkspaceSettings';
 import { api, mode, type Session } from '../api';
 import { marketItems, marketTabs, type MarketItem, type MarketTab } from './skill-market-data';
 import './skill-market.css';
@@ -9,6 +10,18 @@ import './skill-market.css';
 const tabIcons = { skills: Sparkles, plugins: Puzzle, suites: Layers3 };
 
 export function SkillMarket({ session }: { session: Session }) {
+  const client = useQueryClient();
+  const settings = useQuery({ queryKey: ['workspace-settings', session.workspace.id], enabled: mode === 'real', queryFn: ({ signal }) => api.get<WorkspaceConfiguration>(`/workspaces/${session.workspace.id}/settings`, signal) });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<unknown>();
+  async function toggleSkill(id: string, enabled: boolean) {
+    setSaving(true); setError(undefined);
+    try {
+      const next = await api.patch<WorkspaceConfiguration>(`/workspaces/${session.workspace.id}/settings`, { skills: [{ id, enabled }] });
+      client.setQueryData(['workspace-settings', session.workspace.id], next);
+      await client.invalidateQueries({ queryKey: ['skill-market', session.workspace.id] });
+    } catch (e) { setError(e); } finally { setSaving(false); }
+  }
   type ServerItem = Omit<MarketItem, 'icon'> & { tab: MarketTab; status: 'available' | 'disabled' | 'planned' };
   const catalog = useQuery({ queryKey: ['skill-market', session.workspace.id, session.user.id], enabled: mode === 'real',
     queryFn: ({ signal }) => api.get<{ items: ServerItem[] }>(`/workspaces/${session.workspace.id}/skill-market`, signal) });
@@ -21,6 +34,7 @@ export function SkillMarket({ session }: { session: Session }) {
   const [selected, setSelected] = useState<MarketItem | null>(null);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const id = useId();
+  const selectedSkill = settings.data?.skills.find(s => s.id === selected?.id);
   const current = marketTabs.find((item) => item.id === tab)!;
   const keyword = query.trim().toLocaleLowerCase();
   const items = catalogItems[tab].filter((item) =>
@@ -50,7 +64,7 @@ export function SkillMarket({ session }: { session: Session }) {
 
   return (
     <div className="feature-page skill-market">
-      <ErrorNotice error={catalog.error} onRetry={() => void catalog.refetch()} />
+      <ErrorNotice error={error || catalog.error} onRetry={() => void catalog.refetch()} />
       {mode === 'real' && catalog.isLoading && <Loading label="正在读取可用能力" />}
       <header className="market-heading">
         <h1>技能市场</h1>
@@ -173,6 +187,8 @@ export function SkillMarket({ session }: { session: Session }) {
                 </li>
               ))}
             </ul>
+            {selectedSkill && <div className="market-skill-control"><span>{selectedSkill.enabled ? '已启用 · Agent 可按需调用' : '已停用'}</span>{session.user.role === 'admin' && <button className="button button-primary" disabled={saving} onClick={() => void toggleSkill(selectedSkill.id, !selectedSkill.enabled)}>{saving ? '保存中…' : selectedSkill.enabled ? '停用技能' : '启用技能'}</button>}</div>}
+            <ErrorNotice error={error} />
             <button className="button" onClick={() => setSelected(null)}>
               返回市场
             </button>

@@ -46,6 +46,7 @@ import { CanvasPersistence } from './canvas-persistence';
 import { ResizeHandle } from '../components/ResizeHandle';
 import { FilePreview, OriginalDocument, WorkingDocument } from './InquiryDocument';
 import { ConversationResults } from './ConversationResults';
+import { BusinessArtifactDocument, artifactNames, artifactPreview, type BusinessArtifact } from './BusinessArtifact';
 import type { GenerationNode } from './GenerateNodeDialog';
 import {
   canvasKey,
@@ -64,6 +65,7 @@ import '@xyflow/react/dist/style.css';
 import './inquiry-canvas.css';
 
 const icons = {
+  artifact: FileText,
   original: Mail,
   conversation: MessageSquare,
   requirements: ListTree,
@@ -77,6 +79,7 @@ const icons = {
   revision: History,
 };
 const kindLabels: Record<DocumentKind, string> = {
+  artifact: '业务成果',
   original: '客户原文',
   conversation: '沟通记录',
   requirements: '需求规格',
@@ -202,7 +205,7 @@ function ServerCanvas(props: Props) {
       writer.initialize(result.editVersion, state);
       setLoaded(state);
       writer.onSaved(state);
-      setStatus('已与服务端同步');
+      setStatus('已保存');
     }).catch(e => { if (live) setError(e); });
     const leaving = (event: BeforeUnloadEvent) => {
       if (writer.pending || writer.saving) { event.preventDefault(); event.returnValue = ''; }
@@ -215,7 +218,7 @@ function ServerCanvas(props: Props) {
     };
   }, [writer, retry]);
   if (error) return <ErrorNotice error={error} onRetry={() => setRetry(v => v + 1)} />;
-  if (!loaded) return <Loading label="正在恢复服务端画板" />;
+  if (!loaded) return <Loading label="正在打开工作画布" />;
   return <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, minWidth: 0 }}>
     <div role="status" style={{ padding: '4px 12px', fontSize: 12 }}>
       {status}
@@ -303,6 +306,7 @@ function CanvasWorkspace({
         ),
     })),
   });
+  const businessArtifacts = useQuery({ queryKey: ['business-artifacts', scope], enabled: mode === 'real', queryFn: ({ signal }) => api.get<{ items: BusinessArtifact[] }>(`${path}/artifacts`, signal) });
   const assetIds = revision?.assetRefs ?? [];
   const assets = useQuery({
     queryKey: ['assets-for-inquiry', scope],
@@ -325,7 +329,15 @@ function CanvasWorkspace({
     }
   }, [state, scope, initial.error]);
   const docs = revisionDocuments(inquiry, revision, messages, revisions, replyText);
-  docs.push({ id: 'result:hub', title: '对话成果汇总', kind: 'result', folder: 'analysis', text: `已保存 ${revisions.length} 个业务版本。统一查看每轮需求、报价、回复与来源；历史恢复请到版本记录。`, caption: mode === 'real' ? '数据库留档 · 统一入口' : '统一成果入口' });
+  const latestArtifacts = new Map<string, BusinessArtifact>();
+  const historical = !!revision && revision.number !== inquiry.currentRevision;
+  const historicalIds = new Set(Object.values(revision?.artifactVersionIds || {}));
+  for (const artifact of businessArtifacts.data?.items || []) {
+    if (historical && !historicalIds.has(artifact.id)) continue;
+    if (!latestArtifacts.has(artifact.kind) || latestArtifacts.get(artifact.kind)!.version < artifact.version) latestArtifacts.set(artifact.kind, artifact);
+  }
+  for (const artifact of latestArtifacts.values()) docs.push({ id: `artifact:${artifact.kind}`, kind: 'artifact', title: artifact.title || artifactNames[artifact.kind] || '业务成果', folder: 'business', text: artifactPreview(artifact.content), caption: `V${artifact.version} · ${artifact.status === 'approved' ? '已批准' : '待审核'}`, artifact });
+  docs.push({ id: 'result:hub', title: '对话成果汇总', kind: 'result', folder: 'analysis', text: `已保存 ${revisions.length} 个业务版本。统一查看每轮需求、报价、回复与来源；历史恢复请到版本记录。`, caption: '历次业务成果' });
   useEffect(() => {
     const remap = (id: string) => /^(requirements|risks|quote|reply):\d+$/.test(id) ? `${id.split(':')[0]}:${revision?.number || 0}` : id;
     setState(s => ({ ...s, tabs: [...new Set(s.tabs.map(remap))], active: remap(s.active) }));
@@ -489,6 +501,7 @@ function CanvasWorkspace({
     .sort((a, b) => {
       const rank = (kind: DocumentKind) =>
         ({
+          artifact: 2,
           original: 0,
           requirements: 1,
           quote: 2,
@@ -605,6 +618,7 @@ function CanvasWorkspace({
       : undefined;
   return (
     <div className="ic-workspace">
+      <ErrorNotice error={businessArtifacts.error} onRetry={() => void businessArtifacts.refetch()} />
       <div className="ic-toolbar">
         <button
           ref={directoryToggleRef}
@@ -890,7 +904,7 @@ function CanvasWorkspace({
               />
               <Panel position="top-left" className="ic-board-label">
                 <span>INQUIRY CANVAS</span>
-                <small>双击打开文档 · 节点可直接生成 · 历史统一留档</small>
+                <small>双击打开文档 · 拖动整理工作画布</small>
               </Panel>
               <Panel position="top-right">
                 <button
@@ -969,6 +983,8 @@ function CanvasWorkspace({
                       onChange={(value) => draft(id, value)}
                       onSaved={onOriginalSaved}
                     />
+                  ) : doc.kind === 'artifact' && doc.artifact ? (
+                    <BusinessArtifactDocument key={doc.artifact.id} artifact={doc.artifact} path={path} readOnly={readOnly} onInstruction={onInstruction} />
                   ) : ['requirements', 'risks', 'quote'].includes(doc.kind) ? (
                     <WorkingDocument
                       doc={original!}

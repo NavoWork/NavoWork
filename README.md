@@ -16,20 +16,22 @@ python dev.py
 
 浏览器打开 <http://127.0.0.1:5173>。演示账号为 `demo@navowork.local`，密码为 `ChangeMe123!`；可在 `backend/.env` 修改。`dev.py` 自动运行迁移、启动 API、Worker 和 real 模式前端，按 Ctrl+C 关闭。数据写在 `backend/data/`，上传原件写在 `backend/storage/`，均不纳入 Git。
 
-## 比赛演示资料
-
-完整操作见 [演示操作手册](demo/competition_v1/演示操作手册.md)。包含5个待办场景、8篇Wiki和21份模拟原件，覆盖首次报价、彩盒变更、PO与生产资料放行、MOQ阻断和需求澄清。
+## 比赛演示
 
 ```powershell
 backend/.venv/Scripts/python.exe demo/seed.py
-backend/.venv/Scripts/python.exe demo/advance.py --case de_a --step quote
+python dev.py
 ```
 
-继续用 `--step change`、`order`，然后在界面逐项审核；`approve`、`release` 是需要操作者分别执行的模拟批准和放行命令。重复导入保留进度；重演用 `demo/seed.py --batch replay1`。导入不会提前批准或放行。所有资料仅用于演示，当前链路终点为生产资料包放行。
+默认导入 `intake` 批次的德国定制背包、墨西哥帆布袋、英国品牌礼品三条新询盘。每条只有客户原文和询盘原件，初始没有规格、供应商报价记录、报价、样品、订单或批准。重复导入保留已做的工作；需要重新演示时使用 `demo/seed.py --batch rehearsal2`。
 
-画布的需求、风险、报价、回复节点及 SOP 阶段均可点击“依据现有资料生成”，选择原件和 Wiki 固定版本。对话成果在数据库留档，画布只有一个“对话成果汇总”入口。版本记录支持恢复单节点或从旧版继续编辑，恢复会创建新草稿并保留历史；业务资料面板也可恢复单份成果。
+导入同时准备 8 篇业务知识和 47 份公司资产，其中包含 `test/core15` 的 17 份业务文件和 9 封原件。后续报价、样品与订单材料只在资产库中，用户进入对应环节时指挥 Agent 选择引用。core15 是 WB-26 / V3 / S03 档案，引用前应核对款号与版本，不能直接当作 BP-DE-3000 的当前确认。
 
-演示客户已补充获客渠道、邮箱、模拟官网/LinkedIn 和待核验背景。模型配置支持 `MODEL_BASE_URL`；`APP_ENV=demo` 时模型调用失败会明确提示并降级为有限规则抽取，未知字段仍需补充。正式环境调用失败不会静默降级。
+打开“德国定制背包询盘”，先发送“请整理客户需求和待确认事项”。之后依次要求生成规格、读取工厂报价并核价、准备客户报价。每次只推进本轮指定环节；后续节点保持未开始。聊天会显示工具执行情况，保存的需求、业务草稿和知识/资产引用会同步回工作台。
+
+详细指令见 [演示操作手册](demo/competition_v1/演示操作手册.md)。`demo/advance.py` 仅保留为手动辅助入口，默认指向 `intake`；比赛主线直接在对话中完成。
+
+在 `backend/.env` 中设置 `MODEL_BASE_URL`、`MODEL_API_KEY`、`MODEL_NAME`，即可启用模型工具调用。模型凭据只放本机配置，不提交到仓库。工作空间设置管理默认贸易条款、核价参数与启用的业务技能；最终报价仍使用本轮明确选择的供应商与条件。
 
 ## 验证
 
@@ -50,7 +52,7 @@ npm run build
 
 根目录 npm workspaces 只包含 `fontend/`。直接执行 `npm run dev` 时，前端会连接 `http://127.0.0.1:8000` 的 API；使用 `python dev.py` 可同时启动全部服务。需要体验原有纯前端合成数据模式时，在 `fontend/.env.local` 写入 `VITE_API_MODE=mock`，再启动前端。单独运行现有 Mock 浏览器回归用 `npm run test:e2e`；真实前后端浏览器联调用 `npm run test:e2e -- --config=playwright.real.config.ts`（在 `fontend/` 目录）。Windows 测试默认使用已安装的 Edge，可用 `PLAYWRIGHT_BROWSER_PATH` 指定其他浏览器。
 
-- [产品需求](doc/TradeWorkbench_PRD_v1.0.md)
+- [产品需求](doc/Navowork_PRD_v1.0_满血版.md)
 - [后端设计](doc/TradeWorkbench_Backend_Design_v1.0.md)
 - [Agent 节点图](doc/TradeWorkbench_Agent_Node_Graph_v1.0.md)
 - [新版前端适配：架构、实际节点链路与接口 v1.1](doc/Frontend_Backend_Adaptation_v1.1.md)
