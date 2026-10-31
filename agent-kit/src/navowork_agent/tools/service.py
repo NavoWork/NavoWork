@@ -135,7 +135,10 @@ class ToolService:
             result = ToolResult(status="error", code="INVALID_OR_UNSUPPORTED", warnings=[str(exc)[:1000]])
         except Exception:
             result = ToolResult(status="error", code="TOOL_FAILED", warnings=["Tool operation failed; inspect local diagnostics."], retryable=[call.name])
-        self.adapter.emit("tool_rejected", f"{call.name}: {result.status} ({result.code})")
+        try:
+            self.adapter.emit("tool_rejected", f"{call.name}: {result.status} ({result.code})")
+        except AgentError:
+            pass  # A fenced/unauthorized run must not append new host events either.
         return result
 
     def _validate_fact(self, fact: Fact):

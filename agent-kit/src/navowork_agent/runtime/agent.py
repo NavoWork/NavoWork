@@ -55,10 +55,13 @@ def build_graph(service, model, saver, *, max_tools=30, timeout_seconds=180, liv
                 result = ToolResult(status="blocked", code="EXECUTION_LIMIT")
             else:
                 call = ToolCall(tool_call_id=tc["id"], name=tc["name"], arguments=tc["args"],
-                    idempotency_key=digest([service.adapter.context().generation, tc["name"], tc["args"]]))
+                    idempotency_key=digest([tc["name"], tc["args"]] if tc["name"] in
+                        {"publish_documents", "edit_file", "export_artifact", "package_customer_files", "request_info"} else
+                        [service.adapter.context().run_id, state["messages"][-1].id, tc["id"], tc["name"], tc["args"]]))
                 result = service.call(call)
                 steps += 1
             payload = result.model_dump(mode="json")
+            payload["_tool_name"] = tc["name"]
             results.append(payload)
             if tc["name"] in ("request_info", "publish_documents"):
                 questions.extend(q.model_dump() for q in result.questions)
@@ -117,9 +120,14 @@ def build_graph(service, model, saver, *, max_tools=30, timeout_seconds=180, liv
         try:
             value = compiled.invoke(graph_input, config=config)
         except Exception:
-            service.adapter.emit("run_failed", "Model/graph execution failed; checkpoint retained")
-            return {"status": "error", "code": "MODEL_OR_GRAPH_FAILED", "live_executed": live_model,
-                    "summary": "Execution failed; inspect the saved checkpoint and actual tool results."}
+            partial = report(compiled.get_state(config).values, live_model=live_model)
+            partial.update(status="error", code="MODEL_OR_GRAPH_FAILED",
+                summary=f"Execution failed; {len(partial['outputs'])} generated files retained. Checkpoint saved.")
+            try:
+                service.adapter.emit("run_failed", partial["summary"])
+            except AgentError:
+                pass  # A cancelled or superseded run may no longer append events.
+            return partial
         result = report(value, live_model=live_model)
         service.adapter.emit("run_waiting" if result["status"] == "needs_info" else "run_finished", result["summary"])
         result["live_executed"] = live_model
@@ -137,8 +145,35 @@ def report(state, *, live_model=False):
         for f in r.get("outputs", []): outputs[f["file_id"]] = f
         for a in r.get("artifacts", []): artifacts[(a["artifact_id"], a["version"])] = a
     questions = state.get("pending_questions", [])
+    if not questions:
+        last_publication = next((r for r in reversed(results) if r.get("artifacts")), None)
+        if last_publication and last_publication["status"] == "needs_info":
+            questions = last_publication.get("questions", [])
+        elif not last_publication:
+            last_calculation = next((r for r in reversed(results) if r.get("_tool_name") == "calculate_quote"), None)
+            if last_calculation and last_calculation["status"] == "needs_info":
+                questions = last_calculation.get("questions", [])
     current_results = results[state.get("attempt_result_start", 0):]
-    last_problem = next((r for r in reversed(current_results) if r["status"] in ("error", "conflict", "blocked")), None)
+    problems = []
+    for index, r in enumerate(current_results):
+        if r["status"] not in ("error", "conflict", "blocked"):
+            continue
+        failed = r.get("data", {}).get("failed", [])
+        unresolved = []
+        for branch in failed:
+            kind, fmt = branch.split(".", 1)
+            ref = next((a for a in r.get("artifacts", []) if a["kind"] == kind), None)
+            repaired = ref and any(later.get("_tool_name") == "export_artifact"
+                and later["status"] in ("success", "needs_review")
+                and later.get("data", {}).get("artifact_id") == ref["artifact_id"]
+                and later.get("data", {}).get("version") == ref["version"]
+                and any(f["name"].endswith("." + fmt) for f in later.get("outputs", []))
+                for later in current_results[index + 1:])
+            if not repaired:
+                unresolved.append(branch)
+        if not failed or unresolved:
+            problems.append(r)
+    last_problem = problems[-1] if problems else None
     status = "needs_info" if questions else "blocked" if state.get("status") == "blocked" else (last_problem["status"] if last_problem else "needs_review")
     return {"status": status, "live_executed": live_model, "verification_mode": "live_model" if live_model else "offline_model_double", "outputs": list(outputs.values()), "artifacts": list(artifacts.values()),
             "questions": questions, "tool_steps": state.get("tool_steps", 0),

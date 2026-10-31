@@ -105,7 +105,7 @@ def resume_run(request, db, user, case, body, marker):
         fail("REVISION_CONFLICT", "任务或业务版本已更新，请刷新", 409)
     job = db.get(Job, run.job_id)
     payload = decode(job.payload)
-    if job.kind == "prepare_quote":
+    if job.kind == "prepare_quote" and not payload.get("agentFileTools"):
         require_capability(db, "costing")
     answers = body.get("answers")
     questions = decode(run.payload).get("clarification", {}).get("questions", [])
@@ -113,7 +113,7 @@ def resume_run(request, db, user, case, body, marker):
     if not isinstance(answers, list) or len(answers) != len(expected) or any(not isinstance(a, dict) or not isinstance(a.get("value"), str) or not a["value"].strip() or len(a["value"]) > 20000 for a in answers) or {a.get("questionId") for a in answers} != expected:
         fail("INVALID_INPUT", "请逐项填写当前任务的澄清答案")
     resume = {"text": "\n".join(a["value"].strip() for a in answers)}
-    if job.kind == "prepare_quote":
+    if job.kind == "prepare_quote" and not payload.get("agentFileTools"):
         row = db.get(Item, str(body.get("selectedSupplierOfferId", "")))
         if not row or row.kind != "supplier_offer" or row.case_id != case.id:
             fail("SUPPLIER_EVIDENCE_REQUIRED", "请选择当前询盘的供应商报价", 422)
@@ -127,6 +127,24 @@ def resume_run(request, db, user, case, body, marker):
             fail("INVALID_INPUT", "请填写有效汇率、毛利率及不低于 MOQ 的数量")
         resume.update(costInputs=cost, selectedSupplierOfferId=row.id, supplierOffers=[offer])
         payload.update(costInputs=cost, selectedSupplierOfferId=row.id, supplierOffers=[offer])
+    if payload.get("agentFileTools"):
+        from .agent_files import confirmed_facts
+        require_capability(db, "costing")
+        payload["agentFacts"] = {**payload.get("agentFacts", {}), **confirmed_facts(resume["text"])}
+        payload["agentMessages"] = [*payload.get("agentMessages", []), resume["text"]]
+        case.payload = encode({**decode(case.payload), "agentFacts": payload["agentFacts"]})
+        # New evidence may resolve the question; freeze current authorized sources for the next attempt.
+        payload["evidence"] = [{"id": row.id, **item_view(row)} for row in items(db, "evidence", case_id=case.id)]
+        from .workspace_api import canvas_file
+        canvas_refs = body.get("canvasFileIds") or []
+        if not isinstance(canvas_refs, list) or len(canvas_refs) > 50 or any(not isinstance(v, str) for v in canvas_refs):
+            fail("INVALID_INPUT", "画板附件引用无效")
+        manifest = {x["id"]: x for x in payload.get("canvasManifest", [])}
+        for ref in canvas_refs:
+            row = canvas_file(db, user, case, ref)
+            blob = db.get(Blob, decode(row.payload)["blobId"])
+            manifest[row.id] = {"id": row.id, "blobId": blob.id, "sha256": blob.sha256}
+        payload["canvasManifest"] = list(manifest.values())
     payload["resume"] = resume
     job.payload = encode(payload)
     job.status = "pending"

@@ -1,57 +1,45 @@
-# Agent Kit to NavoWork host mapping
+# Agent Kit 与宿主接入
 
-**Host baseline reviewed:** `origin/lirui` at `5fcf0a1ff968830ca356522a9d91db4005d71317` (2026-10-31). It is merged into the local `justike` branch as merge commit `4e34ce0`. This is a source inspection of `backend/app/models.py`, `core.py`, `main.py`, `run_context.py`, `sop_api.py`, `workspace_api.py`, `worker.py`, and `exports.py`; it is not evidence that Agent Kit is integrated or running in the backend.
+核对基线：`origin/lirui@5fcf0a1`，合入 `justike@4e34ce0`。独立模块提交为 `d23ab0a`。随后新增真实宿主适配器；下面记录实现边界。真实模型和浏览器主线尚未验收，API 离线测试不代表 M5 最终完成。
 
-## Contract mapping
+## 安装与启用
 
-| Agent Kit contract | Host representation and verified behavior | Mapping work / gaps |
-| --- | --- | --- |
-| `ExecutionContext` | `Case.id`, `Job.id`, `Run.id`; `Run.base_revision`; `WorkItem.lease_generation`. `main.create_run` authenticates the user, resolves the authorized `Case`, freezes task inputs, and creates Job/Run/WorkItem. | Construct context from the authenticated request and claimed work item. Treat `can_read`/`can_write` as adapter policy derived from host authorization and tool policy, never as permissions supplied by a model. Recheck case access, base revision, active run, and lease generation before writes. The generation is a worker lease fence, not a business revision. |
-| `FileRef` | Case Evidence is an `Item(kind="evidence")`; its payload has `blobId`, `sha256`, `title`, `sourceRole`, and extracted `text`. `Blob` carries `id`, `case_id`, `media_type`, `filename`, `sha256`, `byte_size`, and storage `path`. Case evidence download resolves the evidence item through a case-scoped route. `workspace_api.py` also stores library assets as versioned `Item(kind="asset")` rows linked to Blob. | Resolve opaque IDs through an authorized case/item lookup before opening bytes. Map source file ID to Evidence ID (or Asset version ID when explicitly permitted), name to `title`/`filename`, byte size and media type from Blob, and checksum from Blob/Evidence. Agent Kit `role` is a tool-side source/output/working classification; there is no matching Blob role column. Avoid exposing storage paths. |
-| `Citation` | Evidence items retain `sha256` and extracted text; resource refs in `run_context.prepare_context` include a source version ID, `locator`, and `contentHash`. Parsed `fact` items currently store `sourceId` and `fieldPath`, but do not require a page/cell/paragraph locator. | Use the source Evidence ID plus Blob/Evidence SHA-256, reader locator, and bounded excerpt. Locator-level provenance must be kept in the Agent Kit result and explicitly persisted in host payloads if it must survive the run; the existing parsed-fact shape does not establish it. |
-| `ArtifactRef` | Business artifacts are `Item(kind="artifact")` rows. Payload fields include `kind`, `title`, `version`, structured `content`, status, and optionally `basedOnId`, `jobId`, and `runId`. The DB row also has `version`, `case_id`, `parent_id`, and `status`. New versions are created with `baseVersion` compare-and-set; the route rejects stale baselines and creates a new row rather than replacing the prior version. | Map artifact ID/version/kind and structured content from the Item. Compute `snapshot_hash` over a canonical, stable representation; the host does not currently persist a field with that exact meaning. `baseline` maps to the version used as `baseVersion`. Map output files separately through Blob/export records; artifacts themselves are JSON payloads, not file paths. |
-| `ToolResult` | There is no host ToolResult model or generic tool-result persistence API. Existing business routes return domain-shaped JSON, and write conflicts use HTTP 409 with a host error code. A successful worker run writes revision/artifact Items and finishes the Run. | Keep the typed result inside the adapter/runtime boundary; persist a compact result reference and public summary as a `run_event` or Item payload if needed. Do not collapse business statuses into Run status codes. Host validation, authorization, and approval routes remain authoritative. |
-| `ExecutionEvent` | `run_event` is an `Item` with `case_id`, `parent_id=run.id`, and payload fields `runId`, `inquiryId`, `seq`, `type`, `payload`, and `createdAt`. The worker increments `Run.last_seq` and writes progress, clarification, completion, and failure events. `GET /runs/{id}/events` returns those rows sorted by `seq`. | Emit through an adapter that allocates the next sequence and inserts the event in the same transaction as the state transition. Current event payload is host-shaped (`type` and nested `payload`), so map Agent Kit `kind`, `summary`, and `result_ref` into it; do not add a second event table. |
-| `TaskSnapshot` | Case state is in `Case.status`, `current_revision`, `active_run_id`, and `payload`; task state is in `Job`, `Run`, `WorkItem`, their payloads, and artifact Items. Worker checkpointing uses SQLite `SqliteSaver` with `thread_id=job.id`. Run payload records clarification and completed phases; Job payload contains frozen inputs and resume answers. | Build the snapshot from a single consistent DB read scoped to the Case. Map `generation` to the active WorkItem lease generation when available. Resolve current artifacts from case-scoped artifact Items and pending questions from `Run.payload.clarification`. The checkpoint DB/thread ID is internal to the worker; the API does not expose a checkpoint reference. |
+在同一个 Python 3.12+ 环境执行：
 
-## State names are distinct
+```powershell
+python -m pip install -e './agent-kit[test]' -e './backend[test]'
+python -m pytest backend/tests agent-kit/tests -q
+```
 
-Host business and orchestration states are separate fields; they are not interchangeable:
+`backend/.env` 设置 `AGENT_FILE_TOOLS=1`、`MODEL_NAME`、`MODEL_API_KEY`，可选 `MODEL_BASE_URL`。`python dev.py` 启动 API、Worker 和 real 模式前端。开关默认 0；启用后，对话入口的询盘理解、报价和包装变更使用真实工具循环。缺少模型时明确失败，不降级到预设业务流程。
 
-| Host field | Observed states / meaning |
+## 字段与职责映射
+
+| Agent Kit | 真实宿主映射 |
 | --- | --- |
-| `Case.status` | `todo`, `active`, `waiting`, `done` describe case-level workflow state. |
-| `Job.status` | `pending`, `running`, `needs_input`, `needs_review`, `completed`, `failed`, `cancelled` describe the requested work and its review state. For selected business kinds, a successfully completed Run leaves its Job at `needs_review`. |
-| `Run.status` | `queued`, `running`, `needs_input`, `succeeded`, `failed`, `cancelled` describe one execution attempt. `needs_input` is supported: `worker.record_progress` saves clarification, emits an event, parks the WorkItem, and `run_context.resume_run` checks the base revision and resumes the same checkpointed Job/Run. |
-| `WorkItem.status` | Queue/lease states including `queued`, `running`, `waiting`, and `done`; `lease_generation` fences stale workers. |
-| `Item.status` | Item-specific values such as `draft`, `observed`, `proposed`, or approval decisions. These do not mean a Run completed. |
-| Agent Kit `ToolResult.status` | `success`, `needs_info`, `needs_review`, `blocked`, `conflict`, `error` are tool outcomes. `needs_info` can request the existing host clarification pause and map to Run/Job `needs_input`; this is a deliberate adapter transition, not a same-name state. `needs_review` is an artifact/review outcome and may accompany a successful Run. `conflict` should preserve a host 409 / conflict code. `blocked` and `error` should be represented in result/event details; only an unhandled execution failure should fail the Run. |
+| `ExecutionContext` | 从已认证用户、Case、Job、Run 和已领取 WorkItem 构造。generation 为租约代数。每次操作检查权限、Run 基线、active Run、租约代数/状态/期限。模型不能传入权限。 |
+| `FileRef` | Evidence ID → Blob；输出 Blob ID → agent_file Item。公司资产版本和本人画板附件先由现有授权函数解析，再进入冻结清单。原文、粘贴证据、用户任务消息和所选文字资料版本作为带哈希的 TXT 来源。物理路径只由适配器解析。 |
+| `Citation` | 保存于受控快照及 agentRecord.ref.inputs；绑定文件 ID、哈希、页/表/单元格/段落定位和摘录。工具检查引用存在，语义正确性另验收。 |
+| `ArtifactRef` | Case/成果类型稳定逻辑 ID；不可变 artifact Item 版本。agentRecord 保存快照、来源、计算、差异、文件和独立状态。宿主行 ID 用于批准/导出。与现有版本共同 CAS；人工或旧 JSON 成果需协调，不静默覆盖。 |
+| `ToolResult` | agent_result Item 保存实际结果；现有 Idempotency 表按 Case/Job/工具键绑定请求哈希和响应，与成果登记和事件在同一 SQLite 写事务提交。跨租约重试复用相同写入。 |
+| `ExecutionEvent` | 现有 run_event Item；Run.last_seq 分配序号。agent.* 类型带公开摘要和结果引用，不新建业务数据库。 |
+| 检查点 | LangGraph SQLite checkpointer，Case/Job 绑定线程，路径 FILE_GRAPH_CHECKPOINT_DB。业务状态、文件和批准仍由现有服务管理。 |
+| 交付清单 | Run.fileOutputs 含实际文件、哈希和授权下载 URL；Case Revision 绑定成果、文件、冻结输入。指定 artifactVersionId 复用已生成字节，不用内部 JSON 重渲染客户文件。 |
 
-There is no implemented blanket mapping of all six tool outcomes to Run statuses. Preserve tool outcome, host Run state, Job review state, and Case state as separate concepts.
+实现：`backend/app/agent_files.py`、`file_worker.py`。宿主 `agent.py:price_quote` 仅转换旧 DTO，委托同一个 Agent Kit Decimal 计算器。前端 Mock/旧演示计算不作为真实业务计算来源。
 
-## Existing capability and gaps
+## 输入、继续与状态
 
-Verified host capabilities include authenticated, Case-scoped access (`require_case` and case-specific item checks); 20 MB Case evidence upload; SHA-256 and Blob storage; frozen selected input references in `run_context.prepare_context`; immutable business artifact versions with baseline checks; deterministic pricing validation before quote work; SQLite-backed LangGraph checkpointing; clarification pause/resume; lease-generation and revision checks before committing worker output; append-only run event Items; generated export Blobs; and approval/release gates.
+对话默认冻结当前 Case 证据；显式 inputRefs 时使用所选证据。前端提交当前用户画板 canvasFileIds，服务端重新校验归属。公司资产通过 assetVersionIds，文字资料通过 sourceVersionIds 明确选择。个人资产禁止进入协作 Case。哈希变化、资料撤销、越界引用均拒绝。
 
-The host's current upload-time `_extract_file` is a separate, limited extractor: TXT/EML/CSV/Markdown become UTF-8 text, PDF extraction is capped at 100 pages and 50,000 characters, and XLSX extraction is a bounded display of cached values. DOCX is not accepted by the Case Evidence upload allowlist. This differs from the new Agent Kit readers; no host route currently calls `read_file` or persists its per-section locators. The host's artifact API stores structured JSON and renders HTML/XLSX/PDF exports; it does not yet use Agent Kit `ArtifactRef`, `FileRef`, `Citation`, or `ToolResult` directly.
+可直接说“汇率7.20，毛利20%”。宿主保守解析明确依据，在 Case 内保存供后续变更复用；假设或否定不创建确认事实。其他语义字段可引用冻结用户消息。附件文字按数据处理。
 
-`workspace_api.py` has separate company/personal library assets and a user-owned canvas attachment flow. Those files must not be treated as Case evidence just because they are visible in the workbench: scope and ownership checks differ, and any cross-reference needs an explicit authorized input reference. The local Agent Kit manifest/adapter is a test harness, not a second business database and not a replacement for the host's SQLAlchemy models.
+needs_info → Run/Job needs_input、WorkItem waiting；已有草稿可下载。上传补价并回答当前问题后，在同一 Job/Run 继续，冻结补充证据和回答文本，无需重填可从文件读取的供应商成本。当前前端将一次对话补充映射到各待答问题，复杂逐项选择仍使用原交互。
 
-## Declared dependencies and environment check
+needs_review 可对应 Run succeeded / Job needs_review。blocked/conflict/error 对应失败，保留成功文件。生成、宿主投影、内部批准、客户接受分别记录；工具无批准或外发能力。现有商业批准仍要求绑定供应商报价及业务验证；本次文件草稿不自动满足该批准条件。
 
-The Agent Kit `pyproject.toml` declares Python 3.12+, `pydantic>=2.14,<3`, `openpyxl==3.1.5`, `python-docx==1.2.0`, `pypdf>=6.10,<7`, `reportlab>=4.4.9,<6`, `langgraph==1.2.19`, `langgraph-checkpoint-sqlite==3.1.3`, `langchain==1.4.7`, and `langchain-openai==1.7.3`; pytest `9.2.0` is an optional test dependency.
+## 验收边界
 
-The host `backend/pyproject.toml` separately declares FastAPI `0.162.0`, Uvicorn `0.54.0`, SQLAlchemy `2.1.6`, Alembic `1.20.1`, LangGraph `1.2.19`, SQLite checkpointer `3.1.3`, LangChain `1.4.7`, OpenAI integration `1.7.3`, multipart `0.0.32`, openpyxl `3.1.5`, pypdf `6.21.4`, and reportlab `5.1.0`; host test extras include pytest `9.2.0` and httpx `0.28.1`. Agent Kit and host ranges differ for pypdf/reportlab, so dependency resolution and a single compatible environment must be verified before in-process installation.
+`backend/tests/test_agent_file_tools.py` 使用实际 FastAPI、SQLite、Blob、Artifact、事件、授权下载及 LangGraph；模型为明确标记的离线替身。覆盖下载越权、冻结输入、租约失效、幂等、暂停继续、旧版保护、客户字段隔离、资产/资料权限、撤销和无模型显式失败。
 
-At inspection time, the bundled Codex Python runtime had Pydantic `2.14.1`, openpyxl `3.1.5`, python-docx `1.2.0`, pypdf `6.10.0`, and reportlab `4.4.9`; `langgraph`, `langgraph-checkpoint-sqlite`, `langchain`, `langchain-openai`, and `pytest` were absent. This is only an environment snapshot, not proof of the host virtual environment's package state. The root task reported that dependency installation was in progress; recheck the target environment before claiming the Agent Kit runtime is executable.
-
-## M5 integration sequence
-
-1. Add host adapters behind the existing `CaseContextPort`, `FileStorePort`, `ArtifactPort`, and `EventSink` protocols. Keep FastAPI/SQLAlchemy imports at the host composition boundary; inject a user-scoped DB session and authenticated user.
-2. Build `ExecutionContext` from the authorized Case, Job, Run, and claimed WorkItem. Enforce user/case access, `Run.base_revision`, active Run, and `WorkItem.lease_generation` on every read/write boundary that can outlive the initial request.
-3. Implement `FileStorePort` for Case Evidence and explicitly authorized Asset versions. Resolve IDs to case-scoped Item rows and Blob rows; verify checksum/size metadata and read bytes only from the host storage path. Register generated files through host Blob/Export storage so downloads retain the host's authorization and no-store behavior.
-4. Implement `ArtifactPort` with case-scoped artifact Item reads and append-only version creation using the current `baseVersion` CAS contract. Canonicalize the payload to derive a snapshot hash. Preserve host status, approval, `basedOnId`, and revision rules; do not treat artifact creation as approval or external delivery.
-5. Implement Citation persistence in structured evidence/fact/artifact payloads. Bind each citation to Evidence identity and checksum plus the reader's page/sheet/cell/paragraph locator. Add schema validation and API projection only where the current host payload contract cannot carry it safely.
-6. Implement `EventSink` by writing sequenced `run_event` Items in the same transaction as meaningful host state changes. Keep event text public and bounded; store machine references in payloads, not file contents or secrets.
-7. Adapt tool outcomes deliberately: send `needs_info` through the existing clarification pause/resume flow; preserve `needs_review` while allowing Run success where work completed; surface host 409s as conflict outcomes; retain blocked/error details without forging approval states. Use the host's costing and approval gates as the authority.
-8. Add adapter contract tests that exercise case isolation, immutable source bytes, citations and locators, artifact CAS conflicts, lease/revision fencing, clarification resume, event sequence ordering, generated-file download authorization, and approval separation. Run host and Agent Kit suites in the resolved target environment, then separately verify dependency compatibility and a real model run. Until those steps complete, this mapping is a proposal grounded in host code, not an integration completion claim.
+真实模型解释、假设/否定、注入抵抗，以及浏览器上传→对话→补证→下载尚待模型配置后验证。类型检查、前端单测和构建不能替代该主线。DOCX/XLSX 未做 Office 视觉验收。见 [verification.md](verification.md)。并行扩展目录各有交付说明；代码合入不表示已注册到报价运行时。

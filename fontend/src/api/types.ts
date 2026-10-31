@@ -102,6 +102,8 @@ export interface Revision {
   changeSummary: string[];
 }
 export interface Run {
+  fileOutputs?: { file_id: string; name: string; sha256: string; downloadUrl: string }[];
+  agentVerification?: { liveExecuted: boolean; mode: string } | null;
   completedPhases?: string[];
   id: string;
   runId: string;

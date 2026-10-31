@@ -73,3 +73,36 @@ def test_tool_budget_and_missing_model(tmp_path, monkeypatch):
         result = run(goal="Run live")
     assert result["live_executed"] is False
     assert result["code"] == "MODEL_NOT_CONFIGURED"
+
+
+def test_model_failure_keeps_committed_outputs(tmp_path):
+    a = make_adapter(tmp_path)
+    snapshot = base_snapshot(a)
+    fake = ScriptedModel([call("publish_documents", {"snapshot": snapshot.model_dump(mode="json"),
+        "baselines": baselines(a), "intent": "initial"})])
+    # The next provider call fails after a real file-writing tool has committed.
+    with agent_session(ToolService(a), fake) as run:
+        result = run(goal="Prepare quote")
+    assert result["status"] == "error" and result["code"] == "MODEL_OR_GRAPH_FAILED"
+    assert len(result["outputs"]) == 4 and len(a.list_artifacts()) == 3
+    assert all(a.read_bytes(f["file_id"]) for f in result["outputs"])
+
+
+def test_graph_can_retry_only_failed_pdf_branch(tmp_path):
+    a = make_adapter(tmp_path)
+    snapshot = base_snapshot(a)
+    service = ToolService(a, fail_formats={"pdf"})
+    class RetryModel(ScriptedModel):
+        def invoke(self, messages):
+            if a.list_artifacts():
+                service.fail_formats.clear()
+            return super().invoke(messages)
+    from navowork_agent.contracts import digest
+    aid = "a_" + digest([a.context().case_id, "quotation"])[:24]
+    fake = RetryModel([call("publish_documents", {"snapshot": snapshot.model_dump(mode="json"),
+        "baselines": baselines(a), "intent": "initial"}),
+        call("export_artifact", {"artifact_id": aid, "version": 1, "format": "pdf"}, "retry"), AIMessage(content="done")])
+    with agent_session(service, fake) as run:
+        result = run(goal="Prepare quote and retry failed export")
+    assert result["status"] == "needs_review", result
+    assert len(result["outputs"]) == 4 and {a["version"] for a in result["artifacts"]} == {1}

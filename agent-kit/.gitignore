@@ -1,4 +1,5 @@
 .deps/
+.host-deps/
 .venv/
 __pycache__/
 *.egg-info/

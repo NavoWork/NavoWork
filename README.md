@@ -8,7 +8,7 @@
 
 ```powershell
 python -m venv backend/.venv
-backend/.venv/Scripts/python.exe -m pip install -e 'backend[test]'
+backend/.venv/Scripts/python.exe -m pip install -e agent-kit -e 'backend[test]'
 npm ci
 Copy-Item backend/.env.example backend/.env
 python dev.py
@@ -26,6 +26,8 @@ npm run build
 ```
 
 可在 `backend/.env` 设置 `MODEL_API_KEY` 和 `MODEL_NAME` 启用模型抽取；未配置时用有限规则提取，未知字段保持待确认。正式商业批准、外部确认和生产放行由服务端门禁控制，草稿下载不表示已发送或已开工。演示账号和默认密钥仅用于本机演示，不可公开部署。
+
+新增文件工具执行链见 [agent-kit/README.md](agent-kit/README.md)。设置 `AGENT_FILE_TOOLS=1` 后，对话报价/变更目标使用真实模型工具调用，读取已上传的 Case 资料及本次显式引用的画板附件，返回真实规格 DOCX、成本 XLSX、客户报价 XLSX/PDF。汇率和毛利可在对话中明确提供，例如“汇率7.20，毛利20%”。缺价先生成草稿，再通过现有澄清机制补证继续。此模式无模型配置时明确失败；确定性离线回放不代表真实 Agent 或浏览器集成已验收。
 
 ## 开发与文档
 

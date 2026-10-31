@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { inflateRawSync } from 'node:zlib';
 import {
   applyChange,
   artifacts,
@@ -14,6 +11,83 @@ import {
   proposeChange,
 } from './model';
 import { buildExport } from './export';
+
+function crc32(data: Buffer): number {
+  let crc = 0xffffffff;
+  for (const byte of data) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function readZip(input: Uint8Array): Map<string, Buffer> {
+  const zip = Buffer.from(input);
+  const minEocdOffset = Math.max(0, zip.length - 22 - 0xffff);
+  let eocdOffset = -1;
+  for (let offset = zip.length - 22; offset >= minEocdOffset; offset -= 1) {
+    if (zip.readUInt32LE(offset) === 0x06054b50) {
+      eocdOffset = offset;
+      break;
+    }
+  }
+  if (eocdOffset < 0) throw new Error('ZIP end-of-central-directory record not found');
+  const disk = zip.readUInt16LE(eocdOffset + 4);
+  const centralDisk = zip.readUInt16LE(eocdOffset + 6);
+  const diskEntries = zip.readUInt16LE(eocdOffset + 8);
+  const entryCount = zip.readUInt16LE(eocdOffset + 10);
+  const centralSize = zip.readUInt32LE(eocdOffset + 12);
+  const centralOffset = zip.readUInt32LE(eocdOffset + 16);
+  const commentLength = zip.readUInt16LE(eocdOffset + 20);
+  if (disk !== 0 || centralDisk !== 0 || diskEntries !== entryCount)
+    throw new Error('Multi-disk ZIP archives are unsupported');
+  if (eocdOffset + 22 + commentLength !== zip.length)
+    throw new Error('Invalid ZIP end-of-central-directory bounds');
+  if (centralOffset + centralSize !== eocdOffset)
+    throw new Error('Invalid ZIP central-directory bounds');
+
+  const files = new Map<string, Buffer>();
+  let offset = centralOffset;
+  for (let index = 0; index < entryCount; index += 1) {
+    if (offset + 46 > zip.length || zip.readUInt32LE(offset) !== 0x02014b50)
+      throw new Error('Invalid ZIP central-directory entry');
+    const flags = zip.readUInt16LE(offset + 8);
+    const method = zip.readUInt16LE(offset + 10);
+    const expectedCrc = zip.readUInt32LE(offset + 16);
+    const compressedSize = zip.readUInt32LE(offset + 20);
+    const uncompressedSize = zip.readUInt32LE(offset + 24);
+    const filenameLength = zip.readUInt16LE(offset + 28);
+    const extraLength = zip.readUInt16LE(offset + 30);
+    const entryCommentLength = zip.readUInt16LE(offset + 32);
+    const localOffset = zip.readUInt32LE(offset + 42);
+    const entryEnd = offset + 46 + filenameLength + extraLength + entryCommentLength;
+    if (entryEnd > zip.length) throw new Error('Truncated ZIP central-directory entry');
+    if (flags & 1) throw new Error('Encrypted ZIP entries are unsupported');
+    const name = zip.toString('utf8', offset + 46, offset + 46 + filenameLength);
+    if (localOffset + 30 > zip.length || zip.readUInt32LE(localOffset) !== 0x04034b50)
+      throw new Error(`Invalid ZIP local header for ${name}`);
+    const localNameLength = zip.readUInt16LE(localOffset + 26);
+    const localExtraLength = zip.readUInt16LE(localOffset + 28);
+    const localName = zip.toString('utf8', localOffset + 30, localOffset + 30 + localNameLength);
+    if (localName !== name) throw new Error(`ZIP filename mismatch for ${name}`);
+    const dataOffset = localOffset + 30 + localNameLength + localExtraLength;
+    const dataEnd = dataOffset + compressedSize;
+    if (dataEnd > zip.length) throw new Error(`Truncated ZIP entry ${name}`);
+    const compressed = zip.subarray(dataOffset, dataEnd);
+    let contents: Buffer;
+    if (method === 0) contents = Buffer.from(compressed);
+    else if (method === 8) contents = inflateRawSync(compressed);
+    else throw new Error(`Unsupported ZIP compression method ${method} for ${name}`);
+    if (contents.length !== uncompressedSize || crc32(contents) !== expectedCrc)
+      throw new Error(`ZIP size or CRC mismatch for ${name}`);
+    files.set(name, contents);
+    offset = entryEnd;
+  }
+  if (offset !== centralOffset + centralSize) throw new Error('Invalid ZIP central-directory size');
+  return files;
+}
 
 describe('PRD deterministic costing and version boundaries', () => {
   it('calculates A, B and the packaging change with upward cent rounding', () => {
@@ -86,49 +160,40 @@ describe('PRD deterministic costing and version boundaries', () => {
 });
 
 it('exports valid Office ZIP containers with one consistent snapshot, real worksheets, and unsent mail', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'trade-export-'));
-  try {
-    const state = applyChange(proposeChange(initialState()));
-    state.current.specs.product = 'Backpack <sample> & "logo"';
-    state.current.specs.terms = 'FCA Shanghai';
-    writeFileSync(
-      join(dir, 'pack.zip'),
-      buildExport(
-        state,
-        artifacts.map((a) => a.id),
-      ),
-    );
-    execFileSync('unzip', ['-t', join(dir, 'pack.zip')]);
-    execFileSync('unzip', ['-q', join(dir, 'pack.zip'), '-d', join(dir, 'files')]);
-    for (const artifact of artifacts) {
-      const path = join(dir, 'files', `${artifact.id}-V2.${artifact.format.toLowerCase()}`);
-      execFileSync('unzip', ['-t', path]);
-      const xml = execFileSync(
-        'unzip',
-        ['-p', path, artifact.format === 'XLSX' ? 'xl/worksheets/sheet1.xml' : 'word/document.xml'],
-        { encoding: 'utf8' },
-      );
-      expect(xml).toContain('V2');
-      expect(xml).toContain('定制彩盒');
-      expect(xml).toContain('FCA Shanghai');
-      expect(xml).not.toContain('已发送');
-      if (artifact.id === 'cost' || artifact.id === 'quote') expect(xml).toContain('9.21');
-      if (artifact.id === 'spec' || artifact.id === 'quote')
-        expect(xml).toContain('&lt;sample&gt; &amp; &quot;logo&quot;');
-      if (artifact.id === 'production') expect(xml).toContain('BLOCKED');
-    }
-    const exported = JSON.parse(
-      readFileSync(join(dir, 'files', 'evidence-and-version.json'), 'utf8'),
-    );
-    expect(exported.snapshot.costs.packaging).toBe(5);
-    expect(exported.sent).toBe(false);
-    expect(readFileSync(join(dir, 'files', 'quotation-draft.eml'), 'utf8')).toContain(
-      'FCA Shanghai',
-    );
-    expect(readFileSync(join(dir, 'files', 'quotation-draft.eml'), 'utf8')).toContain(
-      'X-Unsent: 1',
-    );
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
+  const state = applyChange(proposeChange(initialState()));
+  state.current.specs.product = 'Backpack <sample> & "logo"';
+  state.current.specs.terms = 'FCA Shanghai';
+  const files = readZip(
+    buildExport(
+      state,
+      artifacts.map((a) => a.id),
+    ),
+  );
+  for (const artifact of artifacts) {
+    const filename = `${artifact.id}-V2.${artifact.format.toLowerCase()}`;
+    const officeFile = files.get(filename);
+    expect(officeFile, `missing exported artifact ${filename}`).toBeDefined();
+    const officeFiles = readZip(officeFile!);
+    const worksheet = artifact.format === 'XLSX' ? 'xl/worksheets/sheet1.xml' : 'word/document.xml';
+    const xmlBytes = officeFiles.get(worksheet);
+    expect(xmlBytes, `missing Office document part ${worksheet}`).toBeDefined();
+    const xml = xmlBytes!.toString('utf8');
+    expect(xml).toContain('V2');
+    expect(xml).toContain('定制彩盒');
+    expect(xml).toContain('FCA Shanghai');
+    expect(xml).not.toContain('已发送');
+    if (artifact.id === 'cost' || artifact.id === 'quote') expect(xml).toContain('9.21');
+    if (artifact.id === 'spec' || artifact.id === 'quote')
+      expect(xml).toContain('&lt;sample&gt; &amp; &quot;logo&quot;');
+    if (artifact.id === 'production') expect(xml).toContain('BLOCKED');
   }
+  const evidence = files.get('evidence-and-version.json');
+  const mail = files.get('quotation-draft.eml');
+  expect(evidence).toBeDefined();
+  expect(mail).toBeDefined();
+  const exported = JSON.parse(evidence!.toString('utf8'));
+  expect(exported.snapshot.costs.packaging).toBe(5);
+  expect(exported.sent).toBe(false);
+  expect(mail!.toString('utf8')).toContain('FCA Shanghai');
+  expect(mail!.toString('utf8')).toContain('X-Unsent: 1');
 });

@@ -31,7 +31,7 @@ def local_env() -> dict[str, str]:
 
 def main() -> int:
     if not PYTHON.exists() or not (ROOT / "node_modules").exists():
-        print("先运行：python -m venv backend/.venv；backend/.venv/Scripts/python -m pip install -e 'backend[test]'；npm ci")
+        print("先运行：python -m venv backend/.venv；backend/.venv/Scripts/python -m pip install -e agent-kit -e 'backend[test]'；npm ci")
         return 1
     env = local_env()
     subprocess.run([str(PYTHON), "-m", "alembic", "upgrade", "head"], cwd=BACKEND, env=env, check=True)

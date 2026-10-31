@@ -71,3 +71,12 @@ navowork-agent run --workspace ./agent-kit/output/live-case --resume '工厂补�
 `tests/contracts/` 对本地适配器与宿主 DTO/服务替身运行共享契约；替身不是 FastAPI/SQLite 真正接入测试。工具测试检查实际文件内容、哈希、公式缓存、幂等、隔离、MOQ、缺价、部分失败和人工冲突。离线模型替身检查真实 LangGraph 的多轮工具协议、重启恢复和执行限额。`tests/live/` 必须有真实模型配置才能验收模型语义与决策。
 
 报告见 `docs/verification.md`。PDF 已做文本和页面图像检查；DOCX/XLSX 已重新打开验证，未将重开成功称为视觉检查。M5 工作台接入与扩展能力另行验收。
+
+真实宿主适配器已实现，安装和字段映射见 [host-mapping.md](docs/host-mapping.md)。在同一环境安装 `-e './agent-kit[test]' -e './backend[test]'`，执行 `python -m pytest backend/tests agent-kit/tests -q`，可验证真实 FastAPI/SQLite/Blob 服务。本开发环境对应命令：
+
+```powershell
+$env:PYTHONPATH = 'agent-kit/.host-deps;agent-kit/.deps;agent-kit/src;backend;agent-kit/tests'
+& $py -m pytest backend/tests agent-kit/tests -q
+```
+
+`.host-deps` 使用宿主精确版本的 FastAPI、SQLAlchemy、pypdf 和 reportlab 等；模型替身仍明确标记离线。工作台已增加实际文件下载入口，M5 浏览器主线尚待验收。

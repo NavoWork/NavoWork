@@ -129,6 +129,13 @@ def export_route(db: Session, user: User, parts: list[str], request: Request):
 def export_artifact(db: Session, case: Case, artifact: Item, fmt: str):
     """Render one immutable artifact version; exports remain draft until a separate approval."""
     value = item_view(artifact)
+    if value.get("agentRecord"):
+        # Reuse the bytes bound to this exact artifact snapshot, never re-render internal JSON for a customer.
+        bound = [item_view(i) for i in items(db, "export", case_id=case.id)
+                 if item_view(i).get("artifactVersionId") == artifact.id and item_view(i).get("format") == fmt]
+        if bound:
+            return bound[-1]
+        fail("EXPORT_NOT_AVAILABLE", "该成果版本尚无此格式；请重试对应文件导出分支", 422)
     title = str(value.get("title") or value.get("kind"))
     content = value.get("content") or {}
     if not isinstance(content, dict):

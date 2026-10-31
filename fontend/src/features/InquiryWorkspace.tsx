@@ -256,7 +256,12 @@ export function InquiryWorkspace({
   ) {
     if (!inquiry || running || (draftsPending && !!revision)) return;
     await operate(async () => {
+      const canvas = mode === 'real'
+        ? await api.get<{ state: { files?: { serverFileId?: string }[] } | null }>(`${path}/canvas`)
+        : null;
+      const canvasFileIds = canvas?.state?.files?.flatMap(file => file.serverFileId ? [file.serverFileId] : []) ?? [];
       const r = await api.post<Run>(`${path}/runs`, {
+        ...(mode === 'real' ? { canvasFileIds } : {}),
         baseRevision: inquiry.currentRevision,
         action,
         assetVersionIds: selectedAssets ?? revision?.assetRefs ?? [],
@@ -686,6 +691,25 @@ export function InquiryWorkspace({
                       <TriangleAlert size={13} /> {q.question}
                     </p>
                   ))}
+                  {!!run.fileOutputs?.length && (
+                    <div aria-label="本次生成的文件">
+                      <p>已生成文件草稿，需审核后使用。</p>
+                      {run.fileOutputs.map(file => (
+                        <button key={file.file_id} className="button button-ghost" title={`SHA-256: ${file.sha256}`}
+                          onClick={() => void operate(async () => {
+                            const blob = await api.download(file.downloadUrl.replace(/^\/api\/v1/, ''));
+                            const url = URL.createObjectURL(blob);
+                            const anchor = document.createElement('a');
+                            anchor.href = url;
+                            anchor.download = file.name;
+                            anchor.click();
+                            URL.revokeObjectURL(url);
+                          })}>
+                          <Download size={13} /> {file.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <div className="iw-run-actions">
                     <details className="iw-run-details">
                       <summary>运行详情</summary>
