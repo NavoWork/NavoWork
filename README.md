@@ -57,7 +57,7 @@ npm run build
 
 ## 开发与文档
 
-根目录 npm workspaces 只包含 `fontend/`。直接执行 `npm run dev` 时，前端会连接 `http://127.0.0.1:8000` 的 API；使用 `python dev.py` 可同时启动全部服务。需要体验原有纯前端合成数据模式时，在 `fontend/.env.local` 写入 `VITE_API_MODE=mock`，再启动前端。单独运行现有 Mock 浏览器回归用 `npm run test:e2e`；真实前后端浏览器联调用 `npm run test:e2e -- --config=playwright.real.config.ts`（在 `fontend/` 目录）。Windows 测试默认使用已安装的 Edge，可用 `PLAYWRIGHT_BROWSER_PATH` 指定其他浏览器。
+根目录 npm workspaces 只包含 `fontend/`。直接执行 `npm run dev` 时，前端连接 `http://127.0.0.1:8000` 的 API；使用 `python dev.py` 可同时启动全部服务。前后端浏览器回归在 `fontend/` 执行 `npm run test:e2e`（会启动独立临时数据库）；Windows 默认使用已安装的 Edge，可用 `PLAYWRIGHT_BROWSER_PATH` 指定 Chrome/Edge 路径。
 
 - [Workbench v2 契约：阶段、成果、工具与 Skill](doc/18-workbench-v2-contract.md)
 - [产品需求](doc/TradeWorkbench_PRD_v1.0.md)

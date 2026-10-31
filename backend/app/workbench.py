@@ -370,7 +370,7 @@ def stage_state(db: Session, case: Case) -> list[dict]:
                 artifacts.append(spec["itemId"])
             if bom:
                 artifacts.append(bom["itemId"])
-            missing = (spec or {}).get("content", {}).get("missing") or ([] if spec else ["spec"])
+            missing = (spec or {}).get("content", {}).get("missing") or []
             confirmed = bool(spec and _approval_for(db, case, "customer_spec_approval", spec))
             status = _status("draft" if spec else "empty", missing, confirmed)
             summary = _spec_summary((spec or {}).get("content"))
@@ -379,7 +379,7 @@ def stage_state(db: Session, case: Case) -> list[dict]:
             for item in (comparison, cost, quotation):
                 if item:
                     artifacts.append(item["itemId"])
-            missing = missing_quote_fields((quotation or {}).get("content")) if quotation else ["quotation"]
+            missing = missing_quote_fields((quotation or {}).get("content")) if quotation else []
             confirmed = bool(quotation and _approval_for(db, case, "commercial_quotation_approval", quotation))
             status = _status("draft" if (comparison or cost or quotation) else "empty", missing, confirmed)
             summary = _quote_summary((quotation or {}).get("content"))
@@ -388,10 +388,11 @@ def stage_state(db: Session, case: Case) -> list[dict]:
             if sample:
                 artifacts.append(sample["itemId"])
             content = (sample or {}).get("content") or {}
-            missing = [] if sample else ["sample"]
-            for label, value in (("样品种类", content.get("type")), ("样品编号", content.get("sampleRef")), ("规格版本", content.get("specVersionId"))):
-                if not value:
-                    missing.append(label)
+            missing = []
+            if sample:
+                for label, value in (("样品种类", content.get("type")), ("样品编号", content.get("sampleRef")), ("规格版本", content.get("specVersionId"))):
+                    if not value:
+                        missing.append(label)
             confirmed = bool(sample and _approval_for(db, case, "sample_approval", sample))
             status = _status("draft" if sample else "empty", missing, confirmed)
             summary = " · ".join(part for part in (content.get("sampleRef"), content.get("type")) if part)
@@ -401,10 +402,11 @@ def stage_state(db: Session, case: Case) -> list[dict]:
                 if item:
                     artifacts.append(item["itemId"])
             content = (order or {}).get("content") or {}
-            missing = [] if order else ["order"]
-            for label, value in (("PO 编号", (content.get("po") or {}).get("number")), ("PI 编号", (content.get("pi") or {}).get("number"))):
-                if not value:
-                    missing.append(label)
+            missing = []
+            if order:
+                for label, value in (("PO 编号", (content.get("po") or {}).get("number")), ("PI 编号", (content.get("pi") or {}).get("number"))):
+                    if not value:
+                        missing.append(label)
             conflicts = [row for row in content.get("diff") or [] if row.get("status") == "conflict"]
             if conflicts:
                 missing.append(f"{len(conflicts)} 项 PO 差异")
@@ -425,7 +427,7 @@ def stage_state(db: Session, case: Case) -> list[dict]:
             for item in (production, ta, qc):
                 if item:
                     artifacts.append(item["itemId"])
-            missing = [gap["message"] for gap in gate["missing"] if gap["stage"] == "production"]
+            missing = [gap["message"] for gap in gate["missing"] if gap["stage"] == "production"] if production else []
             confirmed = bool(production and _approval_for(db, case, "production_release", production))
             status = _status("draft" if production else "empty", missing, confirmed)
             summary = "生产资料、T&A 与验货标准" if production else ""
@@ -540,6 +542,7 @@ def workbench_view(db: Session, case: Case, user: User) -> dict:
                 "title": value.get("title"),
                 "name": value.get("name"),
                 "version": row.version,
+                "versionId": f"{value.get('id')}:v{row.version}",
                 "mediaType": value.get("mediaType"),
                 "size": value.get("size"),
                 "folder": value.get("folder"),

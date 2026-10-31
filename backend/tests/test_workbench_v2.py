@@ -168,5 +168,6 @@ def test_manual_edit_creates_new_revision_and_rejects_stale(client):
     assert updated["case"]["currentRevision"] == 2
     assert updated["artifacts"]["spec"]["version"] == 2
     assert updated["artifacts"]["spec"]["content"]["fields"]["product"] == "backpack"
+    assert updated["artifacts"]["spec"]["content"]["fields"]["style"] == "commuter"
     stale = client.put(path + "/workbench/artifacts/spec", json={"baseVersion": 1, "content": {"fields": {"style": "travel"}}})
     assert stale.status_code == 409

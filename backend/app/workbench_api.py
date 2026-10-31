@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from .core import create_item, decode, encode, fail, item_view, items, now, touch
 from .domain import (
     QUOTE_REQUIRED_FIELDS,
+    DomainError,
     merge_spec,
     missing_quote_fields,
     normalize_bom,
@@ -78,21 +79,24 @@ def _manual_edit(db: Session, case: Case, kind: str, body: dict) -> dict:
     content = body.get("content")
     if not isinstance(content, dict):
         fail("INVALID_INPUT", "成果内容必须是对象", 400)
-    if kind == "spec":
-        merged = merge_spec((latest or {}).get("content"), content)
-        merged["missing"] = [key for key in merged.get("missing", []) if not merged["fields"].get(key)]
-    elif kind == "bom":
-        merged = {"rows": normalize_bom(content.get("rows") if isinstance(content.get("rows"), list) else content)}
-    elif kind == "quotation":
-        merged = {**((latest or {}).get("content") or {}), **content}
-        merged["costVersionId"] = merged.get("costVersionId") or (latest_artifacts(db, case).get("cost") or {}).get("itemId")
-        merged["unitPriceUsd"] = merged.get("unitPriceUsd") or ((latest_artifacts(db, case).get("cost") or {}).get("content") or {}).get("unitPriceUsd")
-        merged["totalUsd"] = merged.get("totalUsd") or ((latest_artifacts(db, case).get("cost") or {}).get("content") or {}).get("totalUsd")
-        merged["quantity"] = merged.get("quantity") or ((latest_artifacts(db, case).get("cost") or {}).get("content") or {}).get("quantity")
-        merged["product"] = merged.get("product") or (((latest_artifacts(db, case).get("spec") or {}).get("content") or {}).get("fields") or {}).get("product")
-        merged["status"] = "draft"
-    else:
-        merged = {**((latest or {}).get("content") or {}), **content, "kind": kind}
+    try:
+        if kind == "spec":
+            merged = merge_spec((latest or {}).get("content"), content)
+            merged["missing"] = [key for key in merged.get("missing", []) if not merged["fields"].get(key)]
+        elif kind == "bom":
+            merged = {"rows": normalize_bom(content.get("rows") if isinstance(content.get("rows"), list) else content)}
+        elif kind == "quotation":
+            merged = {**((latest or {}).get("content") or {}), **content}
+            merged["costVersionId"] = merged.get("costVersionId") or (latest_artifacts(db, case).get("cost") or {}).get("itemId")
+            merged["unitPriceUsd"] = merged.get("unitPriceUsd") or ((latest_artifacts(db, case).get("cost") or {}).get("content") or {}).get("unitPriceUsd")
+            merged["totalUsd"] = merged.get("totalUsd") or ((latest_artifacts(db, case).get("cost") or {}).get("content") or {}).get("totalUsd")
+            merged["quantity"] = merged.get("quantity") or ((latest_artifacts(db, case).get("cost") or {}).get("content") or {}).get("quantity")
+            merged["product"] = merged.get("product") or (((latest_artifacts(db, case).get("spec") or {}).get("content") or {}).get("fields") or {}).get("product")
+            merged["status"] = "draft"
+        else:
+            merged = {**((latest or {}).get("content") or {}), **content, "kind": kind}
+    except DomainError as exc:
+        fail("INVALID_INPUT", exc.message, 400)
     title = body.get("title") or (latest or {}).get("title") or kind
     artifact = append_artifact(db, case, kind, merged, title=title, status="draft")
     # Manual edits still produce a business revision so history and the stage
@@ -138,10 +142,17 @@ def _record(db: Session, case: Case, user: User, body: dict) -> dict:
         _require_refs(db, case, refs, "customer_approval")
         if not latest.get("content", {}).get("specVersionId"):
             fail("BUSINESS_VALIDATION_FAILED", "样品尚未绑定规格版本", 422)
-    if scope == "order_buyer_confirmation":
-        _require_refs(db, case, refs, "customer_approval")
-    if scope == "order_seller_confirmation":
-        _require_refs(db, case, refs, "internal_note")
+        spec = _latest_target(db, case, "spec")
+        if latest.get("content", {}).get("specVersionId") != spec["itemId"]:
+            fail("BUSINESS_VALIDATION_FAILED", "样品不是基于当前规格版本", 422)
+    if scope in ("order_buyer_confirmation", "order_seller_confirmation"):
+        if scope == "order_buyer_confirmation":
+            _require_refs(db, case, refs, "customer_approval")
+        else:
+            _require_refs(db, case, refs, "internal_note")
+        conflicts = [row for row in latest.get("content", {}).get("diff") or [] if row.get("status") == "conflict"]
+        if conflicts:
+            fail("BUSINESS_VALIDATION_FAILED", "PO 与报价/规格仍有硬冲突，不能确认订单", 422, {"conflicts": conflicts})
     if scope == "payment_verification":
         _require_refs(db, case, refs, "payment_receipt")
         if not str(body.get("verificationBasis") or "").strip():

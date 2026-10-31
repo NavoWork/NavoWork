@@ -175,7 +175,7 @@ class PrepareProductionArgs(BaseModel):
 
 
 class RequestInfoArgs(BaseModel):
-    fields: list[str] = Field(min_length=1, max_length=8, description="需要用户补充的字段/信息")
+    fields: list[str] = Field(min_length=1, max_length=5, description="需要用户补充的字段/信息；一次最多 5 个")
     reason: str = Field(default="", max_length=500, description="为什么这些信息影响当前工作")
 
 
@@ -390,7 +390,7 @@ class WorkbenchToolbox:
                     continue
                 current = assets_by_id.get(value.get("id"))
                 if current is None or row.version > current["version"]:
-                    assets_by_id[value.get("id")] = {"id": value.get("id"), "title": value.get("title"), "version": row.version, "mediaType": value.get("mediaType"), "name": value.get("name")}
+                    assets_by_id[value.get("id")] = {"id": value.get("id"), "versionId": f"{value.get('id')}:v{row.version}", "title": value.get("title"), "version": row.version, "mediaType": value.get("mediaType"), "name": value.get("name")}
             assets = list(assets_by_id.values())
             data = {
                 "case": {"id": case.id, "title": decode(case.payload).get("title"), "customer": decode(case.payload).get("customer"), "originalText": (decode(case.payload).get("originalText") or "")[:6000], "destination": decode(case.payload).get("destination"), "currentRevision": case.current_revision, "nextAction": decode(case.payload).get("nextAction")},
@@ -747,7 +747,8 @@ class WorkbenchToolbox:
             artifact = append_artifact(db, case, "order", order, title="PO 与 PI", run_id=run.id, job_id=job.id)
             payment = None
             if args.payment_schedule:
-                payment = append_artifact(db, case, "payment", {"schedule": args.payment_schedule}, title="付款计划", run_id=run.id, job_id=job.id)
+                schedule = [{**row, "status": "pending"} for row in args.payment_schedule if isinstance(row, dict)]
+                payment = append_artifact(db, case, "payment", {"schedule": schedule}, title="付款计划", run_id=run.id, job_id=job.id)
             conflicts = [row for row in order["diff"] if row["status"] == "conflict"]
             result = {"status": "success", "summary": f"订单草稿已保存；{len(conflicts)} 项冲突", "data": {"orderVersionId": artifact["itemId"], "paymentVersionId": (payment or {}).get("itemId"), "diff": order["diff"], "conflicts": conflicts}}
             self._log(db, "record_order", args.model_dump(), result)
@@ -757,7 +758,7 @@ class WorkbenchToolbox:
         with self._tx(write=True) as (db, case, user, run, job):
             latest = latest_artifact(db, case, "payment")
             content = (latest or {}).get("content") or {}
-            schedule = [*((content.get("schedule") or [])), *args.schedule]
+            schedule = [*((content.get("schedule") or [])), *[{**row, "status": "pending"} for row in args.schedule if isinstance(row, dict)]]
             artifact = append_artifact(db, case, "payment", {"schedule": schedule}, title="付款计划", run_id=run.id, job_id=job.id)
             result = {"status": "success", "summary": f"付款计划已保存，共 {len(schedule)} 个节点", "data": {"paymentVersionId": artifact["itemId"], "schedule": schedule}}
             self._log(db, "record_payment", args.model_dump(), result)

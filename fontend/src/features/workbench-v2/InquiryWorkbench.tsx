@@ -466,7 +466,8 @@ function SourcesDialog({ data, path, selectedEvidence, selectedKnowledge, select
       const form = new FormData();
       form.append('file', file);
       form.append('sourceRole', role);
-      await api.post(`${path}/evidence`, form);
+      const uploaded = await api.post<WorkbenchEvidence>(`${path}/evidence`, form);
+      onChangeEvidence([...selectedEvidence, uploaded.id]);
       setFile(null);
       onUploaded();
     } catch (e) {
@@ -480,9 +481,9 @@ function SourcesDialog({ data, path, selectedEvidence, selectedKnowledge, select
     <Modal title="项目资料" onClose={onClose}>
       <div className="wbv2-sources">
         <div className="wbv2-source-tabs">
-          <button className={tab === 'evidence' ? 'is-active' : ''} onClick={() => setTab('evidence')}>原件 {data.evidence.length}</button>
-          <button className={tab === 'knowledge' ? 'is-active' : ''} onClick={() => setTab('knowledge')}>知识库 {data.knowledge.length}</button>
-          <button className={tab === 'assets' ? 'is-active' : ''} onClick={() => setTab('assets')}>资产 {data.assets.length}</button>
+          <button className={tab === 'evidence' ? 'is-active' : ''} onClick={() => { setTab('evidence'); setPreview(''); }}>原件 {data.evidence.length}</button>
+          <button className={tab === 'knowledge' ? 'is-active' : ''} onClick={() => { setTab('knowledge'); setPreview(''); }}>知识库 {data.knowledge.length}</button>
+          <button className={tab === 'assets' ? 'is-active' : ''} onClick={() => { setTab('assets'); setPreview(''); }}>资产 {data.assets.length}</button>
         </div>
         {tab === 'evidence' && (
           <>

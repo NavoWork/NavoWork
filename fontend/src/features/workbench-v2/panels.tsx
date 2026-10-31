@@ -281,6 +281,7 @@ export function CostingPanel({ data, onAgent, onSave, onConfirm, onExport, busy 
     }
   };
   const approved = data.approvals.some((item) => item.scope === 'commercial_quotation_approval' && item.targetVersionId === quote?.itemId);
+  const quoteReady = data.stages.find((stage) => stage.key === 'costing')?.status === 'ready';
   return (
     <div className="wbv2-stack">
       <Section
@@ -336,7 +337,7 @@ export function CostingPanel({ data, onAgent, onSave, onConfirm, onExport, busy 
         actions={
           <>
             {quote && <button className="button" disabled={!dirty || saving || busy} onClick={() => void saveTerms()}>{saving ? '保存中…' : '保存条款'}</button>}
-            {quote && !approved && <button className="button button-primary" disabled={busy} onClick={() => onConfirm('commercial_quotation_approval', quote, '')}><ShieldCheck size={14} /> 内部批准报价</button>}
+            {quote && !approved && <button className="button button-primary" disabled={busy || !quoteReady} onClick={() => onConfirm('commercial_quotation_approval', quote, '')}><ShieldCheck size={14} /> 内部批准报价</button>}
             {approved && <Pill tone="green"><Check size={12} /> 已批准</Pill>}
             {quote && <button className="button button-ghost" onClick={() => onExport('quotation', 'pdf')}><Download size={13} /> 导出 PDF</button>}
           </>
@@ -426,6 +427,7 @@ export function OrderPanel({ data, onAgent, onConfirm, busy }: { data: Workbench
   const buyer = approvals.some((item) => item.scope === 'order_buyer_confirmation' && item.targetVersionId === order?.itemId);
   const seller = approvals.some((item) => item.scope === 'order_seller_confirmation' && item.targetVersionId === order?.itemId);
   const paid = approvals.some((item) => item.scope === 'payment_verification' && item.targetVersionId === payment?.itemId);
+  const orderConflicts = diff.some((row: any) => row.status === 'conflict');
   return (
     <div className="wbv2-stack">
       <Section
@@ -486,8 +488,8 @@ export function OrderPanel({ data, onAgent, onConfirm, busy }: { data: Workbench
         description="定金、尾款或信用证节点逐项登记；到账只能由人工核验。"
         actions={
           <>
-            {order && !buyer && <button className="button" disabled={busy} onClick={() => onConfirm('order_buyer_confirmation', order, 'customer_approval')}>买方确认</button>}
-            {order && !seller && <button className="button" disabled={busy} onClick={() => onConfirm('order_seller_confirmation', order, 'internal_note')}>卖方确认</button>}
+            {order && !buyer && <button className="button" disabled={busy || orderConflicts} onClick={() => onConfirm('order_buyer_confirmation', order, 'customer_approval')}>买方确认</button>}
+            {order && !seller && <button className="button" disabled={busy || orderConflicts} onClick={() => onConfirm('order_seller_confirmation', order, 'internal_note')}>卖方确认</button>}
             {payment && !paid && <button className="button button-primary" disabled={busy} onClick={() => onConfirm('payment_verification', payment, 'payment_receipt', { basis: '人工核对付款凭据与合同金额' })}><ShieldCheck size={14} /> 核验付款</button>}
           </>
         }
@@ -505,7 +507,7 @@ export function OrderPanel({ data, onAgent, onConfirm, busy }: { data: Workbench
                     <td>{row.ratio ? `${Number(row.ratio) * 100}%` : '—'}</td>
                     <td>{money(row.amountUsd)}</td>
                     <td>{row.due || '—'}</td>
-                    <td><Pill tone={paid || row.status === 'verified' ? 'green' : 'amber'}>{paid || row.status === 'verified' ? '已核验' : '待核验'}</Pill></td>
+                    <td><Pill tone={paid ? 'green' : 'amber'}>{paid ? '已核验' : '待核验'}</Pill></td>
                   </tr>
                 ))}
               </tbody>

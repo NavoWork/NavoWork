@@ -111,3 +111,14 @@ def test_node_dependencies():
     assert not can_generate_node("costing", {})
     assert can_generate_node("costing", {"spec": {}})
     assert not can_generate_node("order", {"spec": {}, "quotation": {}})
+
+
+def test_free_text_order_clauses_are_review_not_conflict():
+    diff = order_diff(
+        {"po": {"paymentTerms": "30% deposit, 70% before shipment", "deliveryDate": "45 days after sample approval"}},
+        {"quantity": 3000, "unitPriceUsd": "8.69", "incoterm": "FOB", "namedPlace": "Ningbo", "paymentTerms": "30% 定金 + 70% 见提单副本"},
+        {"fields": {"delivery": "45天"}},
+    )
+    rows = {row["field"]: row["status"] for row in diff}
+    assert rows["paymentTerms"] == "review"
+    assert rows["deliveryDate"] == "review"
