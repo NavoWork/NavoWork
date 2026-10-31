@@ -13,7 +13,7 @@ async function expectTheme(page: Page, value: 'light' | 'dark') {
 }
 async function login(page: Page) {
   await page.getByRole('button', { name: '进入演示工作空间' }).click();
-  await expect(page.getByRole('heading', { name: '把手上的事，向前推进。' })).toBeVisible();
+  await expect(page.locator('.topbar')).toBeVisible();
 }
 
 test('首屏在 React 加载前恢复深色主题及 favicon', async ({ page }) => {
@@ -94,7 +94,7 @@ test('深色覆盖工作台、弹窗和延迟加载资源，切换不丢失报�
   await page.goto('/');
   await theme(page).selectOption('dark');
   await login(page);
-  await page.locator('.wh-featured-job').click();
+  await page.goto('/workbench');
   await page.getByLabel('工厂基础报价').fill('46');
   await expect(page.getByTestId('unit-price')).toHaveText('$9.03');
   await expect(page.locator('.tw-canvas')).toHaveCSS('background-color', 'rgb(25, 27, 32)');
@@ -105,13 +105,13 @@ test('深色覆盖工作台、弹窗和延迟加载资源，切换不丢失报�
   await page.getByRole('button', { name: '供应商 A · B2', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCSS('background-color', 'rgb(34, 37, 44)');
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: '知识 Wiki', exact: true }).click();
-  await page.getByRole('button', { name: '新建知识', exact: true }).click();
+  await page.getByRole('button', { name: '知识库', exact: true }).click();
+  await page.getByRole('button', { name: '新建文档', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCSS('background-color', 'rgb(34, 37, 44)');
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: '全部询盘', exact: true }).click();
+  await page.goto('/inquiries');
   await page.getByRole('button', { name: '墨西哥帆布袋试单', exact: true }).click();
-  await expect(page.locator('.iw-stage-bar')).toHaveCSS('background-color', 'rgb(25, 27, 32)');
+  await expect(page.locator('.iw-answer-result')).toHaveCSS('background-color', 'rgb(25, 27, 32)');
 });
 
 test('移动端可切换主题和打开侧栏，无页面横向溢出', async ({ page }) => {
@@ -123,7 +123,7 @@ test('移动端可切换主题和打开侧栏，无页面横向溢出', async ({
   await page.getByRole('button', { name: '打开导航' }).click();
   await expect(page.locator('.sidebar .navo-logo-dark')).toBeVisible();
   await page.keyboard.press('Escape');
-  await page.locator('.wh-featured-job').click();
+  await page.goto('/workbench');
   await theme(page).selectOption('light');
   await expect(page.getByTestId('unit-price')).toHaveText('$8.69');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

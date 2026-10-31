@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   ArrowRight,
@@ -67,8 +67,7 @@ const time = (value: string) =>
     minute: '2-digit',
     hour12: false,
   }).format(new Date(value));
-export function TradeWorkbench({ session }: { session: Session }) {
-  const navigate = useNavigate();
+export function TradeWorkbench({ session, onBack }: { session: Session; onBack: () => void }) {
   const [searchParams] = useSearchParams();
   const scope = `${session.user.id}:${session.workspace.id}:${caseId}`;
   const { state, setState, storageError } = useWorkbench(scope);
@@ -240,7 +239,7 @@ export function TradeWorkbench({ session }: { session: Session }) {
     <div className="trade-workbench">
       <header className="tw-case-header">
         <div className="tw-case-title">
-          <button className="icon-button" aria-label="返回工作台" onClick={() => navigate('/')}>
+          <button className="icon-button" aria-label="返回工作台" onClick={onBack}>
             <ArrowLeft size={17} />
           </button>
           <span className="tw-case-mark">

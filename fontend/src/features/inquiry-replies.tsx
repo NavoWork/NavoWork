@@ -7,6 +7,7 @@ export interface DraftState {
   revision: number | null;
   versions: Partial<Record<Locale, number>>;
   pending: boolean;
+  texts?: Partial<Record<Locale, string>>;
 }
 type Entry = {
   saved: Draft;
@@ -118,6 +119,9 @@ export function ReplyEditor({
   useEffect(() => {
     onState({
       revision: revision.number,
+      texts: Object.fromEntries(
+        locales.flatMap((l) => (entries[l] ? [[l, entries[l]!.text]] : [])),
+      ),
       versions: Object.fromEntries(
         locales.flatMap((l) => (entries[l] ? [[l, entries[l]!.saved.draftVersion]] : [])),
       ),

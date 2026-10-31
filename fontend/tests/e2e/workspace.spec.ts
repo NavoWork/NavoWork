@@ -2,15 +2,14 @@ import { test, expect, type Page } from '@playwright/test';
 async function login(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: '进入演示工作空间' }).click();
-  await expect(page.getByRole('heading', { name: /把手上的事，向前推进/ })).toBeVisible();
-  await page.getByRole('button', { name: '全部询盘', exact: true }).click();
+  await expect(page.getByRole('heading', { name: /我的工作/ })).toBeVisible();
 }
 async function home(page: Page) {
   await page
     .getByRole('navigation', { name: '主导航' })
     .getByRole('button', { name: '工作台', exact: true })
     .click();
-  await page.getByRole('button', { name: '全部询盘', exact: true }).click();
+  await expect(page.getByRole('heading', { name: /我的工作/ })).toBeVisible();
 }
 async function openMexico(page: Page) {
   await page.getByRole('button', { name: '墨西哥帆布袋试单', exact: true }).click();
@@ -51,14 +50,15 @@ test('创建保留独立原文，Mock 对未见原文诚实返回需补充', asy
   await expect(page.locator('.iw-original')).not.toContainText('canvas');
   await page.getByRole('button', { name: '开始处理', exact: true }).click();
   await expect(page.locator('.iw-run')).toContainText('需补充信息', { timeout: 12000 });
-  await expect(page.getByRole('button', { name: '版本记录 暂无' })).toBeVisible();
+  await expect(page.getByRole('region', { name: /本轮成果/ })).toHaveCount(0);
 });
 test('最近工作不重复、未发送文字隔离、关闭及刷新恢复', async ({ page }) => {
   await openMexico(page);
-  await page.getByRole('button', { name: '收起业务结果', exact: true }).click();
+  await page.getByRole('button', { name: '收起 AI 面板', exact: true }).click();
   await expect(page.locator('.iw-results')).toBeHidden();
-  await expect(page.getByRole('textbox', { name: /补充要求或客户反馈/ })).toBeInViewport();
-  await page.getByRole('button', { name: '展开业务结果', exact: true }).click();
+  await expect(page.getByRole('tab', { name: '询盘画板', exact: true })).toBeInViewport();
+  await expect(page.getByRole('textbox', { name: /补充要求或客户反馈/ })).toBeHidden();
+  await page.getByRole('button', { name: '展开 AI 面板', exact: true }).click();
   await expect(page.locator('.iw-results')).toBeVisible();
   await page.getByRole('button', { name: '收起导航', exact: true }).click();
   await expect(page.getByRole('navigation', { name: '主导航' })).toBeHidden();
@@ -99,20 +99,24 @@ test('最近工作不重复、未发送文字隔离、关闭及刷新恢复', as
     '墨西哥专属未发送文字',
   );
 });
-test('三阶段只导航，来源可回读，历史只读', async ({ page }) => {
+test('对话内展开成果不改版本，来源可回读，历史只读', async ({ page }) => {
   await openMexico(page);
   const before = await snapshot(page, '/workspaces/ws_demo/inquiries/inq_mx026');
-  for (const name of ['准备方案', '完成回复', '读懂询盘'])
-    await page.getByRole('button', { name: new RegExp(name) }).click();
+  for (const name of ['需求与风险', '方案与报价', '客户回复'])
+    await page.locator('.iw-result-section > summary').filter({ hasText: name }).click();
   const after = await snapshot(page, '/workspaces/ws_demo/inquiries/inq_mx026');
   expect(after.currentRevision).toBe(before.currentRevision);
   expect(after.activeRunId).toBeNull();
-  await page.getByRole('tab', { name: '资料依据' }).click();
-  await page.getByRole('button', { name: /现货商品价表/ }).click();
+  await page.locator('.iw-result-section > summary').filter({ hasText: '资料依据' }).click();
+  await page.getByRole('button', { name: '现货商品价表 · USD V1 · 第 3 行', exact: true }).click();
   await expect(page.getByRole('dialog')).toContainText('USD 1.80');
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: /版本记录/ }).click();
-  await page.locator('.iw-history-list').getByRole('button').last().click();
+  await page.locator('.ic-directory .ic-folder-toggle').filter({ hasText: '版本记录' }).click();
+  await page
+    .locator('.ic-directory')
+    .getByRole('button', { name: 'V1 · 历史版本', exact: true })
+    .press('Enter');
+  await page.getByRole('button', { name: '在对话中查看此版本', exact: true }).click();
   await expect(page.getByText('正在查看 V1 历史快照，内容只读。')).toBeVisible();
   await expect(page.getByRole('textbox', { name: /补充要求或客户反馈/ })).toBeDisabled();
 });
@@ -120,7 +124,7 @@ test('运行中切换、关闭、刷新后结果只写入原询盘', async ({ pa
   await openMexico(page);
   await page.getByRole('textbox', { name: /补充要求或客户反馈/ }).fill('改为600件，请更新报价');
   await expect(page.getByRole('button', { name: '处理反馈', exact: true })).toBeEnabled();
-  await page.getByRole('textbox', { name: /补充要求或客户反馈/ }).press('Control+Enter');
+  await page.getByRole('textbox', { name: /补充要求或客户反馈/ }).press('Enter');
   await expect(page.locator('.iw-run')).toBeVisible();
   await home(page);
   await page
@@ -135,8 +139,10 @@ test('运行中切换、关闭、刷新后结果只写入原询盘', async ({ pa
     .locator('.inquiry-table')
     .getByRole('button', { name: '墨西哥帆布袋试单', exact: true })
     .click();
-  await expect(page.getByRole('button', { name: '版本记录 V3' })).toBeVisible({ timeout: 15000 });
-  await page.getByRole('tab', { name: '方案与报价' }).click();
+  await expect(page.getByRole('region', { name: 'V3 本轮成果', exact: true })).toBeVisible({
+    timeout: 15000,
+  });
+  await page.locator('.iw-result-section > summary').filter({ hasText: '方案与报价' }).click();
   await expect(page.locator('.inquiry-mount:not([hidden]) .iw-quote-amount')).toContainText(
     '1,080.00',
   );
@@ -160,14 +166,18 @@ test('390px 主线无水平溢出，表单键盘焦点受限于弹窗', async ({
   );
   await page.screenshot({ path: 'docs/screenshots/home-mobile.png', fullPage: true });
   await openMexico(page);
-  await page.getByRole('tab', { name: '方案与报价' }).click();
+  await page.getByRole('button', { name: 'AI 助手', exact: true }).click();
+  await page.locator('.iw-result-section > summary').filter({ hasText: '方案与报价' }).click();
   await expect(page.locator('.iw-quote-amount')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
   await page.screenshot({ path: 'docs/screenshots/inquiry-mobile.png', fullPage: true });
-  await page.getByRole('button', { name: '对话', exact: true }).click();
+  await page.getByRole('button', { name: '画板与资料', exact: true }).click();
+  await expect(page.getByRole('tab', { name: '询盘画板', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'AI 助手', exact: true }).click();
   await expect(page.getByRole('textbox', { name: /补充要求或客户反馈/ })).toBeVisible();
+  await page.screenshot({ path: 'docs/screenshots/inquiry-ai-mobile.png', fullPage: true });
   await page.getByRole('button', { name: '打开导航' }).click();
   await page.getByRole('button', { name: '新建工作', exact: true }).first().click();
   for (let i = 0; i < 12; i++) await page.keyboard.press('Tab');
@@ -179,7 +189,7 @@ test('桌面展示截图与退出登录', async ({ page }) => {
   await expect(page.locator('.inquiry-table tbody tr')).toHaveCount(4);
   await page.screenshot({ path: 'docs/screenshots/home-desktop.png', fullPage: true });
   await openMexico(page);
-  await page.getByRole('tab', { name: '方案与报价' }).click();
+  await page.locator('.iw-result-section > summary').filter({ hasText: '方案与报价' }).click();
   await expect(page.locator('.iw-quote-amount')).toBeVisible();
   await expect(page.getByRole('button', { name: '导出草稿材料', exact: true })).toBeEnabled();
   await page.screenshot({ path: 'docs/screenshots/inquiry-desktop.png', fullPage: true });
@@ -203,5 +213,5 @@ test('浏览器存储被禁用与异常链接不会使页面崩溃', async ({ pa
     window.dispatchEvent(new PopStateEvent('popstate'));
   });
   await expect(page.getByText('询盘链接格式不正确，请从工作台重新打开。')).toBeVisible();
-  await expect(page.getByRole('heading', { name: /把手上的事，向前推进/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /我的工作/ })).toBeVisible();
 });

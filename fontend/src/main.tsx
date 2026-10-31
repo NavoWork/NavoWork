@@ -7,6 +7,7 @@ import './styles.css';
 import './features/workbench/workbench.css';
 import './theme/brand.css';
 import './workspace.css';
+import './features/workbench/work-home.css';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { retry: false, staleTime: 15000, refetchOnWindowFocus: true },

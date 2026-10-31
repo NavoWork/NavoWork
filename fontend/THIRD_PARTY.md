@@ -6,6 +6,7 @@
 | ---------------------- | ------- | ---------- |
 | @radix-ui/react-dialog | 1.3.1   | MIT        |
 | @tanstack/react-query  | 5.105.0 | MIT        |
+| @xyflow/react          | 12.12.0 | MIT        |
 | idb                    | 8.0.4   | ISC        |
 | lucide-react           | 0.468.0 | ISC        |
 | papaparse              | 5.7.0   | MIT        |

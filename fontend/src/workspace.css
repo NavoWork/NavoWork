@@ -340,24 +340,20 @@
   background: var(--navo-color-surface);
 }
 .iw-heading {
-  padding: 17px 28px;
+  padding: 14px 28px;
   margin: 0;
-  min-height: 85px;
+  min-height: 64px;
   flex-shrink: 0;
   gap: 12px;
 }
 .iw-title {
-  margin-top: 4px;
+  margin-top: 0;
   gap: 9px;
 }
 .iw-title h1 {
   font-size: 19px;
   line-height: 1.4;
   letter-spacing: -0.4px;
-}
-.iw-eyebrow {
-  font-size: 11px;
-  color: var(--navo-color-text-muted);
 }
 .iw-actions {
   gap: 6px;
@@ -582,20 +578,6 @@
   padding: 9px 12px;
   flex-shrink: 0;
   font-size: 11px;
-}
-.iw-run {
-  border: 0;
-  border-top: 1px solid var(--navo-color-border-subtle);
-  border-radius: 0;
-  padding: 15px 0;
-}
-.iw-run-details {
-  color: var(--navo-color-text-muted);
-  font-size: 10px;
-  margin-top: 8px;
-}
-.iw-run-details summary {
-  cursor: pointer;
 }
 .iw-focus-chat .iw-columns {
   grid-template-columns: minmax(0, 1fr);
