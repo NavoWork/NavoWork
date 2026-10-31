@@ -48,9 +48,9 @@ navowork-agent run --workspace ./agent-kit/output/live-case --resume '工厂补�
 
 ## 暴露的工具
 
-`list_context`、`read_document`、`load_skill`、`list_artifacts`、`calculate_quote`、`publish_documents`、`edit_file`、`validate_artifact`、`export_artifact`、`package_customer_files`、`request_info`。参数 JSON Schema 来自严格 Pydantic 模型，拒绝未知顶层参数。权限上下文、物理路径、已确认用户依据和测试故障注入都不能由工具参数设置。没有 shell、任意 Python、外发、批准或收款工具。
+`list_context`、`read_document`、`load_skill`、`list_artifacts`、`calculate_quote`、`publish_documents`、`create_working_copy`、`edit_file`、`validate_artifact`、`export_artifact`、`package_customer_files`、`request_info`。参数 JSON Schema 来自严格 Pydantic 模型，拒绝未知顶层参数。权限上下文、物理路径、已确认用户依据和测试故障注入都不能由工具参数设置。没有 shell、任意 Python、外发、批准或收款工具。
 
-两个产品 Skill 随包保存在 `src/navowork_agent/skills/`，由工具按需加载，不安装个人 Codex skills。模型负责语义映射、判断假设/否定与选择工具，程序负责确定性计算、访问和版本检查。测试中由脚本构建快照的流程明确属于离线工具回放。
+两个产品 Skill 随包保存在 `src/navowork_agent/skills/`，由工具按需加载，不安装个人 Codex skills。DOCX/XLSX 来源须先复制为独立工作副本，工具保留原件并对副本生成新版本。模型负责语义映射、判断假设/否定与选择工具，程序负责确定性计算、访问和版本检查。测试中由脚本构建快照的流程明确属于离线工具回放。
 
 报价使用 Decimal，数量为严格正整数，成本项明确范围 `per_unit` / `per_order`；base、packaging、local 任一缺失都不补零。FX 为 CNY/USD，毛利是 `[0,1)` 的比例；按单件向上舍入 USD 0.01 再乘数量。每个已知字段需要来源定位或完全匹配的宿主用户依据。引用检查能核验哈希、定位和摘录存在，不能自动证明模型的语义解释正确；后者需要真实模型与外部评测。
 

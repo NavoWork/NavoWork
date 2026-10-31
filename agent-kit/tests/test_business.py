@@ -162,6 +162,30 @@ def test_unknown_moq_missing_cost_and_invalid_numbers(tmp_path):
         assert invoke(ToolService(other), "read_document", {"file_id": a.list_files()[0].file_id}).code == "FILE_UNAVAILABLE"
 
 
+def test_source_docx_is_copied_before_agent_edits(tmp_path):
+    source_path = tmp_path / "customer-spec.docx"
+    original = Document()
+    original.add_paragraph("Requested material: canvas")
+    original.save(source_path)
+    adapter = make_adapter(tmp_path / "case")
+    source = adapter.import_source(source_path)
+    source_bytes = adapter.read_bytes(source.file_id)
+    service = ToolService(adapter)
+
+    copied = invoke(service, "create_working_copy", {"file_id": source.file_id}, "copy-source-docx")
+    assert copied.status == "needs_review" and len(copied.artifacts) == 1
+    assert copied.outputs[0].role == "working"
+    artifact = copied.artifacts[0]
+    edited = invoke(service, "edit_file", {"artifact_id": artifact.artifact_id, "baseline": artifact.version,
+        "file_id": copied.outputs[0].file_id, "operations": [{"op": "append_paragraph", "text": "Reviewed by agent"}]}, "edit-working-docx")
+    assert edited.status == "needs_review" and edited.outputs[0].role == "working"
+    validated = invoke(service, "validate_artifact", {"artifact_id": artifact.artifact_id, "version": edited.artifacts[0].version})
+    assert validated.status == "needs_review"
+    result_doc = Document(BytesIO(adapter.read_bytes(edited.outputs[0].file_id)))
+    assert "Reviewed by agent" in " ".join(p.text for p in result_doc.paragraphs)
+    assert adapter.read_bytes(source.file_id) == source_bytes
+
+
 def test_forged_confirmation_citations_and_prompt_injection(tmp_path):
     a = make_adapter(tmp_path)
     snap = base_snapshot(a)

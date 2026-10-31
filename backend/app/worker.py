@@ -267,11 +267,7 @@ def work_once(graph, owner: str = "worker-local") -> bool:
             job.status = "running"
             db.commit()
             payload = decode(job.payload)
-            if payload.get("agentMode"):
-                from .agent_runtime import execute_agent_work
-                execute_agent_work(item_id, generation)
-                return True
-            if payload.get("agentFileTools"):
+            if payload.get("agentMode") or payload.get("agentFileTools"):
                 from .file_worker import execute_file_work
                 execute_file_work(item_id, generation)
                 return True

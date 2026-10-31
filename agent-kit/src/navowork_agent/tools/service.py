@@ -40,6 +40,10 @@ class ArtifactArgs(Model):
     version: int = Field(ge=1)
 
 
+class WorkingCopyArgs(Model):
+    file_id: str
+
+
 class ExportArgs(ArtifactArgs):
     format: Literal["pdf", "xlsx"]
 
@@ -87,6 +91,7 @@ SCHEMAS = {
     "load_skill": (SkillArgs, "Load an available business Skill on demand."),
     "calculate_quote": (PriceArgs, "Deterministic pricing with sourced costs and explicit host-confirmed FX/margin."),
     "publish_documents": (PublishArgs, "Create spec DOCX, internal cost XLSX, customer quotation XLSX/PDF from one snapshot with baseline CAS. Only initial or explicit confirmed change."),
+    "create_working_copy": (WorkingCopyArgs, "Create a versioned DOCX/XLSX working copy from a Case-authorized file. The original remains read-only."),
     "list_artifacts": (Empty, "Read current managed artifacts, source snapshots and versions."),
     "validate_artifact": (ArtifactArgs, "Reopen artifact files and check content hashes, format, and business readiness."),
     "export_artifact": (ExportArgs, "Retry just one quotation export format, bound to the immutable snapshot version."),
@@ -122,7 +127,7 @@ class ToolService:
             if call.name not in SCHEMAS:
                 raise AgentError("UNKNOWN_TOOL", "Tool is not exposed")
             args = SCHEMAS[call.name][0].model_validate(call.arguments)
-            if call.name in {"publish_documents", "edit_file", "export_artifact", "package_customer_files", "request_info"}:
+            if call.name in {"publish_documents", "create_working_copy", "edit_file", "export_artifact", "package_customer_files", "request_info"}:
                 return self.adapter.execute_once(call.idempotency_key, {"name": call.name, "arguments": args.model_dump(mode="json")},
                     lambda state: self._dispatch(call.name, args, state))
             result = self._dispatch(call.name, args, None)
@@ -189,12 +194,18 @@ class ToolService:
                               questions=[missing_question(value["missing"])] if value["missing"] else [])
         if name == "publish_documents":
             return self._publish(args, state)
+        if name == "create_working_copy":
+            return self._create_working_copy(args, state)
         if name == "validate_artifact":
             artifact = self.adapter.get_artifact(args.artifact_id, args.version)
             checks = []
             for ref in artifact["ref"]["files"]:
                 fmt = ref["name"].rsplit(".", 1)[-1]
                 checks.append({"file_id": ref["file_id"], **verify_output(self.adapter.read_bytes(ref["file_id"]), fmt)})
+            if artifact.get("working_copy"):
+                return ToolResult(status="needs_review", data={"checks": checks, "source": artifact["working_copy"],
+                    "content_matches_snapshot": True, "visual_review": "not_performed_by_tool"},
+                    warnings=["Working copy passed structural validation; the source is unchanged and visual review remains required."])
             snap = ContentSnapshot.model_validate(artifact["snapshot"])
             price = calculate_quote(snap.pricing) if snap.pricing else {"status": "needs_info", "quote": None}
             return ToolResult(status="needs_review" if price.get("quote") else price["status"], data={"checks": checks, "business": price,
@@ -258,6 +269,40 @@ class ToolService:
                 if number(values["Unit quote USD"]) != number(expected["unit_usd"]) or number(values["Goods subtotal USD"]) != number(expected["total_usd"]):
                     raise ValueError("Rendered cost formula values disagree with deterministic pricing")
         return data
+
+    def _create_working_copy(self, args, state):
+        source = next((ref for ref in self.adapter.list_files() if ref.file_id == args.file_id), None)
+        if source is None:
+            raise AgentError("FILE_UNAVAILABLE", "File is unavailable in this Case")
+        fmt = Path(source.name).suffix.lower().lstrip(".")
+        if fmt not in ("docx", "xlsx"):
+            raise AgentError("UNSUPPORTED_EDIT_FORMAT", "Editable working copies currently support DOCX and XLSX")
+        self.adapter.read_document(source.file_id)
+        data = self.adapter.read_bytes(source.file_id)
+        if fmt == "xlsx":
+            from navowork_agent.tools.formulas import recalculate_xlsx
+            data = recalculate_xlsx(data)
+        verify_output(data, fmt)
+        kind = "working_file_" + digest([self.adapter.context().case_id, source.file_id])[:16]
+        artifact_id = "a_" + digest([self.adapter.context().case_id, kind])[:24]
+        current = state.current(artifact_id)
+        if current:
+            return ToolResult(status="needs_review", artifacts=[ArtifactRef.model_validate(current["ref"])],
+                              outputs=[FileRef.model_validate(f) for f in current["ref"]["files"]],
+                              warnings=["An editable copy already exists; continue from its current version."])
+        working = state.put_file(data, f"{Path(source.name).stem}-working-v1.{fmt}", "working")
+        snapshot = {"source_file_id": source.file_id, "source_name": source.name,
+                    "source_sha256": source.sha256, "source_version": source.model_dump(mode="json")}
+        hash_value = digest({"source_file_id": source.file_id, "source_sha256": source.sha256, "working_sha256": working.sha256})
+        ref = ArtifactRef(artifact_id=artifact_id, kind=kind, version=1, baseline=0,
+                          snapshot_hash=hash_value, files=[working])
+        record = {"ref": ref.model_dump(mode="json"), "snapshot": snapshot, "working_copy": snapshot,
+                  "content_matches_snapshot": True, "generated": False, "synchronized": True,
+                  "internally_approved": False, "customer_accepted": False}
+        state.append_artifact(record)
+        return ToolResult(status="needs_review", artifacts=[ref], outputs=[working],
+                          data={"source": snapshot, "editable_format": fmt},
+                          warnings=["Created a separate working copy. The source file remains unchanged."])
 
     def _publish(self, args, state):
         snapshot = args.snapshot

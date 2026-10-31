@@ -168,6 +168,93 @@ def test_canvas_manifest_and_no_model_no_fake_success(client, monkeypatch):
     assert client.get(CASE + "/artifacts").json()["items"] == []
 
 
+def test_workbench_agent_mode_uses_file_capable_tool_loop(client, monkeypatch):
+    response = client.post(CASE + "/runs", json={"action": "analyze", "instruction": "修改已上传的产品规格文件",
+        "baseRevision": client.get(CASE).json()["currentRevision"], "agentMode": True})
+    assert response.status_code == 200, response.text
+    run_id = response.json()["id"]
+    calls = []
+
+    def execute_file_work(item_id, generation):
+        calls.append((item_id, generation))
+
+    def unexpected_business_agent(*args, **kwargs):
+        raise AssertionError("agentMode must use the unified file-capable tool loop")
+
+    monkeypatch.setattr("app.file_worker.execute_file_work", execute_file_work)
+    monkeypatch.setattr("app.agent_runtime.execute_agent_work", unexpected_business_agent)
+    from app.worker import work_once
+
+    assert work_once(None)
+    assert len(calls) == 1
+    view = client.get(BASE + "/runs/" + run_id).json()
+    assert view["status"] == "running"
+
+
+def test_workbench_chat_edits_uploaded_docx_and_preserves_source(client, tmp_path, monkeypatch):
+    from docx import Document
+    from app.file_worker import execute_file_work
+
+    source_doc = Document()
+    source_doc.add_paragraph("Product: travel bag")
+    buffer = BytesIO()
+    source_doc.save(buffer)
+    uploaded = client.post(CASE + "/evidence", files={"file": ("product-spec.docx", buffer.getvalue(),
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document")})
+    assert uploaded.status_code == 200, uploaded.text
+    source_id = uploaded.json()["id"]
+    run_response = client.post(CASE + "/runs", json={"action": "analyze", "instruction": "Add a reviewed note to the end of the specification document",
+        "baseRevision": client.get(CASE).json()["currentRevision"], "agentMode": True})
+    assert run_response.status_code == 200, run_response.text
+    adapter = claim(run_response.json()["id"])
+    original_bytes = adapter.read_bytes(source_id)
+
+    class EditingChatModel:
+        def __init__(self):
+            self.stage = 0
+
+        def bind_tools(self, schemas):
+            names = {schema["function"]["name"] for schema in schemas}
+            assert {"create_working_copy", "edit_file", "validate_artifact"} <= names
+            return self
+
+        def invoke(self, messages):
+            if self.stage == 0:
+                self.stage += 1
+                return call("list_context", id="context")
+            result = __import__("json").loads(messages[-1].content)
+            if self.stage == 1:
+                source = next(file for file in result["data"]["files"] if file["file_id"] == source_id)
+                self.stage += 1
+                return call("create_working_copy", {"file_id": source["file_id"]}, id="copy")
+            if self.stage == 2:
+                artifact, output = result["artifacts"][0], result["outputs"][0]
+                self.stage += 1
+                return call("edit_file", {"artifact_id": artifact["artifact_id"], "baseline": artifact["version"],
+                    "file_id": output["file_id"], "operations": [{"op": "append_paragraph", "text": "Reviewed by agent"}]}, id="edit")
+            if self.stage == 3:
+                artifact = result["artifacts"][0]
+                self.stage += 1
+                return call("validate_artifact", {"artifact_id": artifact["artifact_id"], "version": artifact["version"]}, id="validate")
+            return AIMessage(content="Created and validated a separate working copy.")
+
+    result = execute_file_work(adapter.work_item_id, adapter.context().generation, model=EditingChatModel())
+    assert result["status"] == "needs_review", result
+    from app.core import decode
+    from app.db import SessionLocal
+    from app.models import Blob, Item
+    with SessionLocal() as db:
+        source_record = decode(db.get(Item, source_id).payload)
+        source_blob = db.get(Blob, source_record["blobId"])
+        assert Path(source_blob.path).read_bytes() == original_bytes
+    view = client.get(BASE + "/runs/" + run_response.json()["id"]).json()
+    assert view["status"] == "succeeded" and len(view["fileOutputs"]) == 2
+    edited_output = next(file for file in view["fileOutputs"] if "edited-v2" in file["name"])
+    edited_bytes = client.get(edited_output["downloadUrl"]).content
+    edited_doc = Document(BytesIO(edited_bytes))
+    assert "Reviewed by agent" in " ".join(paragraph.text for paragraph in edited_doc.paragraphs)
+
+
 def test_selected_assets_resources_and_revocation(client, monkeypatch):
     monkeypatch.setenv("AGENT_FILE_TOOLS", "1")
     pasted = client.post(CASE + "/evidence", json={"title": "Supplier note", "text": "Lead time is unknown."}).json()
