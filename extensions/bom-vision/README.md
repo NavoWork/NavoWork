@@ -1,6 +1,14 @@
 # BOM 图片候选识别
 
-独立函数、CLI、产品能力声明和薄适配层已实现。**真实视觉识别未验收；主链路未接入。** 本模块只产生待复核候选、缺失项和疑问，不批准供应商价格，也不复刻报价计算器。
+当前演示使用新增的 **mock 独立入口**：图片哈希匹配预置 JSON，再复用现有候选、纠正和校验逻辑；不需要模型或 Agent。通用 mock 封装及其他流程接入方法见 [MOCKING.md](MOCKING.md)。原有真实识别模块保留，**真实视觉识别未验收；工作台主链路未接入。** 本模块只产生待复核候选、缺失项和疑问，不批准供应商价格，也不复刻报价计算器。
+
+```powershell
+# 在 extensions/bom-vision 下执行，无模型配置要求；输出文件须不存在。
+python -m bom_vision.mock_cli samples/clear.jpg --catalog samples/mock.catalog.json --out out/demo.json
+python -m bom_vision correct out/demo.json samples/patches.example.json --expected-revision 1 --actor local-reviewer --reason '演示纠正' --out out/demo-corrected.json
+```
+
+以下真实识别命令与接口作为保留能力；演示默认走上面的 mock 入口。
 
 ## 支持范围
 

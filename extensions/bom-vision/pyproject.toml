@@ -4,12 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "navowork-bom-vision"
-version = "0.1.0"
+version = "0.2.0"
 requires-python = ">=3.12"
 dependencies = ["Pillow>=10.4,<14"]
 
 [project.scripts]
 bom-vision = "bom_vision.cli:main"
+bom-mock = "bom_vision.mock_cli:main"
+demo-mock = "demo_mock.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["bom_vision*"]
+include = ["bom_vision*", "demo_mock*"]

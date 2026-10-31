@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "catalog_id": "document-demo-v1",
+  "scenarios": [
+    {
+      "id": "summary-zh",
+      "workflow": "document-demo",
+      "operation": "summarize",
+      "inputs": {
+        "request": {
+          "kind": "json-v1",
+          "sha256": "fb2d92d9ccd30a34cc06248b2b778ee3313a95af1a1b8ae2bff084a5062337fc"
+        }
+      },
+      "output": {
+        "path": "summary.json",
+        "sha256": "f2ca209352c7dc049922c79c1427fcc54ac3e63b0d36da7503aa2437175f57d6"
+      }
+    },
+    {
+      "id": "actions-zh",
+      "workflow": "document-demo",
+      "operation": "next-actions",
+      "inputs": {
+        "summary": {
+          "kind": "json-v1",
+          "sha256": "f2ca209352c7dc049922c79c1427fcc54ac3e63b0d36da7503aa2437175f57d6"
+        }
+      },
+      "output": {
+        "path": "actions.json",
+        "sha256": "331f87c280ba886c4567aa645c2e3367af813a6d1c0f10b4f610a41c97852f31"
+      }
+    }
+  ]
+}
