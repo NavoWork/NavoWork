@@ -174,6 +174,9 @@ def case_routes(request: Request, db: Session, user: User, parts: list[str], bod
         return {key: values.count(key) for key in ("todo", "active", "waiting", "done")}
     case = require_case(db, user, parts[0])
     tail = parts[1:]
+    if tail and tail[0] == "workbench":
+        from .workbench_api import workbench_routes
+        return workbench_routes(request, db, user, case, tail[1:], body, form)
     if tail and tail[0] == "canvas":
         from .workspace_api import canvas_routes
         return canvas_routes(request, db, user, case, tail, body, form)
@@ -344,7 +347,8 @@ def create_run(request: Request, db: Session, user: User, case: Case, body: dict
     if base_revision != case.current_revision:
         fail("REVISION_CONFLICT", "业务版本已有更新", 409, {"currentRevision": case.current_revision})
     action = str(body.get("action") or kind or "analyze")
-    interactive = kind is None
+    agent_mode = bool(body.get("agentMode"))
+    interactive = kind is None and not agent_mode
     kind = kind or route_intent(action, str(body.get("instruction", "")))
     allowed = {"qualify_inquiry", "confirm_requirements", "prepare_quote", "manage_sample", "confirm_order", "prepare_production", "manage_shipment", "reconcile_payment", "handle_aftersales", "apply_change", "follow_up"}
     if kind not in allowed:
@@ -356,9 +360,9 @@ def create_run(request: Request, db: Session, user: User, case: Case, body: dict
     selected_offer_id = body.get("selectedSupplierOfferId")
     if kind == "prepare_quote":
         require_capability(db, "costing")
-    if kind == "prepare_quote" and not selected_offer_id and not interactive:
+    if kind == "prepare_quote" and not selected_offer_id and not interactive and not agent_mode:
         fail("SUPPLIER_EVIDENCE_REQUIRED", "报价任务须选择已绑定原件的供应商报价", 422)
-    if kind == "prepare_quote" and selected_offer_id:
+    if kind == "prepare_quote" and selected_offer_id and not agent_mode:
         offer_row = db.get(Item, str(selected_offer_id))
         if not offer_row or offer_row.case_id != case.id or offer_row.kind != "supplier_offer":
             fail("NOT_FOUND", "供应商报价不存在", 404)
@@ -383,6 +387,12 @@ def create_run(request: Request, db: Session, user: User, case: Case, body: dict
             fail("INVALID_INPUT", "未知生成节点")
     from .agent_files import enabled as file_tools_enabled, confirmed_facts
     file_tools = file_tools_enabled() and interactive and kind in ("prepare_quote", "apply_change", "confirm_requirements")
+    if agent_mode:
+        evidence_rows = items(db, "evidence", case_id=case.id) if not body.get("inputRefs") else [db.get(Item, ref) for ref in body["inputRefs"]]
+        context["evidence"] = [{"id": row.id, **item_view(row)} for row in evidence_rows if row]
+        facts = {**decode(case.payload).get("agentFacts", {}), **confirmed_facts(instruction)}
+        context.update(agentMode=True, agentNode=body.get("agentNode"), agentFacts=facts, agentMessages=[instruction])
+        case.payload = encode({**decode(case.payload), "agentFacts": facts})
     if file_tools:
         # Freeze actual case attachments at dispatch, including explicitly selected user-owned canvas files.
         evidence_rows = items(db, "evidence", case_id=case.id) if not body.get("inputRefs") else [db.get(Item, ref) for ref in body["inputRefs"]]
@@ -399,7 +409,7 @@ def create_run(request: Request, db: Session, user: User, case: Case, body: dict
         facts = {**decode(case.payload).get("agentFacts", {}), **confirmed_facts(instruction)}
         context.update(agentFileTools=True, agentFacts=facts, agentMessages=[instruction])
         case.payload = encode({**decode(case.payload), "agentFacts": facts})
-    job = Job(id=uid("job"), case_id=case.id, kind=kind, goal=instruction, graph_version="sop-v2", payload=encode({**context, "inputRefs": body.get("inputRefs", []), "costInputs": cost_inputs, "selectedSupplierOfferId": selected_offer_id, "changeSetId": body.get("changeSetId"), "interactive": interactive, "generationTarget": generation_target}))
+    job = Job(id=uid("job"), case_id=case.id, kind=kind, goal=instruction, graph_version="workbench-v2" if agent_mode else "sop-v2", payload=encode({**context, "inputRefs": body.get("inputRefs", []), "costInputs": cost_inputs, "selectedSupplierOfferId": selected_offer_id, "changeSetId": body.get("changeSetId"), "interactive": interactive, "generationTarget": generation_target, "agentMode": agent_mode, "agentNode": body.get("agentNode")}))
     run = Run(id=uid("run"), job_id=job.id, case_id=case.id, base_revision=base_revision, action=action, instruction=instruction, payload=encode({"assetVersionIds": body.get("assetVersionIds", [])}))
     db.add(job)
     db.flush()
