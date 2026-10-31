@@ -42,9 +42,13 @@ const Resources = lazy(() =>
   import('./features/Resources').then((module) => ({ default: module.Resources })),
 );
 const TradeWorkbench = lazy(() =>
-  import('./features/workbench/TradeWorkbench').then((module) => ({
-    default: module.TradeWorkbench,
-  })),
+  mode === 'real'
+    ? import('./features/workbench/RealWorkbench').then((module) => ({
+        default: module.RealWorkbench,
+      }))
+    : import('./features/workbench/TradeWorkbench').then((module) => ({
+        default: module.TradeWorkbench,
+      })),
 );
 
 function Brand({ onClick }: { onClick?: () => void }) {
@@ -299,7 +303,7 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
             ? 'capabilities'
             : 'home';
   const activeTitle = isTrade
-    ? '德国客户 · 定制背包'
+    ? (mode === 'real' ? '包袋出口工作台' : '德国客户 · 定制背包')
     : id
       ? tabs.find((t) => t.id === id)?.title || '询盘详情'
       : {
@@ -318,6 +322,11 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
   }, [tabs, pref]);
   const open = useCallback(
     (i: Inquiry) => {
+      if (mode === 'real') {
+        navigate(`/workbench?case=${encodeURIComponent(i.id)}`);
+        setMobile(false);
+        return;
+      }
       setTabs((old) =>
         old.some((t) => t.id === i.id)
           ? old.map((t) => (t.id === i.id ? { id: i.id, title: i.title } : t))
@@ -413,7 +422,7 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
             <PanelLeftClose size={17} />
           </IconButton>
         </div>
-        <button
+                  <button
           className="button button-ghost new-inquiry"
           aria-label="新建工作"
           aria-keyshortcuts="Meta+K Control+K"
@@ -455,10 +464,10 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
                 }}
               >
                 <FileText size={15} />
-                <span>德国定制背包 · 报价</span>
+                <span>{mode === 'real' ? '包袋出口工作台' : '德国定制背包 · 报价'}</span>
               </button>
               <IconButton
-                label="关闭德国背包工作标签"
+                label={mode === 'real' ? '关闭包袋出口工作台标签' : '关闭德国背包工作标签'}
                 onClick={() => {
                   setTradeOpened(false);
                   if (isTrade) navigate('/');
@@ -474,7 +483,7 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
                 <button
                   className="recent-item"
                   onClick={() => {
-                    navigate(`/inquiries/${encodeURIComponent(t.id)}`);
+                    navigate(mode === 'real' ? `/workbench?case=${encodeURIComponent(t.id)}` : `/inquiries/${encodeURIComponent(t.id)}`);
                     setMobile(false);
                   }}
                 >
@@ -536,7 +545,7 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
             <ThemeSwitch />
             <span className="mode-label">
               <span className="connection-dot" />
-              {isTrade ? '前端演示 · 本地保存' : mode === 'mock' ? '演示工作空间' : '真实服务'}
+              {mode === 'mock' ? '演示工作空间 · 本地保存' : '真实服务 · 服务端保存'}
             </span>
             <IconButton label="工作空间设置" onClick={() => setSettings(true)}>
               <Settings2 size={15} />

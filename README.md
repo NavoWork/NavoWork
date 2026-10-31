@@ -1,79 +1,38 @@
 # NavoWork
 
-使用 **npm workspaces** 管理的 monorepo。前端应用集中在 [`fontend/`](./fontend/)，根目录负责依赖锁定、工作区命令和共享代码格式。
+包袋出口业务工作台。前端为 React/Vite，后端为 FastAPI + SQLAlchemy/SQLite，任务由独立 LangGraph Worker 处理。当前可运行的核心流程：询盘建档、证据和候选事实、规格与询价/核价/报价草稿、成果版本和导出、任意业务变更的节点影响与候选修订、样品/订单/付款保障记录和生产资料门禁。生产进度、真实物流和银行数据仍需外部资料接入。
 
-```text
-NavoWork/
-├── package.json          # workspace 定义与统一命令
-├── package-lock.json     # 全仓库唯一锁文件
-├── .prettierrc.json       # 共享格式规范
-├── LICENSE
-└── fontend/              # @navowork/fontend · Navowork 前端
-    ├── package.json      # 前端依赖与脚本
-    ├── .env.example      # 环境配置示例
-    ├── src/              # 页面、组件、API 与 Mock
-    ├── public/
-    ├── tests/            # Playwright 浏览器测试
-    ├── docs/             # 联调、验证、截图
-    ├── vite.config.ts
-    ├── vitest.config.ts
-    ├── playwright.config.ts
-    └── tsconfig.json
-```
+## 本地启动（Windows）
 
-## 启动
+需要 Python 3.12+ 和 Node.js 20+。在仓库根目录执行：
 
-推荐 Node.js 22.12+ 或 24。在仓库根目录执行：
-
-```sh
+```powershell
+python -m venv backend/.venv
+backend/.venv/Scripts/python.exe -m pip install -e 'backend[test]'
 npm ci
-npm run dev
+Copy-Item backend/.env.example backend/.env
+python dev.py
 ```
 
-打开 [Navowork 本地预览](http://127.0.0.1:5173/)。默认 Mock 演示模式，业务数据为合成测试数据；真实服务尚待联调。开发服务器固定使用 5173，端口占用时直接报告错误。
+浏览器打开 <http://127.0.0.1:5173>。演示账号为 `demo@navowork.local`，密码为 `ChangeMe123!`；可在 `backend/.env` 修改。`dev.py` 自动运行迁移、启动 API、Worker 和 real 模式前端，按 Ctrl+C 关闭。数据写在 `backend/data/`，上传原件写在 `backend/storage/`，均不纳入 Git。
 
-## 根目录命令
+## 验证
 
-| 命令                   | 行为                                                        |
-| ---------------------- | ----------------------------------------------------------- |
-| `npm run dev`          | 启动 `fontend` 开发服务器                                   |
-| `npm run build`        | 构建所有提供 build 脚本的工作区；当前产物为 `fontend/dist/` |
-| `npm run preview`      | 预览前端生产构建                                            |
-| `npm run typecheck`    | 检查工作区 TypeScript                                       |
-| `npm test`             | 执行工作区单元/接口测试                                     |
-| `npm run test:e2e`     | 执行前端浏览器测试                                          |
-| `npm run format`       | 格式化整个仓库                                              |
-| `npm run format:check` | 检查整个仓库格式                                            |
-
-首次运行浏览器测试需安装 Chromium：
-
-```sh
-npm exec --workspace=fontend -- playwright install chromium
+```powershell
+backend/.venv/Scripts/python.exe -m pytest -q
+npm run typecheck
+npm run test
+npm run build
 ```
 
-按文件运行浏览器测试：
+可在 `backend/.env` 设置 `MODEL_API_KEY` 和 `MODEL_NAME` 启用模型抽取；未配置时用有限规则提取，未知字段保持待确认。正式商业批准、外部确认和生产放行由服务端门禁控制，草稿下载不表示已发送或已开工。演示账号和默认密钥仅用于本机演示，不可公开部署。
 
-```sh
-npm run test:e2e -- tests/e2e/resources.spec.ts
-```
+## 开发与文档
 
-也可显式指定工作区：`npm run dev --workspace=fontend`，或进入 `fontend/` 执行包内命令。新增前端依赖从根目录执行 `npm install <包名> --workspace=fontend`；共享工具用根目录 devDependencies。`node_modules/` 可由 npm 提升至根目录，这是 workspace 的正常布局。
+根目录 npm workspaces 只包含 `fontend/`。直接执行 `npm run dev` 时，前端会连接 `http://127.0.0.1:8000` 的 API；使用 `python dev.py` 可同时启动全部服务。需要体验原有纯前端合成数据模式时，在 `fontend/.env.local` 写入 `VITE_API_MODE=mock`，再启动前端。单独运行现有 Mock 浏览器回归用 `npm run test:e2e`；真实前后端浏览器联调用 `npm run test:e2e -- --config=playwright.real.config.ts`（在 `fontend/` 目录）。Windows 测试默认使用已安装的 Edge，可用 `PLAYWRIGHT_BROWSER_PATH` 指定其他浏览器。
 
-## 配置与文档
-
-- 环境文件放在 **`fontend/.env.local`**，参考 [`fontend/.env.example`](./fontend/.env.example)。
-- 前端说明与功能边界：[`fontend/README.md`](./fontend/README.md)。
-- 品牌图标、双主题与颜色变量：[`fontend/docs/BRAND_THEME.md`](./fontend/docs/BRAND_THEME.md)。
-- 接口联调：[`fontend/docs/INTEGRATION.md`](./fontend/docs/INTEGRATION.md)。
-- 验证记录：[`fontend/docs/VALIDATION.md`](./fontend/docs/VALIDATION.md)。
-- 开源依赖：[`fontend/THIRD_PARTY.md`](./fontend/THIRD_PARTY.md)。
-- 产品需求：[`doc/TradeWorkbench_PRD_v1.0.md`](./doc/TradeWorkbench_PRD_v1.0.md)。
-- 后端开发计划：[`后端开发计划.md`](./后端开发计划.md)。
-- 后端详细设计与前端接口映射：[`doc/TradeWorkbench_Backend_Design_v1.0.md`](./doc/TradeWorkbench_Backend_Design_v1.0.md)。
-- Agent 节点图与阶段门禁：[`doc/TradeWorkbench_Agent_Node_Graph_v1.0.md`](./doc/TradeWorkbench_Agent_Node_Graph_v1.0.md)。
-
-**业务主线：** 客户开发与询盘评估 → 需求书面确认 → 供应商核价/报价与打样 → PO/合同及付款保障核验 → 生产与验货 → 出口出运 → 收款与售后。首轮演示实现前半段及生产资料准备；通用变更机制分析任意业务变化对事实、成果、SOP 节点和门禁的影响，并引导用户逐项维护。Agent 节点和阶段门禁见后端详细设计第 12.7 节。
-
-**核心技术栈：** 已有前端为 React 19 + TypeScript + Vite 7；规划后端为 Python + FastAPI + Pydantic + SQLAlchemy/Alembic + SQLite（WAL）+ 单个独立 Worker。Agent 规划使用 LangGraph 主图与持久化检查点，按需接入 LangChain 中间件处理上下文与调用限额；结构化工具负责业务操作，核价和审批由确定性代码处理。后端是独立 Python 项目，不加入 npm workspaces。
-
-后续新增 JavaScript 共享包时，再在根 `package.json` 的 `workspaces` 中增加实际目录；当前 npm workspace 仅包含前端。
+- [产品需求](doc/TradeWorkbench_PRD_v1.0.md)
+- [后端设计](doc/TradeWorkbench_Backend_Design_v1.0.md)
+- [Agent 节点图](doc/TradeWorkbench_Agent_Node_Graph_v1.0.md)
+- [后端开发计划](后端开发计划.md)
+- [前端接口说明](fontend/docs/INTEGRATION.md)

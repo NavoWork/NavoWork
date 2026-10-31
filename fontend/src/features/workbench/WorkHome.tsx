@@ -17,7 +17,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from 'lucide-react';
-import { api } from '../../api';
+import { api, mode } from '../../api';
 import type { Inquiry, Page, Session } from '../../api/types';
 import { ErrorNotice, Loading } from '../../components/ui';
 import { caseId, calculate, initialState, usd } from './model';
@@ -109,7 +109,7 @@ export function WorkHome({
             </button>
           </div>
         </form>
-        <div className="wh-prompts">
+        {mode === 'mock' && <div className="wh-prompts">
           <span>试试演示</span>
           <button onClick={() => navigate('/workbench')}>
             <FileSpreadsheet size={13} />
@@ -126,11 +126,11 @@ export function WorkHome({
             确认 PO → 生产资料
             <ArrowRight size={11} />
           </button>
-        </div>
+        </div>}
       </section>
       <div className="wh-section-heading">
         <h2>
-          继续工作 <span>{working.length + 1}</span>
+          继续工作 <span>{working.length + (mode === 'mock' ? 1 : 0)}</span>
         </h2>
         <button onClick={() => navigate('/inquiries')}>
           查看全部询盘 <ArrowRight size={13} />
@@ -138,7 +138,7 @@ export function WorkHome({
       </div>
       <ErrorNotice error={recent.error} onRetry={() => void recent.refetch()} />
       <div className="wh-jobs">
-        <button className="wh-job wh-featured-job" onClick={() => navigate('/workbench')}>
+        {mode === 'mock' && <button className="wh-job wh-featured-job" onClick={() => navigate('/workbench')}>
           <div className="wh-job-top">
             <span className="wh-job-icon">
               <Package size={20} />
@@ -171,7 +171,7 @@ export function WorkHome({
             </span>
             <ChevronRight size={14} />
           </div>
-        </button>
+        </button>}
         {recent.isPending && <Loading label="正在读取最近工作" />}
         {working.map((inquiry, index) => (
           <button className="wh-job" key={inquiry.id} onClick={() => onOpen(inquiry)}>
@@ -221,7 +221,7 @@ export function WorkHome({
             <h2>需要我决定</h2>
             <span className="wh-small-label">你的判断，让工作继续</span>
           </div>
-          <button
+          {mode === 'mock' && <button
             className="wh-decision-row"
             onClick={() =>
               navigate(
@@ -244,7 +244,7 @@ export function WorkHome({
             </div>
             <span className="tw-chip amber">进入审核</span>
             <ArrowRight size={15} />
-          </button>
+          </button>}
           {waiting && (
             <button className="wh-decision-row" onClick={() => onOpen(waiting)}>
               <span className="wh-decision-icon neutral">
