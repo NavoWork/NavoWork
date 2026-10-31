@@ -224,7 +224,7 @@ TOOL_DESCRIPTIONS = {
     "record_order": "写入 PO、PI、卖方/银行信息、单证和付款计划，并自动计算与报价/规格的差异。双方确认保持 pending。",
     "record_payment": "写入付款节点（定金/尾款/LC）。不得标记已到账或已核验；核验由人工完成。",
     "prepare_production": "生成生产资料、T&A、QC 检查表，并返回放行缺口。只生成草稿，不能放行。",
-    "request_info": "向用户提出真正影响推进的缺项问题；调用后本轮暂停，用户回答后恢复同一任务。",
+    "request_info": "向用户提出真正影响推进的缺项问题；fields 用简短字段名（每个不超过 20 字），不要写成长句；调用后本轮暂停，用户回答后恢复同一任务。",
     "export_artifact": "导出当前最新成果为 PDF/XLSX/HTML 草稿。导出不等于批准或已发送。",
 }
 
@@ -808,8 +808,9 @@ class WorkbenchToolbox:
             return result
 
     def tool_request_info(self, args: RequestInfoArgs):
-        questions = [{"id": f"field_{index + 1}", "question": f"请补充{field}。{args.reason}".strip(), "field": field} for index, field in enumerate(args.fields)]
-        return {"status": "needs_info", "summary": "需要补充信息后继续", "questions": questions}
+        questions = [{"id": f"field_{index + 1}", "question": f"请补充{field.strip()[:40]}。", "field": field} for index, field in enumerate(args.fields)]
+        reason = f"原因：{args.reason}" if args.reason else ""
+        return {"status": "needs_info", "summary": f"需要补充 {len(questions)} 项信息后继续。{reason}", "questions": questions}
 
     def tool_export_artifact(self, args: ExportArtifactArgs):
         with self._tx(write=True) as (db, case, user, run, job):

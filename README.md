@@ -16,20 +16,33 @@ python dev.py
 
 浏览器打开 <http://127.0.0.1:5173>。演示账号为 `demo@navowork.local`，密码为 `ChangeMe123!`；可在 `backend/.env` 修改。`dev.py` 自动运行迁移、启动 API、Worker 和 real 模式前端，按 Ctrl+C 关闭。数据写在 `backend/data/`，上传原件写在 `backend/storage/`，均不纳入 Git。
 
+新询盘从侧栏“新建工作”创建；进入 Cases 后使用三栏工作台：左侧业务节点、中间成果与结构化编辑、右侧 Agent 对话。对话中的工具调用会读取项目原件、知识库和公司资产，并把结果写入对应成果版本。
+
 ## 比赛演示资料
 
-完整操作见 [演示操作手册](demo/competition_v1/演示操作手册.md)。包含5个待办场景、8篇Wiki和21份模拟原件，覆盖首次报价、彩盒变更、PO与生产资料放行、MOQ阻断和需求澄清。
+新的演示包只导入客户原件、知识库和公司资产；**不预生成需求、报价、样品、订单或生产资料**。打开 Cases 后由你指挥 Agent 逐节点推进。
 
 ```powershell
 backend/.venv/Scripts/python.exe demo/seed.py
-backend/.venv/Scripts/python.exe demo/advance.py --case de_a --step quote
 ```
 
-继续用 `--step change`、`order`，然后在界面逐项审核；`approve`、`release` 是需要操作者分别执行的模拟批准和放行命令。重复导入保留进度；重演用 `demo/seed.py --batch replay1`。导入不会提前批准或放行。所有资料仅用于演示，当前链路终点为生产资料包放行。
+会创建三条待办：
 
-画布的需求、风险、报价、回复节点及 SOP 阶段均可点击“依据现有资料生成”，选择原件和 Wiki 固定版本。对话成果在数据库留档，画布只有一个“对话成果汇总”入口。版本记录支持恢复单节点或从旧版继续编辑，恢复会创建新草稿并保留历史；业务资料面板也可恢复单份成果。
+- `inq_demo_de`：Nordlicht Outdoor 定制通勤背包，含客户询盘、两家工厂报价、包装变更、PO、样品反馈、客户确认、内部批准、付款凭据和供应商确认原件。
+- `inq_demo_mx`：Casa Verde 帆布袋试单，演示 300 件与 MOQ 500 的澄清。
+- `inq_demo_uk`：信息不足的英国促销询盘，演示先澄清再推进。
 
-演示客户已补充获客渠道、邮箱、模拟官网/LinkedIn 和待核验背景。模型配置支持 `MODEL_BASE_URL`；`APP_ENV=demo` 时模型调用失败会明确提示并降级为有限规则抽取，未知字段仍需补充。正式环境调用失败不会静默降级。
+演示路径：`询盘评估 → Tech Pack/BOM → 供应商报价与核价 → 客户报价 → 打样 → PO/PI 与付款 → 生产资料与放行`。每个节点由 Agent 通过工具读取原件、写成果或向用户提问；人工确认、付款核验和放行由界面单独记录。
+
+知识库包含 8 篇业务规则（客户评估、箱包 Tech Pack、核价、贸易术语、打样、订单/PI、生产/验货、材料参考）；Agent 会按节点加载对应 Skill。模型配置：
+
+```dotenv
+MODEL_API_KEY=...
+MODEL_NAME=gpt-6.1-sol
+MODEL_BASE_URL=https://api.tokenhubcloud.net/v1
+```
+
+未配置模型时，Agent 工具不会伪造执行结果，会明确返回 `MODEL_NOT_CONFIGURED`。
 
 ## 验证
 
@@ -40,7 +53,7 @@ npm run test
 npm run build
 ```
 
-可在 `backend/.env` 设置 `MODEL_API_KEY` 和 `MODEL_NAME` 启用模型抽取；未配置时用有限规则提取，未知字段保持待确认。正式商业批准、外部确认和生产放行由服务端门禁控制，草稿下载不表示已发送或已开工。演示账号和默认密钥仅用于本机演示，不可公开部署。
+可在 `backend/.env` 设置 `MODEL_API_KEY`、`MODEL_NAME` 和 `MODEL_BASE_URL` 启用 Agent 工具调用；未配置时不会伪造执行结果。正式商业批准、外部确认、付款核验和生产放行由服务端门禁控制，草稿下载不表示已发送或已开工。演示账号和默认密钥仅用于本机演示，不可公开部署。
 
 新增文件工具执行链见 [agent-kit/README.md](agent-kit/README.md)。设置 `AGENT_FILE_TOOLS=1` 后，对话报价/变更目标使用真实模型工具调用，读取已上传的 Case 资料及本次显式引用的画板附件，返回真实规格 DOCX、成本 XLSX、客户报价 XLSX/PDF。汇率和毛利可在对话中明确提供，例如“汇率7.20，毛利20%”。缺价先生成草稿，再通过现有澄清机制补证继续。此模式无模型配置时明确失败；确定性离线回放不代表真实 Agent 或浏览器集成已验收。
 

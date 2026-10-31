@@ -141,3 +141,31 @@ def test_new_inquiry_advances_node_by_node(client):
     final = client.get(path + "/workbench").json()
     assert final["gate"]["status"] == "passed", final["gate"]
     assert final["stages"][5]["status"] == "confirmed"
+
+
+def test_manual_edit_creates_new_revision_and_rejects_stale(client):
+    from app.core import decode
+    from app.db import SessionLocal
+    from app.models import Case, User
+    from app.workbench import append_artifact, commit_revision
+
+    base = "/api/v1/workspaces/ws_demo"
+    case = client.post(base + "/inquiries", json={"title": "手动编辑", "customer": "Test", "originalText": "3,000 bags"}).json()
+    with SessionLocal() as db:
+        row = db.get(Case, case["id"])
+        user = db.query(User).first()
+        append_artifact(db, row, "spec", {"fields": {"product": "backpack", "quantity": "3000"}, "missing": ["fabric"]}, title="规格")
+        commit_revision(db, row, "初始规格")
+        db.commit()
+    path = base + "/inquiries/" + case["id"]
+    view = client.get(path + "/workbench").json()
+    spec = view["artifacts"]["spec"]
+    assert view["case"]["currentRevision"] == 1
+    saved = client.put(path + "/workbench/artifacts/spec", json={"baseVersion": spec["version"], "content": {"fields": {"style": "commuter"}}})
+    assert saved.status_code == 200, saved.text
+    updated = client.get(path + "/workbench").json()
+    assert updated["case"]["currentRevision"] == 2
+    assert updated["artifacts"]["spec"]["version"] == 2
+    assert updated["artifacts"]["spec"]["content"]["fields"]["product"] == "backpack"
+    stale = client.put(path + "/workbench/artifacts/spec", json={"baseVersion": 1, "content": {"fields": {"style": "travel"}}})
+    assert stale.status_code == 409

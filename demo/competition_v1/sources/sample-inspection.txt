@@ -1,8 +1,0 @@
-SIMULATED SAMPLE INSPECTION / SMP-DE-CB02
-Specification: BP-DE-3000 final color-box specification; seal DEMO-SEAL-02.
-Dimensions 45 x 30 x 15 cm, tolerance +/-1 cm: simulation check passed.
-Black 600D shell / 210D lining; 15.6-inch sleeve; 2 mesh pockets: matches supplied specification.
-White embroidered logo 50 x 20 mm; CB-02 color box 48 x 33 x 18 cm: simulation check passed.
-Workmanship, zipper travel, straps and packaging fit: inspected in the fictional scenario.
-Inspection standard: General II, major AQL2.5/minor4.0/critical0 as agreed, not a certification claim.
-Customer approval must be recorded separately using customer-final-approval.eml.

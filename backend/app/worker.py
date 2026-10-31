@@ -35,6 +35,7 @@ def run_view(run: Run) -> dict:
         value["clarification"] = decode(run.payload)["clarification"]
     value["completedPhases"] = decode(run.payload).get("completedPhases", [])
     value["fileOutputs"] = decode(run.payload).get("fileOutputs", [])
+    value["node"] = decode(run.payload).get("agentNode")
     value["agentVerification"] = decode(run.payload).get("agentVerification")
     return value
 

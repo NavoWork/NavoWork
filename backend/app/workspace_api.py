@@ -280,10 +280,23 @@ def canvas_file(db, user, case, file_id):
 
 def skill_market(db):
     enabled = {item_view(r)["id"]: item_view(r)["enabled"] for r in items(db, "capability")}
-    return {"items": [
-        {"id": "requirements", "tab": "skills", "name": "询盘需求分析", "description": "提取包袋规格、生成需求草稿与缺项清单。", "category": "外贸", "tags": ["LangGraph", "人工复核"], "includes": ["需求分析", "澄清与恢复", "固定输入版本"], "status": "available" if enabled.get("agent", True) else "disabled"},
-        {"id": "costing", "tab": "skills", "name": "供应商核价", "description": "使用供应商原件和明确成本条件计算报价草稿。", "category": "外贸", "tags": ["确定性计算"], "includes": ["成本核算", "报价草稿"], "status": "available" if enabled.get("agent", True) and enabled.get("costing", True) else "disabled"},
-        {"id": "changes", "tab": "skills", "name": "SOP 变更分析", "description": "定位受影响的流程节点，生成待复核版本。", "category": "外贸", "tags": ["版本追踪"], "includes": ["影响分析", "节点维护"], "status": "available" if enabled.get("agent", True) else "disabled"},
-        {"id": "logistics", "tab": "plugins", "name": "物流连接器", "description": "尚未接入物流服务，当前不执行运单查询。", "category": "连接器", "tags": ["规划中"], "includes": [], "status": "planned"},
-        {"id": "bags", "tab": "suites", "name": "包袋外贸工作流", "description": "询盘、需求、报价、样品、订单与生产资料草稿。", "category": "业务套件", "tags": ["SQLite", "LangGraph"], "includes": ["询盘画板", "知识与资产库", "业务审批工作台"], "status": "available" if enabled.get("agent", True) else "disabled"}
-    ]}
+    agent_ok = enabled.get("agent", True)
+    skills = [
+        ("inquiry-assessment", "客户与询盘评估", "核验客户背景、渠道、采购条件，输出待确认项与跟进建议。", ["客户档案", "风险核验"], ["客户背景", "询盘缺项", "跟进建议"]),
+        ("requirements-techpack", "箱包 Tech Pack", "把客户要求整理成可询价、可打样、可生产的规格与 BOM。", ["Tech Pack", "BOM"], ["款式结构", "材料辅料", "包装与验货"]),
+        ("costing-quotation", "核价与报价", "归一化多家供应商报价，用确定性工具核价并生成客户报价。", ["多供应商", "确定性计算"], ["成本行", "供应商比较", "报价条款"]),
+        ("sample-management", "打样与样品确认", "记录样品轮次、费用、寄样、检查、反馈和客户批准。", ["样品台账", "批准证据"], ["开发样", "确认样", "产前样"]),
+        ("order-confirmation", "PO 与 PI", "核对 PO 差异，形成 PI 草稿、双方确认与付款计划。", ["PO 差异", "付款计划"], ["PI", "合同条款", "付款保障"]),
+        ("production-release", "生产资料与验货", "生成生产资料、T&A、QC 检查表并检查放行缺口。", ["生产包", "放行门禁"], ["BOM", "T&A", "QC"]),
+        ("change-impact", "变更影响", "客户/供应商变更后的影响分析与联动修订。", ["版本追踪", "联动"], ["影响清单", "新草稿", "重审提示"]),
+    ]
+    items_out = [
+        {"id": key, "tab": "skills", "name": name, "description": description, "category": "外贸业务流程", "tags": tags, "includes": includes, "status": "available" if agent_ok and (key != "costing-quotation" or enabled.get("costing", True)) else "disabled"}
+        for key, name, description, tags, includes in skills
+    ]
+    items_out += [
+        {"id": "mail-connector", "tab": "plugins", "name": "邮件连接器", "description": "将客户往来邮件带入项目；当前以原件上传为主。", "category": "连接器", "tags": ["邮件"], "includes": ["导入邮件", "关联询盘"], "status": "planned"},
+        {"id": "excel-connector", "tab": "plugins", "name": "Excel 读取", "description": "读取供应商报价与订单明细。", "category": "连接器", "tags": ["XLSX"], "includes": ["报价表", "订单明细"], "status": "available"},
+        {"id": "bag-export", "tab": "suites", "name": "包袋出口全流程", "description": "询盘、规格、报价、打样、订单、生产准备的连续工作台。", "category": "业务套件", "tags": ["LangGraph", "证据链"], "includes": ["Agent 工具", "版本与门禁", "知识/资产库"], "status": "available" if agent_ok else "disabled"},
+    ]
+    return {"items": items_out}

@@ -355,8 +355,14 @@ def order_diff(order: dict | None, quotation: dict | None, spec: dict | None) ->
             status = "missing"
         elif baseline in (None, ""):
             status = "review"
+        elif str(actual) == str(baseline):
+            status = "match"
+        elif field in ("paymentTerms", "deliveryDate"):
+            # Free-text clauses are rarely worded identically across PO and
+            # quotation. Flag them for human review instead of a hard conflict.
+            status = "review"
         else:
-            status = "match" if str(actual) == str(baseline) else "conflict"
+            status = "conflict"
         result.append({"field": field, "po": actual, "baseline": baseline, "status": status})
     return result
 

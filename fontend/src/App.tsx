@@ -33,7 +33,7 @@ import { api, mode, setMockFault } from './api';
 import type { Inquiry, Session } from './api/types';
 import { ErrorNotice, IconButton, Loading, Modal } from './components/ui';
 import { CreateInquiry } from './features/CreateInquiry';
-import { InquiryWorkspace } from './features/InquiryWorkspace';
+import { InquiryWorkbench } from './features/workbench-v2/InquiryWorkbench';
 import { WorkHome } from './features/workbench/WorkHome';
 import { BrandMark } from './components/BrandMark';
 import { ThemeSwitch } from './theme/ThemeSwitch';
@@ -595,7 +595,7 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
           {tabs.map((t) => (
             <div key={t.id} hidden={id !== t.id} className="inquiry-mount">
               <FeatureBoundary>
-                <InquiryWorkspace inquiryId={t.id} session={session} onChanged={changed} />
+                <InquiryWorkbench inquiryId={t.id} session={session} onChanged={changed} />
               </FeatureBoundary>
             </div>
           ))}

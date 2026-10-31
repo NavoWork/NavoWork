@@ -254,6 +254,8 @@ def release_gate(db: Session, case: Case) -> dict:
             gap("QUOTE_NOT_APPROVED", "报价尚未获得内部商业批准", "costing")
     if not sample:
         gap("SAMPLE_MISSING", "尚未记录样品", "sample")
+    elif sample.get("content", {}).get("specVersionId") != (spec or {}).get("itemId"):
+        gap("SAMPLE_SPEC_STALE", "样品批准的规格版本已不是当前规格", "sample")
     elif not _approval_for(db, case, "sample_approval", sample):
         gap("SAMPLE_NOT_APPROVED", "最终样品尚未获得客户书面批准", "sample")
     if not order:
@@ -274,6 +276,12 @@ def release_gate(db: Session, case: Case) -> dict:
     if not production:
         gap("PRODUCTION_MISSING", "尚未生成生产资料", "production")
     else:
+        if production.get("content", {}).get("specVersionId") != (spec or {}).get("itemId"):
+            gap("PRODUCTION_SPEC_STALE", "生产资料引用的规格版本已不是当前规格", "production")
+        if production.get("content", {}).get("sampleVersionId") and production.get("content", {}).get("sampleVersionId") != (sample or {}).get("itemId"):
+            gap("PRODUCTION_SAMPLE_STALE", "生产资料引用的样品版本已不是当前样品", "production")
+        if production.get("content", {}).get("orderVersionId") != (order or {}).get("itemId"):
+            gap("PRODUCTION_ORDER_STALE", "生产资料引用的订单版本已不是当前订单", "production")
         if not _approval_for(db, case, "supplier_production_confirmation", production):
             gap("SUPPLIER_NOT_CONFIRMED", "供应商生产条件尚未确认", "production")
     if open_changes(db, case):
@@ -340,7 +348,8 @@ def stage_state(db: Session, case: Case) -> list[dict]:
                 artifacts.append(profile["itemId"])
             if assessment:
                 artifacts.append(assessment["itemId"])
-            profile_data = (profile or {}).get("profile") or {}
+            context = decode(case.payload).get("customerContext") or {}
+            profile_data = {**context, **((profile or {}).get("profile") or {})}
             assessment_data = (assessment or {}).get("content") or {}
             missing = [
                 label
@@ -351,9 +360,8 @@ def stage_state(db: Session, case: Case) -> list[dict]:
                 )
                 if not value
             ]
-            needed = assessment_data.get("missing") or []
             summary = " · ".join(part for part in (profile_data.get("company"), profile_data.get("country")) if part)
-            status = _status("draft" if profile or assessment else "empty", [*missing, *needed], False)
+            status = _status("draft" if profile or assessment or context else "empty", missing, False)
             action = "核对客户背景，整理询盘关键信息与待确认项"
         elif key == "requirements":
             if spec:
@@ -401,6 +409,12 @@ def stage_state(db: Session, case: Case) -> list[dict]:
             buyer = bool(order and _approval_for(db, case, "order_buyer_confirmation", order))
             seller = bool(order and _approval_for(db, case, "order_seller_confirmation", order))
             paid = bool(payment and _approval_for(db, case, "payment_verification", payment))
+            if order and not buyer:
+                missing.append("买方确认")
+            if order and not seller:
+                missing.append("卖方确认")
+            if payment and not paid:
+                missing.append("付款核验")
             confirmed = buyer and seller and paid
             status = _status("draft" if (order or payment) else "empty", missing, confirmed)
             summary = " · ".join(part for part in ((content.get("po") or {}).get("number"), (content.get("pi") or {}).get("number")) if part)
@@ -409,10 +423,7 @@ def stage_state(db: Session, case: Case) -> list[dict]:
             for item in (production, ta, qc):
                 if item:
                     artifacts.append(item["itemId"])
-            content = (production or {}).get("content") or {}
             missing = [gap["message"] for gap in gate["missing"] if gap["stage"] == "production"]
-            if production and not (content.get("release") or {}).get("status") == "released":
-                missing = missing or ["生产资料包尚未放行"]
             confirmed = bool(production and _approval_for(db, case, "production_release", production))
             status = _status("draft" if production else "empty", missing, confirmed)
             summary = "生产资料、T&A 与验货标准" if production else ""
@@ -462,11 +473,33 @@ def _customer_context(case: Case, profile: dict | None) -> dict:
     }
 
 
+def next_stage_action(stages: list[dict]) -> str:
+    priority = {"blocked": 0, "draft": 1, "empty": 2, "ready": 3, "confirmed": 4, "locked": 5}
+    core = [stage for stage in stages if stage["key"] in ("inquiry", "requirements", "costing", "sample", "order", "production")]
+    ordered = sorted(core, key=lambda stage: (priority.get(stage["status"], 9), core.index(stage)))
+    for stage in ordered:
+        if stage["status"] not in ("confirmed", "locked"):
+            return stage["nextAction"]
+    return "完成当前业务"
+
+
 def workbench_view(db: Session, case: Case, user: User) -> dict:
     latest = latest_artifacts(db, case)
     profile = latest_customer_profile(db, case)
     stages = stage_state(db, case)
     payload = decode(case.payload)
+    role_order = {
+        "customer_request": 0,
+        "customer_change": 1,
+        "supplier_quote": 2,
+        "customer_po": 3,
+        "sample_inspection": 4,
+        "customer_approval": 5,
+        "supplier_confirmation": 6,
+        "payment_receipt": 7,
+        "internal_note": 8,
+        "shipping_document": 9,
+    }
     evidence = [
         {
             "id": row.id,
@@ -477,7 +510,10 @@ def workbench_view(db: Session, case: Case, user: User) -> dict:
             "text": (value.get("text") or "")[:4000],
             "createdAt": value.get("createdAt"),
         }
-        for row in items(db, "evidence", case_id=case.id)
+        for row in sorted(
+            items(db, "evidence", case_id=case.id),
+            key=lambda row: (role_order.get(item_view(row).get("sourceRole"), 20), row.created_at, row.id),
+        )
         for value in [item_view(row)]
     ]
     knowledge = []
@@ -525,7 +561,7 @@ def workbench_view(db: Session, case: Case, user: User) -> dict:
             "sampleChecks": SAMPLE_CHECKS,
             "sampleTypes": SAMPLE_TYPES,
         },
-        "nextAction": next((stage["nextAction"] for stage in stages if stage["status"] not in ("confirmed", "locked")), "完成当前业务"),
+        "nextAction": next_stage_action(stages),
     }
 
 

@@ -410,7 +410,7 @@ def create_run(request: Request, db: Session, user: User, case: Case, body: dict
         context.update(agentFileTools=True, agentFacts=facts, agentMessages=[instruction])
         case.payload = encode({**decode(case.payload), "agentFacts": facts})
     job = Job(id=uid("job"), case_id=case.id, kind=kind, goal=instruction, graph_version="workbench-v2" if agent_mode else "sop-v2", payload=encode({**context, "inputRefs": body.get("inputRefs", []), "costInputs": cost_inputs, "selectedSupplierOfferId": selected_offer_id, "changeSetId": body.get("changeSetId"), "interactive": interactive, "generationTarget": generation_target, "agentMode": agent_mode, "agentNode": body.get("agentNode")}))
-    run = Run(id=uid("run"), job_id=job.id, case_id=case.id, base_revision=base_revision, action=action, instruction=instruction, payload=encode({"assetVersionIds": body.get("assetVersionIds", [])}))
+    run = Run(id=uid("run"), job_id=job.id, case_id=case.id, base_revision=base_revision, action=action, instruction=instruction, payload=encode({"assetVersionIds": body.get("assetVersionIds", []), "agentNode": body.get("agentNode")}))
     db.add(job)
     db.flush()
     db.add(run)
