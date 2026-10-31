@@ -1,0 +1,268 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "order-skills/sample-feedback/output (domain data only)",
+  "$ref": "#/$defs/sampleResult",
+  "$defs": {
+    "sampleResult": {
+      "type": "object",
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sample_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "spec_version_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "response_kind": {
+          "enum": [
+            "full",
+            "partial",
+            "conditional",
+            "rejected",
+            "unknown"
+          ]
+        },
+        "sample_approval_supported": {
+          "type": "boolean"
+        },
+        "approval_scope": {
+          "const": "sample_review_only"
+        },
+        "feedback": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/feedback"
+          }
+        },
+        "modifications": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/modification"
+          }
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "response": {
+          "$ref": "#/$defs/statement"
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/finding"
+          }
+        },
+        "production_release": {
+          "const": "not_evaluated"
+        }
+      },
+      "required": [
+        "case_id",
+        "sample_id",
+        "spec_version_id",
+        "response_kind",
+        "sample_approval_supported",
+        "approval_scope",
+        "feedback",
+        "modifications",
+        "conditions",
+        "response",
+        "findings",
+        "production_release"
+      ],
+      "additionalProperties": false
+    },
+    "feedback": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requested_change": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/evidence"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "field",
+        "observation"
+      ],
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "object",
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "locator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quote": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "modification": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requested_change": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/evidence"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sample_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "spec_version_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "const": "proposed_requires_review"
+        }
+      },
+      "required": [
+        "sample_id",
+        "spec_version_id",
+        "field",
+        "observation",
+        "requested_change",
+        "evidence",
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "statement": {
+      "type": "object",
+      "properties": {
+        "decision": {
+          "enum": [
+            "full",
+            "partial",
+            "conditional",
+            "rejected",
+            null
+          ]
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sample_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/evidence"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "finding": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "enum": [
+            "review",
+            "block",
+            "info"
+          ]
+        }
+      },
+      "required": [
+        "code",
+        "path",
+        "message",
+        "severity"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

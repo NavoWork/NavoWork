@@ -1,0 +1,35 @@
+{
+  "case_id": "BAG-2026-DE-001",
+  "sample_id": "S03",
+  "spec_version_id": "spec-v3",
+  "response": {
+    "decision": "conditional",
+    "conditions": [
+      "Review revised 60 mm logo and physical color-box sample"
+    ],
+    "scope": "sample",
+    "version_id": "spec-v3",
+    "sample_id": "S03",
+    "evidence": {
+      "case_id": "BAG-2026-DE-001",
+      "source_id": "synthetic-source",
+      "locator": "body:paragraph-1",
+      "quote": "SIMULATED: We approve sample S03 against spec-v3.",
+      "role": "customer_approval"
+    }
+  },
+  "feedback": [
+    {
+      "field": "logo.width_mm",
+      "observation": "SIMULATED: 50 mm on submitted sample",
+      "requested_change": "Propose 60 mm and obtain new sample review",
+      "evidence": {
+        "case_id": "BAG-2026-DE-001",
+        "source_id": "synthetic-source",
+        "locator": "body:paragraph-1",
+        "quote": "SIMULATED: We approve sample S03 against spec-v3.",
+        "role": "customer_approval"
+      }
+    }
+  ]
+}

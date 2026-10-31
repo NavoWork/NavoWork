@@ -1,0 +1,22 @@
+{
+  "id": "navowork.order-skills",
+  "version": "0.1.0",
+  "resource_kind": "product_skills",
+  "personal_install": false,
+  "integration_status": "independently_tested_host_registration_pending",
+  "entrypoint": "order_skills.adapter:run",
+  "host_contracts": ["ExecutionContext", "FileRef", "Citation", "ToolResult"],
+  "contract_binding": "host_injected_provisional_port_no_shared_abi_claim",
+  "required_capabilities": ["case.read", "sources.read", "artifacts.read_version"],
+  "conditional_capabilities": {
+    "raw_source_parsing": ["sources.parse"],
+    "document_draft": ["artifacts.create_draft", "files.create_document_draft"]
+  },
+  "side_effects": "none_without_explicit_host_document_draft_call",
+  "protected_actions": [],
+  "skills": [
+    {"id": "sample-feedback", "resource": "skills/sample-feedback/SKILL.md", "operation": "sample_feedback", "function": "order_skills.domain:review_sample", "input_schema": "skills/sample-feedback/input.schema.json", "data_schema": "skills/sample-feedback/output.schema.json"},
+    {"id": "po-check", "resource": "skills/po-check/SKILL.md", "operation": "po_check", "function": "order_skills.domain:compare_po", "input_schema": "skills/po-check/input.schema.json", "data_schema": "skills/po-check/output.schema.json"},
+    {"id": "pi-prepare", "resource": "skills/pi-prepare/SKILL.md", "operation": "pi_prepare", "function": "order_skills.domain:prepare_pi", "input_schema": "skills/pi-prepare/input.schema.json", "data_schema": "skills/pi-prepare/output.schema.json"}
+  ]
+}

@@ -1,0 +1,3 @@
+# Optional validation only; production domain functions use Python stdlib.
+jsonschema==4.25.1
+pypdf==6.10.0

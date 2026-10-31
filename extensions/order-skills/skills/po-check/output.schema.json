@@ -1,0 +1,454 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "order-skills/po-check/output (domain data only)",
+  "$ref": "#/$defs/poResult",
+  "$defs": {
+    "poResult": {
+      "type": "object",
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "basis": {
+          "$ref": "#/$defs/basis"
+        },
+        "differences": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/difference"
+          }
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/finding"
+          }
+        },
+        "po": {
+          "$ref": "#/$defs/document"
+        },
+        "baseline_document": {
+          "$ref": "#/$defs/document"
+        },
+        "comparison_complete": {
+          "type": "boolean"
+        },
+        "order_execution_authorized": {
+          "const": false
+        }
+      },
+      "required": [
+        "case_id",
+        "basis",
+        "differences",
+        "findings",
+        "po",
+        "baseline_document",
+        "comparison_complete",
+        "order_execution_authorized"
+      ],
+      "additionalProperties": false
+    },
+    "basis": {
+      "type": "object",
+      "properties": {
+        "version_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "draft",
+            "reviewed",
+            "released",
+            "superseded"
+          ]
+        },
+        "customer_acceptance_supported": {
+          "type": "boolean"
+        },
+        "customer_acceptance": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/statement"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "version_id",
+        "status",
+        "customer_acceptance_supported",
+        "customer_acceptance"
+      ],
+      "additionalProperties": false
+    },
+    "statement": {
+      "type": "object",
+      "properties": {
+        "decision": {
+          "enum": [
+            "full",
+            "partial",
+            "conditional",
+            "rejected",
+            null
+          ]
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sample_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/evidence"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "object",
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "locator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quote": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "difference": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "po": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "baseline": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "path",
+        "po",
+        "baseline"
+      ],
+      "additionalProperties": false
+    },
+    "finding": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "enum": [
+            "review",
+            "block",
+            "info"
+          ]
+        }
+      },
+      "required": [
+        "code",
+        "path",
+        "message",
+        "severity"
+      ],
+      "additionalProperties": false
+    },
+    "document": {
+      "type": "object",
+      "properties": {
+        "buyer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "seller": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "total_quantity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "total_amount": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "currency": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "incoterm": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "named_place": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "incoterms_edition": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payment_terms": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "spec_version_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "delivery_terms": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lines": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/line"
+          }
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "field": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "raw": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evidence": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/evidence"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "line": {
+      "type": "object",
+      "properties": {
+        "line_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sku": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "quantity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unit_price": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "amount": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "line_id"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
