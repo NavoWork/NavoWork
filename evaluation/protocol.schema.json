@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:navowork:evaluation:protocol:1",
+  "title": "Independent evaluator envelope; not shared product contracts",
+  "oneOf": [{"$ref": "#/$defs/request"}, {"$ref": "#/$defs/response"}],
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "ref": {
+      "type": "object", "required": ["id", "version"],
+      "properties": {"id": {"type": "string", "minLength": 1}, "version": {"type": "integer", "minimum": 1}}
+    },
+    "file": {
+      "type": "object", "required": ["path", "sha256", "bytes"],
+      "properties": {"path": {"type": "string", "pattern": "^outputs/"}, "sha256": {"$ref": "#/$defs/sha256"}, "bytes": {"type": "integer", "minimum": 0}}
+    },
+    "citation": {
+      "type": "object", "required": ["source", "sha256", "field", "locator", "excerpt"],
+      "properties": {
+        "source": {"$ref": "#/$defs/ref"}, "sha256": {"$ref": "#/$defs/sha256"},
+        "field": {"const": "cost_cny"}, "excerpt": {"type": "string", "minLength": 1},
+        "locator": {"type": "object", "required": ["type"], "properties": {"type": {"enum": ["text", "xlsx", "pdf"]}}}
+      }
+    },
+    "request": {
+      "type": "object", "required": ["protocol", "run_id", "case_id", "workspace", "inputs", "operations", "instruction", "host"],
+      "additionalProperties": false,
+      "properties": {
+        "protocol": {"const": "navowork-eval/1"}, "run_id": {"type": "string"}, "case_id": {"type": "string"}, "workspace": {"type": "string"},
+        "instruction": {"type": "string"},
+        "inputs": {"type": "array", "items": {
+          "type": "object", "required": ["id", "version", "case_id", "name", "role", "sha256", "path"],
+          "properties": {"id": {"type": "string"}, "version": {"type": "integer", "minimum": 1}, "case_id": {"type": "string"},
+            "name": {"type": "string"}, "role": {"type": "string"}, "sha256": {"$ref": "#/$defs/sha256"},
+            "path": {"type": "string", "pattern": "^inputs/"}, "data_base64": {"type": "string"}}
+        }},
+        "operations": {"type": "array", "minItems": 1, "items": {
+          "type": "object", "required": ["action"], "properties": {
+            "action": {"enum": ["quote", "quote_change", "read", "inspect_requirements", "approve_sample", "read_artifact", "export", "send", "inspect_untrusted"]},
+            "source": {"$ref": "#/$defs/ref"}, "idempotency_key": {"type": "string"},
+            "quantity": {"type": "integer", "minimum": 1}, "fx": {"type": "string"}, "margin": {"type": "string"},
+            "step": {"type": "integer", "minimum": 0}, "audience": {"const": "customer"},
+            "formats": {"type": "array", "items": {"enum": ["html", "zip", "pdf"]}}, "faults": {"type": "object"}
+          }
+        }},
+        "host": {"type": "object", "required": ["permissions", "connectors", "approval_grants"],
+          "properties": {"permissions": {"type": "array", "items": {"type": "string"}}, "connectors": {"type": "array"}, "approval_grants": {"type": "array"}}}
+      }
+    },
+    "response": {
+      "type": "object", "required": ["protocol", "run_id", "case_id", "execution", "steps", "events"],
+      "properties": {
+        "protocol": {"const": "navowork-eval/1"}, "run_id": {"type": "string"}, "case_id": {"type": "string"},
+        "execution": {"type": "object", "required": ["kind"], "properties": {"kind": {"enum": ["offline", "real_model"]}}},
+        "steps": {"type": "array", "items": {"type": "object", "required": ["status"], "properties": {
+          "status": {"enum": ["draft", "blocked", "denied", "conflict", "ready", "partial", "failed"]},
+          "artifact": {"allOf": [{"$ref": "#/$defs/file"}, {"type": "object", "required": ["id", "version"]}]},
+          "citations": {"type": "array", "items": {"$ref": "#/$defs/citation"}},
+          "file": {"$ref": "#/$defs/file"}, "exports": {"type": "array", "items": {"$ref": "#/$defs/file"}}
+        }}},
+        "events": {"type": "array", "items": {"type": "object", "required": ["seq", "type", "run_id", "step"],
+          "properties": {"seq": {"type": "integer", "minimum": 1}, "run_id": {"type": "string"}, "step": {"type": ["integer", "null"]},
+            "type": {"enum": ["run_started", "operation_started", "file_read", "artifact_written", "artifact_read", "idempotency_replay", "access_denied", "export_ready", "export_failed", "operation_finished", "run_finished", "model_call"]}}}},
+        "output_files": {"type": "array", "items": {"type": "object", "required": ["path", "data_base64"],
+          "properties": {"path": {"type": "string", "pattern": "^outputs/"}, "data_base64": {"type": "string"}}}}
+      }
+    }
+  }
+}

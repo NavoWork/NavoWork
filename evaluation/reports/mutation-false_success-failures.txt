@@ -1,0 +1,12 @@
+E09 step=1 [STATUS_MISMATCH] expected partial, got ready
+E10 step=0 [STATUS_MISMATCH] expected blocked, got ready
+E10 step=0 [FALSE_SEND_SUCCESS] sent_at must explicitly be null
+PRECONDITION [FIXTURE_HASH_MISMATCH] test/inputs/BAG-2026-DE-001/factory-B-quote.pdf
+PRECONDITION [FIXTURE_HASH_MISMATCH] test/inputs/BAG-2026-DE-001/po-correct.pdf
+PRECONDITION [FIXTURE_HASH_MISMATCH] test/inputs/BAG-2026-DE-001/po-conflict.pdf
+PRECONDITION [FIXTURE_HASH_MISMATCH] test/inputs/BAG-2026-DE-002/supplier-incomplete.pdf
+PRECONDITION [FIXTURE_HASH_MISMATCH] test/inputs/BAG-2026-DE-003/supplier-reply.pdf
+PRECONDITION [FIXTURE_HASH_MISMATCH] test/core15/evidence/original-inquiry.eml
+PRECONDITION [FIXTURE_HASH_MISMATCH] test/core15/evidence/original-change-color-box.eml
+PRECONDITION [FIXTURE_HASH_MISMATCH] test/core15/evidence/original-customer-conditional-confirmation.eml
+NOT_ACCEPTED [MAIN_CHAIN_BLOCKED] Real Agent/Worker integration and independent model/visual evidence are pending.

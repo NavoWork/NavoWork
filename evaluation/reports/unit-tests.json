@@ -1,0 +1,27 @@
+{
+  "schema": "navowork-evaluation-unit-tests/1",
+  "tests": 21,
+  "failures": 0,
+  "errors": 0,
+  "elapsed_seconds": 7.562,
+  "successful": true,
+  "implementation_files": {
+    "evaluation/__init__.py": "e1e754a7746ab8a984a51b5ab98c0a9e7faab0eb07ac3025c0e3cc109327ba30",
+    "evaluation/__main__.py": "ecec6233eab76cd4825459860db3eaa3518230d0e1a43473ad924f9b95c45f95",
+    "evaluation/adapters.py": "0ade74b750b0ebc11629993c4d4d7e48942b13d388224a3b9236d0cf2c6fcafc",
+    "evaluation/backend_probe.py": "1f9ae8b3a6db9c03a782fd7960904fa8ecba364d8de39bace6c2e332a45c09b5",
+    "evaluation/checker.py": "061a9ea4945e18e86a3057101287833f910628d80e195f5b879cf8e328b9689f",
+    "evaluation/fixture_audit.py": "bd3d0f3618167a6897ad365dd3b5cf7d33b6a941bbb5a8fa022f1ce545608b4c",
+    "evaluation/inspection.py": "fd1312d5a8e5770455dc3ae50d65b6eb3cb374411260056a8b38e2e33540a0fb",
+    "evaluation/mutants.py": "9dd18a931877c5988134662f43492849c92c882e59843774b2f3054b52257536",
+    "evaluation/reference_adapter.py": "726bfe91ea04f16010a7337400a0c36cbd80110edfe6e98fb93991c57b1a06c1",
+    "evaluation/runner.py": "dfc206ea04f1be20a9b100fa9af427e3b6977e67716a27a107d004d3b961756b",
+    "evaluation/selftest.py": "93b3b5cd7fac15e0154fda486166bffff671dce5b5758f22740fb839ca3bfefc",
+    "evaluation/stdio_adapter.py": "be0fdd353c105c0f771ddd1a2b124fe8f9ba5abd4bf5b43088d61a85988459bf",
+    "evaluation/suite.py": "6e26172f70d082b7f3b16250da816f528765cd5c69731d3248fce0e24c742d76",
+    "evaluation/tests/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "evaluation/tests/test_evaluation.py": "f0e9a5ab4cf1a00281c6d6c93993b70d56be30789228df8f8bc06aa73476a1ef"
+  },
+  "real_model_executed": false,
+  "file_visual_review": "not_performed"
+}

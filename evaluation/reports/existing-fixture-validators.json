@@ -1,0 +1,17 @@
+{
+  "read_only": true,
+  "commands": [
+    {
+      "command": "python test/scripts/validate_fixtures.py",
+      "exit_code": 1,
+      "stdout": "FAIL\n - source SHA-256 mismatch: BAG-2026-DE-001/factory-B-quote.pdf\n - source SHA-256 mismatch: BAG-2026-DE-001/po-correct.pdf\n - source SHA-256 mismatch: BAG-2026-DE-001/po-conflict.pdf\n - source SHA-256 mismatch: BAG-2026-DE-002/supplier-incomplete.pdf\n - source SHA-256 mismatch: BAG-2026-DE-003/supplier-reply.pdf\n",
+      "stderr": "incorrect startxref pointer(1)\nparsing for Object Streams\nincorrect startxref pointer(1)\nparsing for Object Streams\nincorrect startxref pointer(1)\nparsing for Object Streams\nincorrect startxref pointer(1)\nparsing for Object Streams\nincorrect startxref pointer(1)\nparsing for Object Streams\nincorrect startxref pointer(1)\nparsing for Object Streams\nincorrect startxref pointer(1)\nparsing for Object Streams\nincorrect startxref pointer(1)\nparsing for Object Streams\nincorrect startxref pointer(1)\nparsing for Object Streams\nincorrect startxref pointer(1)\nparsing for Object Streams\nincorrect startxref pointer(1)\nparsing for Object Streams\nincorrect startxref pointer(1)\nparsing for Object Streams\nincorrect startxref pointer(1)\nparsing for Object Streams\nincorrect startxref pointer(1)\nparsing for Object Streams\nincorrect startxref pointer(1)\nparsing for Object Streams\nincorrect startxref pointer(1)\nparsing for Object Streams\nincorrect startxref pointer(1)\nparsing for Object Streams\nincorrect startxref pointer(1)\nparsing for Object Streams\nincorrect startxref pointer(1)\nparsing for Object Streams\nincorrect startxref pointer(1)\nparsing for Object Streams\nincorrect startxref pointer(1)\nparsing for Object Streams\n"
+    },
+    {
+      "command": "python test/scripts/validate_core15.py",
+      "exit_code": 1,
+      "stdout": "FAIL: core15 fixture consistency\n - evidence digest mismatch original-inquiry.eml\n - evidence digest mismatch original-change-color-box.eml\n - evidence digest mismatch original-customer-conditional-confirmation.eml\n",
+      "stderr": ""
+    }
+  ]
+}
