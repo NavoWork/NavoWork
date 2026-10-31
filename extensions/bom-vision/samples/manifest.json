@@ -1,0 +1,37 @@
+{
+  "clear": {
+    "image": "clear.jpg",
+    "sha256": "b2444d6d13436fec7ea01e88356838a7ce62250de6d970818608fedd8d52297d",
+    "fake_response": "clear.fake.json",
+    "expected_quantity": "2.50",
+    "expected_total": "36.00"
+  },
+  "missing_price": {
+    "image": "missing_price.png",
+    "sha256": "0ab4eea80b2f84f9bdb1b744c96af6a3817ac61f857733e69ec1e301d638aa27",
+    "fake_response": "missing_price.fake.json",
+    "expected_quantity": "2.50",
+    "expected_total": "36.00"
+  },
+  "blurry_digit": {
+    "image": "blurry_digit.png",
+    "sha256": "73b1ddc338909aab2bccb46f120a6272e362ac5aee11d95693f2afe4673e34bc",
+    "fake_response": "blurry_digit.fake.json",
+    "expected_quantity": null,
+    "expected_total": "36.00"
+  },
+  "total_conflict": {
+    "image": "total_conflict.png",
+    "sha256": "78f00ddd583632420f2e7260ce16ad480caa7e679e1d6d2b91e9e6aa1833a6fb",
+    "fake_response": "total_conflict.fake.json",
+    "expected_quantity": "2.50",
+    "expected_total": "39.00"
+  },
+  "changed_number": {
+    "image": "changed_number.png",
+    "sha256": "57e80215e164b0d65030d9b961766db3d3aa18277942d6908502c5b288f2c315",
+    "fake_response": "changed_number.fake.json",
+    "expected_quantity": "3.50",
+    "expected_total": "48.00"
+  }
+}

@@ -1,0 +1,5 @@
+[
+  {"row_id": "row-1", "field": "quantity", "value": "3.50"},
+  {"row_id": "row-1", "field": "subtotal", "value": "42.00"},
+  {"row_id": null, "field": "table_total", "value": "48.00"}
+]
