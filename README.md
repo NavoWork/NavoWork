@@ -66,5 +66,13 @@ npm run test:e2e -- tests/e2e/resources.spec.ts
 - 接口联调：[`fontend/docs/INTEGRATION.md`](./fontend/docs/INTEGRATION.md)。
 - 验证记录：[`fontend/docs/VALIDATION.md`](./fontend/docs/VALIDATION.md)。
 - 开源依赖：[`fontend/THIRD_PARTY.md`](./fontend/THIRD_PARTY.md)。
+- 产品需求：[`doc/TradeWorkbench_PRD_v1.0.md`](./doc/TradeWorkbench_PRD_v1.0.md)。
+- 后端开发计划：[`后端开发计划.md`](./后端开发计划.md)。
+- 后端详细设计与前端接口映射：[`doc/TradeWorkbench_Backend_Design_v1.0.md`](./doc/TradeWorkbench_Backend_Design_v1.0.md)。
+- Agent 节点图与阶段门禁：[`doc/TradeWorkbench_Agent_Node_Graph_v1.0.md`](./doc/TradeWorkbench_Agent_Node_Graph_v1.0.md)。
 
-后续加入后端或共享包时，在根 `package.json` 的 `workspaces` 中增加实际目录；本次仅迁移已有前端。
+**业务主线：** 客户开发与询盘评估 → 需求书面确认 → 供应商核价/报价与打样 → PO/合同及付款保障核验 → 生产与验货 → 出口出运 → 收款与售后。首轮演示实现前半段及生产资料准备；通用变更机制分析任意业务变化对事实、成果、SOP 节点和门禁的影响，并引导用户逐项维护。Agent 节点和阶段门禁见后端详细设计第 12.7 节。
+
+**核心技术栈：** 已有前端为 React 19 + TypeScript + Vite 7；规划后端为 Python + FastAPI + Pydantic + SQLAlchemy/Alembic + SQLite（WAL）+ 单个独立 Worker。Agent 规划使用 LangGraph 主图与持久化检查点，按需接入 LangChain 中间件处理上下文与调用限额；结构化工具负责业务操作，核价和审批由确定性代码处理。后端是独立 Python 项目，不加入 npm workspaces。
+
+后续新增 JavaScript 共享包时，再在根 `package.json` 的 `workspaces` 中增加实际目录；当前 npm workspace 仅包含前端。
