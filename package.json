@@ -1,0 +1,22 @@
+{
+  "name": "navowork",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "fontend"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=fontend --",
+    "build": "npm run build --workspaces --if-present",
+    "preview": "npm run preview --workspace=fontend --",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:e2e": "npm run test:e2e --workspace=fontend --",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.9.10"
+  }
+}
