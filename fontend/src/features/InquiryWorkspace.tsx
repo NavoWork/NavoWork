@@ -13,6 +13,9 @@ import {
   GitBranch,
   History,
   MessageSquare,
+  PanelRightClose,
+  PanelRightOpen,
+  Paperclip,
   ShieldCheck,
   Sparkles,
   Square,
@@ -106,6 +109,8 @@ export function InquiryWorkspace({
     initial.current.selectedAssets ?? null,
   );
   const [mobilePane, setMobilePane] = useState<'chat' | 'results'>('results');
+  const [resultsOpen, setResultsOpen] = useState(true);
+  const messagesRef = useRef<HTMLDivElement>(null);
   const [modal, setModal] = useState<
     'original' | 'history' | 'waiting' | 'close' | 'accept' | 'relations' | null
   >(null);
@@ -151,6 +156,10 @@ export function InquiryWorkspace({
     retry: false,
   });
   const run = runQuery.data;
+  useEffect(() => {
+    const messages = messagesRef.current;
+    if (messages) messages.scrollTop = messages.scrollHeight;
+  }, [detail.data?.messages.length, run?.id]);
   const running = !!inquiry?.activeRunId || (!!run && ['queued', 'running'].includes(run.status));
   const readOnly =
     history ||
@@ -318,7 +327,7 @@ export function InquiryWorkspace({
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `EasyWork-${inquiryId}-V${revision.number}-草稿.html`;
+      a.download = `Navowork-${inquiryId}-V${revision.number}-草稿.html`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     });
@@ -329,20 +338,18 @@ export function InquiryWorkspace({
       <ErrorNotice error={detail.error || '未找到该询盘'} onRetry={() => void detail.refetch()} />
     );
   const canWrite = !readOnly && !busy;
+  const canSend = canWrite && (!revision || !draftsPending);
   return (
-    <div className="iw-page">
+    <div className={`iw-page ${resultsOpen ? '' : 'iw-focus-chat'}`}>
       <header className="iw-heading">
         <div>
           <div className="iw-eyebrow">
-            <span>询盘工作区</span>
-            <ChevronRight size={12} />
             <span>{inquiry.customer}</span>
           </div>
           <div className="iw-title">
             <h1>{inquiry.title}</h1>
             <StatusBadge status={inquiry.businessStatus} />
           </div>
-          <p>客户需求、方案和回复，在同一个上下文里推进。</p>
         </div>
         <div className="iw-actions">
           <button className="button" onClick={() => setModal('history')}>
@@ -353,37 +360,25 @@ export function InquiryWorkspace({
             </span>
           </button>
           <button
-            className="button button-primary"
+            className="button"
             disabled={!revision || draftsPending || busy}
             onClick={requestExport}
           >
             <Download size={14} />
             导出草稿材料
           </button>
+          <button
+            className="icon-button iw-results-toggle"
+            aria-label={resultsOpen ? '收起业务结果' : '展开业务结果'}
+            aria-expanded={resultsOpen}
+            aria-controls={`results-${inquiryId}`}
+            title={resultsOpen ? '收起业务结果' : '展开业务结果'}
+            onClick={() => setResultsOpen((value) => !value)}
+          >
+            {resultsOpen ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
+          </button>
         </div>
       </header>
-      <div className="iw-stage-bar">
-        {stages.map((label, i) => (
-          <button
-            key={label}
-            className={stage === i ? 'selected' : ''}
-            aria-pressed={stage === i}
-            onClick={() => {
-              setStage(i);
-              setTab(i);
-              setMobilePane('results');
-            }}
-          >
-            <span>0{i + 1}</span>
-            <strong>{label}</strong>
-            {i < 2 && <ChevronRight size={15} />}
-          </button>
-        ))}
-        <button className="iw-relation-button" onClick={() => setModal('relations')}>
-          <GitBranch size={14} />
-          业务关联
-        </button>
-      </div>
       <ErrorNotice
         error={error || detail.error}
         onRetry={
@@ -458,7 +453,7 @@ export function InquiryWorkspace({
             </h2>
             <span className="iw-small-label">仅当前询盘</span>
           </div>
-          <div className="iw-messages">
+          <div className="iw-messages" ref={messagesRef}>
             <button className="iw-original" onClick={() => setModal('original')}>
               <FileText size={16} />
               <div>
@@ -484,7 +479,7 @@ export function InquiryWorkspace({
             {detail.data?.messages.map((message) => (
               <article className={`iw-message ${message.role}`} key={message.id}>
                 <div className="iw-message-meta">
-                  <span>{message.role === 'user' ? '你' : 'EasyWork'}</span>
+                  <span>{message.role === 'user' ? '你' : 'Navowork'}</span>
                   <time>{date(message.createdAt)}</time>
                 </div>
                 <p>{message.text}</p>
@@ -508,7 +503,10 @@ export function InquiryWorkspace({
                     />
                   ))}
                 </div>
-                <small>runId: {run.id}</small>
+                <details className="iw-run-details">
+                  <summary>运行详情</summary>
+                  <small>runId: {run.id}</small>
+                </details>
                 {running && <p>可以切换其他询盘，结果会保存在这里。</p>}
                 {run.error && <ErrorNotice error={run.error.message} />}{' '}
                 {run.clarification?.questions.map((q) => (
@@ -549,8 +547,8 @@ export function InquiryWorkspace({
             <ErrorNotice error={runQuery.error} onRetry={() => void runQuery.refetch()} />
           </div>
           <div className="iw-composer">
-            <label htmlFor={`instruction-${inquiryId}`}>
-              补充要求或客户反馈 {input && <span>未发送 · 已在本机暂存</span>}
+            <label className="sr-only" htmlFor={`instruction-${inquiryId}`}>
+              补充要求或客户反馈
             </label>
             <textarea
               id={`instruction-${inquiryId}`}
@@ -563,21 +561,39 @@ export function InquiryWorkspace({
               onChange={(e) => setInput(e.target.value)}
               disabled={!canWrite}
               onKeyDown={(e) => {
-                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && canWrite) {
+                if (
+                  (e.metaKey || e.ctrlKey) &&
+                  e.key === 'Enter' &&
+                  !e.nativeEvent.isComposing &&
+                  canSend
+                ) {
                   e.preventDefault();
                   void startRun();
                 }
               }}
             />
             <div className="iw-composer-foot">
-              <span>⌘ / Ctrl + Enter 处理</span>
               <button
-                className="button button-primary"
-                disabled={!canWrite || (!!revision && draftsPending)}
+                className="icon-button"
+                aria-label="查看客户原始询盘"
+                title="客户原始询盘"
+                onClick={() => setModal('original')}
+              >
+                <Paperclip size={17} />
+              </button>
+              <span>
+                {revision && draftsPending ? '正在载入回复草稿…' : input ? '草稿已暂存' : '仅当前询盘'}
+                <span className="iw-send-shortcut"> · ⌘ / Ctrl + Enter</span>
+              </span>
+              <button
+                className="button button-primary iw-send-button"
+                aria-label={inquiry.currentRevision ? '处理反馈' : '开始处理'}
+                aria-keyshortcuts="Meta+Enter Control+Enter"
+                title={inquiry.currentRevision ? '处理反馈' : '开始处理'}
+                disabled={!canSend}
                 onClick={() => startRun()}
               >
-                {inquiry.currentRevision ? '处理反馈' : '开始处理'}
-                <ArrowUp size={14} />
+                <ArrowUp size={18} />
               </button>
             </div>
           </div>
@@ -598,10 +614,12 @@ export function InquiryWorkspace({
                 结束询盘
               </button>
             )}
-            <span>状态变更由你决定</span>
+            <button onClick={() => setModal('relations')}>
+              <GitBranch size={12} /> 业务关联
+            </button>
           </div>
         </section>
-        <section className="iw-results">
+        <section className="iw-results" id={`results-${inquiryId}`}>
           <div className="iw-panel-head">
             <h2>
               业务结果{' '}
@@ -610,6 +628,24 @@ export function InquiryWorkspace({
             <span className="iw-small-label">
               {revision ? date(revision.createdAt) : '成功运行后生成'}
             </span>
+          </div>
+          <div className="iw-stage-bar" aria-label="工作阶段">
+            {stages.map((label, i) => (
+              <button
+                key={label}
+                className={stage === i ? 'selected' : ''}
+                aria-pressed={stage === i}
+                onClick={() => {
+                  setStage(i);
+                  setTab(i);
+                  setMobilePane('results');
+                }}
+              >
+                <span>0{i + 1}</span>
+                <strong>{label}</strong>
+                {i < 2 && <ChevronRight size={12} />}
+              </button>
+            ))}
           </div>
           {revision?.risks
             .filter((r) => r.status !== 'resolved' && r.severity !== 'info')

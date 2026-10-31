@@ -2,10 +2,15 @@ import { test, expect, type Page } from '@playwright/test';
 async function login(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: '进入演示工作空间' }).click();
-  await expect(page.getByRole('heading', { name: /今天，从一个好机会开始/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /把手上的事，向前推进/ })).toBeVisible();
+  await page.getByRole('button', { name: '全部询盘', exact: true }).click();
 }
 async function home(page: Page) {
-  await page.locator('.tab-bar').getByRole('button', { name: '工作台', exact: true }).click();
+  await page
+    .getByRole('navigation', { name: '主导航' })
+    .getByRole('button', { name: '工作台', exact: true })
+    .click();
+  await page.getByRole('button', { name: '全部询盘', exact: true }).click();
 }
 async function openMexico(page: Page) {
   await page.getByRole('button', { name: '墨西哥帆布袋试单', exact: true }).click();
@@ -30,17 +35,17 @@ test('首页筛选与搜索保持全集计数，弹窗可用 Escape 关闭', asy
   await page.getByRole('button', { name: '待办询盘 1', exact: true }).click();
   await expect(page.locator('.inquiry-table tbody tr')).toHaveCount(1);
   await expect(page.getByRole('button', { name: '德国陶瓷杯采购询盘', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '新建询盘', exact: true }).first().click();
+  await page.keyboard.press('Control+k');
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 test('创建保留独立原文，Mock 对未见原文诚实返回需补充', async ({ page }) => {
-  await page.getByRole('button', { name: '新建询盘', exact: true }).first().click();
+  await page.getByRole('button', { name: '新建工作', exact: true }).first().click();
   await page.getByLabel('询盘名称').fill('日本玻璃瓶订单');
   await page.getByLabel('客户名称').fill('Tokyo Glass');
   await page.getByLabel('客户原文').fill('We need 250 glass bottles delivered to Tokyo.');
-  await page.getByRole('button', { name: '创建并打开询盘' }).click();
+  await page.getByRole('button', { name: '创建并打开工作' }).click();
   await expect(page.getByRole('heading', { name: '日本玻璃瓶订单', exact: true })).toBeVisible();
   await expect(page.locator('.iw-original')).toContainText('250 glass bottles');
   await expect(page.locator('.iw-original')).not.toContainText('canvas');
@@ -48,8 +53,16 @@ test('创建保留独立原文，Mock 对未见原文诚实返回需补充', asy
   await expect(page.locator('.iw-run')).toContainText('需补充信息', { timeout: 12000 });
   await expect(page.getByRole('button', { name: '版本记录 暂无' })).toBeVisible();
 });
-test('唯一 Tab、未发送文字隔离、关闭及刷新恢复', async ({ page }) => {
+test('最近工作不重复、未发送文字隔离、关闭及刷新恢复', async ({ page }) => {
   await openMexico(page);
+  await page.getByRole('button', { name: '收起业务结果', exact: true }).click();
+  await expect(page.locator('.iw-results')).toBeHidden();
+  await expect(page.getByRole('textbox', { name: /补充要求或客户反馈/ })).toBeInViewport();
+  await page.getByRole('button', { name: '展开业务结果', exact: true }).click();
+  await expect(page.locator('.iw-results')).toBeVisible();
+  await page.getByRole('button', { name: '收起导航', exact: true }).click();
+  await expect(page.getByRole('navigation', { name: '主导航' })).toBeHidden();
+  await page.getByRole('button', { name: '展开导航', exact: true }).click();
   await page.getByRole('textbox', { name: /补充要求或客户反馈/ }).fill('墨西哥专属未发送文字');
   await home(page);
   await page
@@ -58,7 +71,7 @@ test('唯一 Tab、未发送文字隔离、关闭及刷新恢复', async ({ page
     .click();
   await page.getByRole('textbox', { name: /补充要求或客户反馈/ }).fill('德国专属未发送文字');
   await page
-    .locator('.tab-bar')
+    .locator('.recent-items')
     .getByRole('button', { name: '墨西哥帆布袋试单', exact: true })
     .click();
   await expect(page.getByRole('textbox', { name: /补充要求或客户反馈/ })).toHaveValue(
@@ -70,7 +83,7 @@ test('唯一 Tab、未发送文字隔离、关闭及刷新恢复', async ({ page
     .getByRole('button', { name: '墨西哥帆布袋试单', exact: true })
     .click();
   await expect(
-    page.locator('.tab-bar').getByRole('button', { name: '墨西哥帆布袋试单', exact: true }),
+    page.locator('.recent-items').getByRole('button', { name: '墨西哥帆布袋试单', exact: true }),
   ).toHaveCount(1);
   await page.getByRole('button', { name: '关闭 墨西哥帆布袋试单', exact: true }).click();
   await home(page);
@@ -106,7 +119,8 @@ test('三阶段只导航，来源可回读，历史只读', async ({ page }) => 
 test('运行中切换、关闭、刷新后结果只写入原询盘', async ({ page }) => {
   await openMexico(page);
   await page.getByRole('textbox', { name: /补充要求或客户反馈/ }).fill('改为600件，请更新报价');
-  await page.getByRole('button', { name: '处理反馈', exact: true }).click();
+  await expect(page.getByRole('button', { name: '处理反馈', exact: true })).toBeEnabled();
+  await page.getByRole('textbox', { name: /补充要求或客户反馈/ }).press('Control+Enter');
   await expect(page.locator('.iw-run')).toBeVisible();
   await home(page);
   await page
@@ -155,7 +169,7 @@ test('390px 主线无水平溢出，表单键盘焦点受限于弹窗', async ({
   await page.getByRole('button', { name: '对话', exact: true }).click();
   await expect(page.getByRole('textbox', { name: /补充要求或客户反馈/ })).toBeVisible();
   await page.getByRole('button', { name: '打开导航' }).click();
-  await page.getByRole('button', { name: '新建询盘', exact: true }).first().click();
+  await page.getByRole('button', { name: '新建工作', exact: true }).first().click();
   for (let i = 0; i < 12; i++) await page.keyboard.press('Tab');
   expect(await page.evaluate(() => !!document.activeElement?.closest('[role=dialog]'))).toBe(true);
 });
@@ -189,5 +203,5 @@ test('浏览器存储被禁用与异常链接不会使页面崩溃', async ({ pa
     window.dispatchEvent(new PopStateEvent('popstate'));
   });
   await expect(page.getByText('询盘链接格式不正确，请从工作台重新打开。')).toBeVisible();
-  await expect(page.getByRole('heading', { name: /今天，从一个好机会开始/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /把手上的事，向前推进/ })).toBeVisible();
 });

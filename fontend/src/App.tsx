@@ -1,4 +1,13 @@
-import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  Component,
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -8,10 +17,12 @@ import {
   ChevronRight,
   Command,
   FlaskConical,
-  Layers3,
+  FileText,
   LayoutDashboard,
   LogOut,
   Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   Settings2,
   ShieldCheck,
@@ -24,18 +35,26 @@ import { ErrorNotice, IconButton, Loading, Modal } from './components/ui';
 import { Home } from './features/Home';
 import { CreateInquiry } from './features/CreateInquiry';
 import { InquiryWorkspace } from './features/InquiryWorkspace';
-import { Resources } from './features/Resources';
+import { WorkHome } from './features/workbench/WorkHome';
+import { BrandMark } from './components/BrandMark';
+import { ThemeSwitch } from './theme/ThemeSwitch';
+const Resources = lazy(() =>
+  import('./features/Resources').then((module) => ({ default: module.Resources })),
+);
+const TradeWorkbench = lazy(() =>
+  import('./features/workbench/TradeWorkbench').then((module) => ({
+    default: module.TradeWorkbench,
+  })),
+);
 
 function Brand({ onClick }: { onClick?: () => void }) {
   return (
-    <button className="brand brand-link" onClick={onClick} aria-label="EasyWork 首页">
-      <span className="brand-icon">
-        <Layers3 size={20} />
-      </span>
+    <button type="button" className="brand brand-link" onClick={onClick} aria-label="Navowork 首页">
+      <BrandMark />
       <span>
-        <span className="brand-name">EasyWork</span>
+        <span className="brand-name">Navowork</span>
         <span className="brand-sub" style={{ display: 'block' }}>
-          OVERSEAS WORKSPACE
+          外贸 AI 工作台
         </span>
       </span>
     </button>
@@ -145,6 +164,9 @@ function Login({
     form
   ) : (
     <main className="login-page">
+      <div className="login-theme">
+        <ThemeSwitch />
+      </div>
       <section className="login-story">
         <Brand />
         <div>
@@ -165,7 +187,7 @@ function Login({
             <span />
           </div>
         </div>
-        <footer>EasyWork / 出海外贸 AI 工作台</footer>
+        <footer>Navowork / 出海外贸 AI 工作台</footer>
       </section>
       {form}
     </main>
@@ -251,25 +273,42 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
   const [restoreAttempt, setRestoreAttempt] = useState(0);
   const [storageUnavailable, setStorageUnavailable] = useState(false);
   const [create, setCreate] = useState(false);
+  const [createText, setCreateText] = useState('');
   const [mobile, setMobile] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [settings, setSettings] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [error, setError] = useState<unknown>();
   const [offline, setOffline] = useState(!navigator.onLine);
   const [logoutBusy, setLogoutBusy] = useState(false);
   const path = location.pathname;
+  const isTrade = path === '/workbench';
+  const [tradeOpened, setTradeOpened] = useState(isTrade);
+  useEffect(() => {
+    if (isTrade) setTradeOpened(true);
+  }, [isTrade]);
   const { id, invalid: invalidPath } = parseInquiryPath(path);
   const page =
-    path === '/knowledge'
-      ? 'knowledge'
-      : path === '/assets'
-        ? 'assets'
-        : path === '/capabilities'
-          ? 'capabilities'
-          : 'home';
-  const activeTitle = id
-    ? tabs.find((t) => t.id === id)?.title || '询盘详情'
-    : { home: '工作台', knowledge: '知识 Wiki', assets: '资产库', capabilities: '能力目录' }[page];
+    path === '/inquiries'
+      ? 'inquiries'
+      : path === '/knowledge'
+        ? 'knowledge'
+        : path === '/assets'
+          ? 'assets'
+          : path === '/capabilities'
+            ? 'capabilities'
+            : 'home';
+  const activeTitle = isTrade
+    ? '德国客户 · 定制背包'
+    : id
+      ? tabs.find((t) => t.id === id)?.title || '询盘详情'
+      : {
+          home: '工作台',
+          inquiries: '全部询盘',
+          knowledge: '知识 Wiki',
+          assets: '资产库',
+          capabilities: '能力目录',
+        }[page];
   useEffect(() => {
     try {
       localStorage.setItem(pref, JSON.stringify(tabs));
@@ -352,35 +391,47 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
   }
   const nav = [
     { path: '/', name: '工作台', icon: LayoutDashboard },
+    { path: '/inquiries', name: '全部询盘', icon: FileText },
     { path: '/knowledge', name: '知识 Wiki', icon: BookOpen },
     { path: '/assets', name: '资产库', icon: Box },
     { path: '/capabilities', name: '能力目录', icon: Command },
   ];
   return (
-    <div className="app-shell">
+    <div
+      className={`app-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${id ? 'inquiry-active' : ''}`}
+    >
       {mobile && <div className="mobile-backdrop" onClick={() => setMobile(false)} />}
       <aside className={`sidebar ${mobile ? 'mobile-open' : ''}`}>
-        <Brand
-          onClick={() => {
-            navigate('/');
-            setMobile(false);
-          }}
-        />
+        <div className="sidebar-brand-row">
+          <Brand
+            onClick={() => {
+              navigate('/');
+              setMobile(false);
+            }}
+          />
+          <IconButton label="收起导航" onClick={() => setSidebarCollapsed(true)}>
+            <PanelLeftClose size={17} />
+          </IconButton>
+        </div>
         <button
-          className="button button-primary new-inquiry"
+          className="button button-ghost new-inquiry"
+          aria-label="新建工作"
+          aria-keyshortcuts="Meta+K Control+K"
           onClick={() => {
             setCreate(true);
             setMobile(false);
           }}
         >
-          <Plus size={15} />
-          新建询盘
+          <Plus size={17} />
+          新建工作
+          <kbd aria-hidden="true">⌘ K</kbd>
         </button>
         <nav aria-label="主导航">
           {nav.map((n) => (
             <button
               key={n.path}
-              className={`nav-item ${!id && (n.path === '/' ? page === 'home' : path === n.path) ? 'active' : ''}`}
+              className={`nav-item ${!id && !isTrade && (n.path === '/' ? page === 'home' : path === n.path) ? 'active' : ''}`}
+              aria-current={!id && !isTrade && path === n.path ? 'page' : undefined}
               onClick={() => {
                 navigate(n.path);
                 setMobile(false);
@@ -389,33 +440,59 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
             >
               <n.icon />
               {n.name}
-              {n.path === '/' && <span className="nav-counter">HOME</span>}
             </button>
           ))}
         </nav>
         <div className="recent-items">
-          <p className="sidebar-label">OPEN INQUIRIES / 已打开</p>
-          {tabs.length ? (
-            tabs.map((t) => (
+          <p className="sidebar-label">最近工作</p>
+          {tradeOpened && (
+            <div className={`recent-work-row ${isTrade ? 'is-active' : ''}`}>
               <button
                 className="recent-item"
-                key={t.id}
                 onClick={() => {
-                  navigate(`/inquiries/${encodeURIComponent(t.id)}`);
+                  navigate('/workbench');
                   setMobile(false);
                 }}
               >
-                <span className="recent-dot" />
-                <span>{t.title}</span>
+                <FileText size={15} />
+                <span>德国定制背包 · 报价</span>
               </button>
+              <IconButton
+                label="关闭德国背包工作标签"
+                onClick={() => {
+                  setTradeOpened(false);
+                  if (isTrade) navigate('/');
+                }}
+              >
+                <X size={12} />
+              </IconButton>
+            </div>
+          )}
+          {tabs.length ? (
+            tabs.map((t) => (
+              <div className={`recent-work-row ${id === t.id ? 'is-active' : ''}`} key={t.id}>
+                <button
+                  className="recent-item"
+                  onClick={() => {
+                    navigate(`/inquiries/${encodeURIComponent(t.id)}`);
+                    setMobile(false);
+                  }}
+                >
+                  <FileText size={15} />
+                  <span>{t.title}</span>
+                </button>
+                <IconButton label={`关闭 ${t.title}`} onClick={() => closeTab(t)}>
+                  <X size={12} />
+                </IconButton>
+              </div>
             ))
-          ) : (
+          ) : !tradeOpened ? (
             <p className="preferences-note" style={{ padding: '8px 13px', fontSize: 10 }}>
               从工作台打开一条询盘，
               <br />
               在这里继续处理。
             </p>
-          )}
+          ) : null}
         </div>
         <div className="workspace-box">
           <div className="workspace-line">
@@ -440,43 +517,32 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
         <header className="topbar">
           <div className="breadcrumbs">
             <button
+              className="icon-button desktop-menu-button"
+              aria-label={sidebarCollapsed ? '展开导航' : '收起导航'}
+              onClick={() => setSidebarCollapsed((value) => !value)}
+            >
+              {sidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+            </button>
+            <button
               className="icon-button mobile-menu-button"
               aria-label="打开导航"
               onClick={() => setMobile(true)}
             >
               <Menu size={18} />
             </button>
-            <span>工作空间</span>
-            <ChevronRight size={11} />
-            <strong>{activeTitle}</strong>
+            <strong>{id ? '询盘工作区' : activeTitle}</strong>
           </div>
           <div className="topbar-actions">
+            <ThemeSwitch />
             <span className="mode-label">
               <span className="connection-dot" />
-              {mode === 'mock' ? 'Mock 演示模式' : '真实服务'}
+              {isTrade ? '前端演示 · 本地保存' : mode === 'mock' ? '演示工作空间' : '真实服务'}
             </span>
             <IconButton label="工作空间设置" onClick={() => setSettings(true)}>
               <Settings2 size={15} />
             </IconButton>
           </div>
         </header>
-        <div className="tab-bar" aria-label="工作标签">
-          <div className={`workspace-tab ${!id ? 'active' : ''}`}>
-            <button onClick={() => navigate('/')}>
-              <LayoutDashboard size={12} /> 工作台
-            </button>
-          </div>
-          {tabs.map((t) => (
-            <div key={t.id} className={`workspace-tab ${id === t.id ? 'active' : ''}`}>
-              <button onClick={() => navigate(`/inquiries/${encodeURIComponent(t.id)}`)}>
-                {t.title}
-              </button>
-              <IconButton label={`关闭 ${t.title}`} onClick={() => closeTab(t)}>
-                <X size={11} />
-              </IconButton>
-            </div>
-          ))}
-        </div>
         {offline && (
           <div className="offline-banner" role="alert">
             网络已断开。未确认的修改不会标记为已保存，恢复连接后可重试。
@@ -497,7 +563,24 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
               changed();
             }}
           />
-          <div hidden={Boolean(id) || page !== 'home'}>
+          {!id && !isTrade && page === 'home' && (
+            <WorkHome
+              session={session}
+              onOpen={open}
+              onCreate={(text = '') => {
+                setCreateText(text);
+                setCreate(true);
+              }}
+            />
+          )}
+          {isTrade && (
+            <FeatureBoundary>
+              <Suspense fallback={<Loading label="正在打开工作画布" />}>
+                <TradeWorkbench session={session} />
+              </Suspense>
+            </FeatureBoundary>
+          )}
+          <div hidden={Boolean(id) || isTrade || page !== 'inquiries'}>
             <Home
               session={session}
               refreshKey={refresh}
@@ -505,7 +588,11 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
               onCreate={() => setCreate(true)}
             />
           </div>
-          {!id && page !== 'home' && <Resources key={page} page={page} session={session} />}{' '}
+          {!id && !isTrade && page !== 'home' && page !== 'inquiries' && (
+            <Suspense fallback={<Loading label="正在打开资源" />}>
+              <Resources key={page} page={page} session={session} />
+            </Suspense>
+          )}{' '}
           {tabs.map((t) => (
             <div key={t.id} hidden={id !== t.id} className="inquiry-mount">
               <FeatureBoundary>
@@ -518,9 +605,14 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
       {create && (
         <CreateInquiry
           session={session}
-          onClose={() => setCreate(false)}
+          initialText={createText}
+          onClose={() => {
+            setCreate(false);
+            setCreateText('');
+          }}
           onCreated={(i) => {
             setCreate(false);
+            setCreateText('');
             open(i);
             changed();
           }}

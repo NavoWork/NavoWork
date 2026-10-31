@@ -8,7 +8,7 @@ NavoWork/
 ├── package-lock.json     # 全仓库唯一锁文件
 ├── .prettierrc.json       # 共享格式规范
 ├── LICENSE
-└── fontend/              # @navowork/fontend · EasyWork 前端
+└── fontend/              # @navowork/fontend · Navowork 前端
     ├── package.json      # 前端依赖与脚本
     ├── .env.example      # 环境配置示例
     ├── src/              # 页面、组件、API 与 Mock
@@ -30,7 +30,7 @@ npm ci
 npm run dev
 ```
 
-打开 [EasyWork 本地预览](http://127.0.0.1:5173/)。默认 Mock 演示模式，业务数据为合成测试数据；真实服务尚待联调。开发服务器固定使用 5173，端口占用时直接报告错误。
+打开 [Navowork 本地预览](http://127.0.0.1:5173/)。默认 Mock 演示模式，业务数据为合成测试数据；真实服务尚待联调。开发服务器固定使用 5173，端口占用时直接报告错误。
 
 ## 根目录命令
 
@@ -63,6 +63,7 @@ npm run test:e2e -- tests/e2e/resources.spec.ts
 
 - 环境文件放在 **`fontend/.env.local`**，参考 [`fontend/.env.example`](./fontend/.env.example)。
 - 前端说明与功能边界：[`fontend/README.md`](./fontend/README.md)。
+- 品牌图标、双主题与颜色变量：[`fontend/docs/BRAND_THEME.md`](./fontend/docs/BRAND_THEME.md)。
 - 接口联调：[`fontend/docs/INTEGRATION.md`](./fontend/docs/INTEGRATION.md)。
 - 验证记录：[`fontend/docs/VALIDATION.md`](./fontend/docs/VALIDATION.md)。
 - 开源依赖：[`fontend/THIRD_PARTY.md`](./fontend/THIRD_PARTY.md)。

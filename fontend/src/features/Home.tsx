@@ -91,7 +91,7 @@ export function Home({
         <div>
           <div className="section-kicker">YOUR WORK, IN FOCUS</div>
           <h1>
-            今天，从一个好机会开始<span style={{ color: '#a3b48e' }}>。</span>
+            今天，从一个好机会开始<span style={{ color: 'var(--navo-color-action)' }}>。</span>
           </h1>
           <p>{session.user.name}，欢迎回来。让每一条询盘，都有清晰的下一步。</p>
         </div>
@@ -273,7 +273,7 @@ export function Home({
               </div>
             ))}
             <div className="guide-note">
-              你掌握业务判断，EasyWork 协助准备。
+              你掌握业务判断，Navowork 协助准备。
               <br />
               每一步结果，都可回到原始依据。
             </div>

@@ -6,14 +6,16 @@ export function CreateInquiry({
   session,
   onClose,
   onCreated,
+  initialText = '',
 }: {
   session: Session;
   onClose: () => void;
   onCreated: (i: Inquiry) => void;
+  initialText?: string;
 }) {
   const [title, setTitle] = useState('');
   const [customer, setCustomer] = useState('');
-  const [originalText, setOriginalText] = useState('');
+  const [originalText, setOriginalText] = useState(initialText);
   const [destination, setDestination] = useState('');
   const [error, setError] = useState<unknown>();
   const [pending, setPending] = useState(false);
@@ -23,14 +25,14 @@ export function CreateInquiry({
     e.preventDefault();
     if (inFlight.current) return;
     const body = {
-      title: title.trim(),
-      customer: customer.trim(),
+      title: title.trim() || originalText.trim().slice(0, 32),
+      customer: customer.trim() || '待识别客户',
       originalText: originalText.trim(),
       destination: destination.trim() || undefined,
       requestedLocales: ['en-US', 'es-MX'],
     };
     if (!body.title || !body.customer || !body.originalText) {
-      setError('请填写询盘名称、客户和客户原文');
+      setError('请先粘贴客户原文或描述工作目标');
       return;
     }
     const encoded = JSON.stringify(body);
@@ -56,36 +58,34 @@ export function CreateInquiry({
   }
   return (
     <Modal
-      title="新建询盘"
+      title="开始新工作"
       onClose={() => {
         if (!pending) onClose();
       }}
     >
       <form className="form-stack" onSubmit={submit}>
         <p className="preferences-note">
-          保留客户的原始表达，后续方案与回复会围绕这条询盘独立展开。
+          从客户原文或工作目标开始。客户与工作名称可以稍后整理，原始内容会独立保留。
         </p>
         <label className="field">
           询盘名称{' '}
           <input
             disabled={pending}
             autoFocus
-            required
             maxLength={80}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="例如：春季新品采购询价"
+            placeholder="选填，例如：春季新品采购询价"
           />
         </label>
         <label className="field">
           客户名称{' '}
           <input
             disabled={pending}
-            required
             maxLength={120}
             value={customer}
             onChange={(e) => setCustomer(e.target.value)}
-            placeholder="公司名称或客户称呼"
+            placeholder="选填，公司名称或客户称呼"
           />
         </label>
         <label className="field">
@@ -122,7 +122,7 @@ export function CreateInquiry({
             取消
           </button>
           <button className="button button-primary" disabled={pending}>
-            {pending ? '正在创建…' : '创建并打开询盘'}
+            {pending ? '正在创建…' : '创建并打开工作'}
           </button>
         </div>
       </form>

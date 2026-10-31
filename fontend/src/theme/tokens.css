@@ -1,0 +1,163 @@
+/* Navowork final colors v4.1.0. Approved icon geometry is unchanged. */
+:root {
+  --navo-brand-blue: #245beb;
+  --navo-brand-black: #111111;
+  --navo-brand-white: #ffffff;
+  color-scheme: light;
+  --navo-color-background: #f7f8fa;
+  --navo-color-surface: #ffffff;
+  --navo-color-surface-raised: #ffffff;
+  --navo-color-surface-muted: #f1f3f6;
+  --navo-color-surface-hover: #e9edf3;
+  --navo-color-text: #111111;
+  --navo-color-text-secondary: #4c586b;
+  --navo-color-text-muted: #5f6b80;
+  --navo-color-text-disabled: #949dac;
+  --navo-color-border-subtle: #dde2eb;
+  --navo-color-border-control: #77839a;
+  --navo-color-disabled-background: #e9edf3;
+  --navo-color-disabled-text: #949dac;
+  --navo-color-overlay: rgba(17, 17, 17, 0.4);
+  --navo-color-shadow-color: rgba(17, 17, 17, 0.1);
+  --navo-color-action: #245beb;
+  --navo-color-action-hover: #1e4dcc;
+  --navo-color-action-active: #173fa8;
+  --navo-color-action-text: #ffffff;
+  --navo-color-link: #245beb;
+  --navo-color-link-hover: #1e4dcc;
+  --navo-color-focus-ring: #245beb;
+  --navo-color-selection-background: #e8f0ff;
+  --navo-color-selection-text: #245beb;
+  --navo-color-selection-indicator: #245beb;
+  --navo-color-highlight-background: #f3f7ff;
+  --navo-color-highlight-text: #111111;
+  --navo-color-danger: #b32e3b;
+  --navo-color-danger-hover: #982432;
+  --navo-color-danger-active: #7c1c28;
+  --navo-color-danger-text: #ffffff;
+  --navo-color-neutral-text: #4c586b;
+  --navo-color-neutral-background: #f1f3f6;
+  --navo-color-info-text: #245beb;
+  --navo-color-info-background: #e8f0ff;
+  --navo-color-success-text: #177444;
+  --navo-color-success-background: #eaf6ef;
+  --navo-color-warning-text: #915900;
+  --navo-color-warning-background: #fff5df;
+  --navo-color-error-text: #b32e3b;
+  --navo-color-error-background: #fff0f1;
+  --navo-color-logo-body: #111111;
+  --navo-color-logo-background: #ffffff;
+  --navo-color-logo-accent: #245beb;
+  --navo-logo-light-display: inline-block;
+  --navo-logo-dark-display: none;
+}
+
+/* Follow the OS only when no explicit data-theme is set. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --navo-color-background: #111111;
+    --navo-color-surface: #191b20;
+    --navo-color-surface-raised: #22252c;
+    --navo-color-surface-muted: #22252c;
+    --navo-color-surface-hover: #2c3039;
+    --navo-color-text: #f5f7fa;
+    --navo-color-text-secondary: #b8c0cf;
+    --navo-color-text-muted: #949fb2;
+    --navo-color-text-disabled: #697487;
+    --navo-color-border-subtle: #343a46;
+    --navo-color-border-control: #747f93;
+    --navo-color-disabled-background: #292e38;
+    --navo-color-disabled-text: #697487;
+    --navo-color-overlay: rgba(0, 0, 0, 0.64);
+    --navo-color-shadow-color: rgba(0, 0, 0, 0.32);
+    --navo-color-action: #8eaeff;
+    --navo-color-action-hover: #a8c0ff;
+    --navo-color-action-active: #7096f4;
+    --navo-color-action-text: #0b1730;
+    --navo-color-link: #8eaeff;
+    --navo-color-link-hover: #a8c0ff;
+    --navo-color-focus-ring: #8eaeff;
+    --navo-color-selection-background: #172646;
+    --navo-color-selection-text: #8eaeff;
+    --navo-color-selection-indicator: #8eaeff;
+    --navo-color-highlight-background: #142039;
+    --navo-color-highlight-text: #f5f7fa;
+    --navo-color-danger: #ff9ea8;
+    --navo-color-danger-hover: #ffb7bf;
+    --navo-color-danger-active: #f08692;
+    --navo-color-danger-text: #351c23;
+    --navo-color-neutral-text: #b8c0cf;
+    --navo-color-neutral-background: #22252c;
+    --navo-color-info-text: #8eaeff;
+    --navo-color-info-background: #172646;
+    --navo-color-success-text: #79dda0;
+    --navo-color-success-background: #142c20;
+    --navo-color-warning-text: #f3c269;
+    --navo-color-warning-background: #342814;
+    --navo-color-error-text: #ff9ea8;
+    --navo-color-error-background: #351c23;
+    --navo-color-logo-body: #ffffff;
+    --navo-color-logo-background: #111111;
+    --navo-color-logo-accent: #245beb;
+    --navo-logo-light-display: none;
+    --navo-logo-dark-display: inline-block;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --navo-color-background: #111111;
+  --navo-color-surface: #191b20;
+  --navo-color-surface-raised: #22252c;
+  --navo-color-surface-muted: #22252c;
+  --navo-color-surface-hover: #2c3039;
+  --navo-color-text: #f5f7fa;
+  --navo-color-text-secondary: #b8c0cf;
+  --navo-color-text-muted: #949fb2;
+  --navo-color-text-disabled: #697487;
+  --navo-color-border-subtle: #343a46;
+  --navo-color-border-control: #747f93;
+  --navo-color-disabled-background: #292e38;
+  --navo-color-disabled-text: #697487;
+  --navo-color-overlay: rgba(0, 0, 0, 0.64);
+  --navo-color-shadow-color: rgba(0, 0, 0, 0.32);
+  --navo-color-action: #8eaeff;
+  --navo-color-action-hover: #a8c0ff;
+  --navo-color-action-active: #7096f4;
+  --navo-color-action-text: #0b1730;
+  --navo-color-link: #8eaeff;
+  --navo-color-link-hover: #a8c0ff;
+  --navo-color-focus-ring: #8eaeff;
+  --navo-color-selection-background: #172646;
+  --navo-color-selection-text: #8eaeff;
+  --navo-color-selection-indicator: #8eaeff;
+  --navo-color-highlight-background: #142039;
+  --navo-color-highlight-text: #f5f7fa;
+  --navo-color-danger: #ff9ea8;
+  --navo-color-danger-hover: #ffb7bf;
+  --navo-color-danger-active: #f08692;
+  --navo-color-danger-text: #351c23;
+  --navo-color-neutral-text: #b8c0cf;
+  --navo-color-neutral-background: #22252c;
+  --navo-color-info-text: #8eaeff;
+  --navo-color-info-background: #172646;
+  --navo-color-success-text: #79dda0;
+  --navo-color-success-background: #142c20;
+  --navo-color-warning-text: #f3c269;
+  --navo-color-warning-background: #342814;
+  --navo-color-error-text: #ff9ea8;
+  --navo-color-error-background: #351c23;
+  --navo-color-logo-body: #ffffff;
+  --navo-color-logo-background: #111111;
+  --navo-color-logo-accent: #245beb;
+  --navo-logo-light-display: none;
+  --navo-logo-dark-display: inline-block;
+}
+
+.navo-logo-light {
+  display: var(--navo-logo-light-display);
+}
+.navo-logo-dark {
+  display: var(--navo-logo-dark-display);
+}

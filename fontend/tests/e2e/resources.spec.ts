@@ -3,7 +3,7 @@ import { test, expect, type Page } from '@playwright/test';
 async function login(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: '进入演示工作空间' }).click();
-  await expect(page.getByRole('heading', { name: /今天，从一个好机会开始/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /把手上的事，向前推进/ })).toBeVisible();
 }
 const csvHeader =
   'sku,name,specification,moq,stock,stockObservedAt,minQuantity,maxQuantity,unitPriceMinor,currency,productionDays,dispatchDays,startsAfter,source\n';
@@ -108,7 +108,11 @@ test('停用必需能力阻止运行，用户输入保留', async ({ page }) => 
   await expect(toggle).toBeChecked();
   await toggle.click();
   await expect(toggle).not.toBeChecked();
-  await page.locator('.tab-bar').getByRole('button', { name: '工作台', exact: true }).click();
+  await page
+    .getByRole('navigation', { name: '主导航' })
+    .getByRole('button', { name: '工作台', exact: true })
+    .click();
+  await page.getByRole('button', { name: '全部询盘', exact: true }).click();
   await page
     .locator('.inquiry-table')
     .getByRole('button', { name: '墨西哥帆布袋试单', exact: true })
