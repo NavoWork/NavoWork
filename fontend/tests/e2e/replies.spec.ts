@@ -7,8 +7,8 @@ async function openReply(page: Page) {
     .locator('.inquiry-table')
     .getByRole('button', { name: '墨西哥帆布袋试单', exact: true })
     .click();
-  await page.getByRole('tab', { name: '业务结果', exact: true }).click();
-  await page.getByRole('tab', { name: '客户回复', exact: true }).click();
+  await page.locator('.iw-result-section > summary').filter({ hasText: '客户回复' }).click();
+  await page.getByRole('button', { name: '打开回复草稿编辑', exact: true }).click();
   await expect(page.getByLabel('English 回复草稿')).toBeVisible();
   await expect(page.locator('.iw-draft-status')).toContainText('已保存');
 }
@@ -104,8 +104,14 @@ test('切到历史版本不会把当前未保存文字呈现为历史正文', as
   await page.getByLabel('English 回复草稿').fill(`${original}\nLOCAL-UNSAVED-CURRENT`);
   await expect(page.locator('.iw-draft-status')).toContainText('保存失败');
   await fault(page, 'none');
-  await page.getByRole('button', { name: '版本记录 V2', exact: true }).click();
-  await page.locator('.iw-history-list').getByRole('button').last().click();
+  await page.locator('.ic-directory .ic-folder-toggle').filter({ hasText: '版本记录' }).click();
+  await page
+    .locator('.ic-directory')
+    .getByRole('button', { name: 'V1 · 历史版本', exact: true })
+    .press('Enter');
+  await page.getByRole('button', { name: '在对话中查看此版本', exact: true }).click();
+  await page.locator('.iw-result-section > summary').filter({ hasText: '客户回复' }).click();
+  await page.getByRole('button', { name: '打开回复草稿编辑', exact: true }).click();
   await expect(page.getByLabel('English 回复草稿')).not.toHaveValue(/LOCAL-UNSAVED-CURRENT/);
   await expect(page.getByLabel('English 回复草稿')).toHaveAttribute('readonly', '');
   await page.getByRole('button', { name: '回到当前版本', exact: true }).click();
@@ -115,19 +121,18 @@ test('切到历史版本不会把当前未保存文字呈现为历史正文', as
   await saved(page, 2);
 });
 test('素材先待提交，运行成功才写入版本；材料清单锁定指定草稿版本', async ({ page }) => {
-  await page.getByRole('tab', { name: '资料依据', exact: true }).click();
+  await page.locator('.iw-result-section > summary').filter({ hasText: '资料依据' }).click();
   await page.getByRole('button', { name: '选择引用素材', exact: true }).click();
   await page.getByRole('dialog').getByRole('checkbox').check();
   await page.getByRole('button', { name: '确认选择 1 份素材', exact: true }).click();
   await expect(page.locator('.iw-materials')).toContainText('当前版本尚未改变');
-  await expect(page.getByRole('button', { name: '版本记录 V2', exact: true })).toBeVisible();
-  await page.getByRole('tab', { name: 'AI 对话', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'V2 本轮成果', exact: true })).toBeVisible();
   await page.getByLabel(/补充要求或客户反馈/).fill('附上所选资料，保持300件现货方案');
   await page.getByRole('button', { name: '处理反馈', exact: true }).click();
-  await expect(page.getByRole('button', { name: '版本记录 V3', exact: true })).toBeVisible({
+  await expect(page.getByRole('region', { name: 'V3 本轮成果', exact: true })).toBeVisible({
     timeout: 15000,
   });
-  await page.getByRole('tab', { name: '业务结果', exact: true }).click();
+  await page.locator('.iw-result-section > summary').filter({ hasText: '资料依据' }).click();
   await expect(page.locator('.iw-asset-refs')).toContainText('asset_sample:v1');
   await page.getByRole('button', { name: '整理材料草稿', exact: true }).click();
   await expect(page.locator('.iw-material-list')).toContainText('V3 材料草稿');

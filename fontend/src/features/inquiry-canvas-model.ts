@@ -1,5 +1,5 @@
 import { openDB } from 'idb';
-import type { Inquiry, Message, Revision, Source } from '../api/types';
+import type { Inquiry, Locale, Message, Revision, Source } from '../api/types';
 
 export type DocumentKind =
   | 'original'
@@ -11,7 +11,13 @@ export type DocumentKind =
   | 'source'
   | 'file'
   | 'note'
+  | 'result'
   | 'revision';
+export interface SavedResult {
+  revision: number;
+  title: string;
+  text: string;
+}
 export interface WorkspaceDocument {
   id: string;
   title: string;
@@ -44,6 +50,8 @@ export interface CanvasState {
   notes: { id: string; title: string; text: string; folder: string }[];
   files: WorkspaceFile[];
   drafts: Record<string, string>;
+  initialRevision?: number;
+  results?: SavedResult[];
 }
 export const defaultFolders = [
   { id: 'inquiry', title: '客户询盘' },
@@ -80,6 +88,14 @@ export function readCanvas(scope: string): CanvasState {
     !Array.isArray(state.folders) ||
     !state.positions ||
     !state.drafts ||
+    (state.results !== undefined &&
+      (!Array.isArray(state.results) ||
+        state.results.some(
+          (result) =>
+            !Number.isInteger(result.revision) ||
+            typeof result.title !== 'string' ||
+            typeof result.text !== 'string',
+        ))) ||
     typeof state.active !== 'string'
   )
     throw new Error('画板草稿格式无法读取');
@@ -89,8 +105,34 @@ export const money = (minor: number | null | undefined) =>
   minor == null
     ? '待确认'
     : `$${(minor / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+export function resultSnapshot(
+  revision: Revision,
+  replies?: Partial<Record<Locale, string>>,
+): SavedResult {
+  const documents = revisionDocuments(
+    { originalText: '', customer: '', currentRevision: revision.number },
+    revision,
+    [],
+    [],
+    replies?.['en-US'],
+  );
+  return {
+    revision: revision.number,
+    title: `V${revision.number} · 对话成果`,
+    text: [
+      ...documents
+        .filter((doc) => ['requirements', 'risks', 'quote', 'reply'].includes(doc.kind))
+        .map((doc) => `## ${doc.title}\n\n${doc.text}`),
+      `## Español · México\n\n${replies?.['es-MX'] ?? revision.replies['es-MX']}`,
+      `## 资料依据\n\n${revision.sourceRefs.map((ref) => `${ref.title} · V${ref.version}\n${ref.supports.join('、')}`).join('\n\n') || '暂无引用来源'}`,
+      `## 内容核对\n\n${revision.checks.map((check) => `${check.status === 'passed' ? '通过' : check.status === 'error' ? '错误' : '待确认'}：${check.label}`).join('\n')}`,
+      `规则版本：${revision.ruleSetVersion}`,
+      `引用素材：${revision.assetRefs.join('、') || '无'}`,
+    ].join('\n\n'),
+  };
+}
 export function revisionDocuments(
-  inquiry: Inquiry,
+  inquiry: Pick<Inquiry, 'originalText' | 'customer' | 'currentRevision'>,
   revision: Revision | undefined,
   messages: Message[],
   revisions: Revision[],

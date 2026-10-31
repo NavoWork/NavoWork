@@ -7,7 +7,7 @@ async function login(page: Page) {
   await expect(page.getByRole('heading', { name: /我的工作/ })).toBeVisible();
 }
 async function openWorkbench(page: Page) {
-  await page.getByRole('button', { name: '演示体验报价工作流' }).click();
+  await page.goto('/workbench');
   await expect(page.getByTestId('unit-price')).toHaveText('$8.69');
 }
 async function changePackaging(page: Page) {
@@ -20,8 +20,8 @@ test.beforeEach(async ({ page }) => {
 
 test('目标入口不要求订单表单，保留用户原文', async ({ page }) => {
   const goal = 'Please quote 250 glass bottles for Tokyo.';
-  await page.getByLabel('描述新的工作目标').fill(goal);
-  await page.getByRole('button', { name: '开始新工作', exact: true }).click();
+  await page.getByRole('button', { name: '新建工作', exact: true }).click();
+  await page.getByLabel('客户原文').fill(goal);
   await expect(page.getByLabel('客户原文')).toHaveValue(goal);
   await page.getByRole('button', { name: '创建并打开工作' }).click();
   await expect(page.locator('.iw-original')).toContainText(goal);
@@ -67,7 +67,7 @@ test('包装变更受缺失价格和依赖门禁保护，并保留可回看的�
   await expect(page.getByTestId('unit-price')).toHaveText('$9.21');
   await page.getByRole('button', { name: '返回工作台', exact: true }).click();
   await expect(page.getByRole('heading', { name: /我的工作/ })).toBeVisible();
-  await page.getByRole('button', { name: '演示体验报价工作流' }).click();
+  await page.goto('/workbench');
   await expect(page.getByRole('button', { name: '版本记录 V2' })).toBeVisible();
   await expect(page.getByTestId('unit-price')).toHaveText('$9.21');
 });

@@ -14,6 +14,12 @@ test.beforeEach(async ({ page }) => {
 
 test('只保留工作台，四张卡片筛选完整列表且搜索不改变统计口径', async ({ page }) => {
   await expect(page.getByRole('button', { name: '全部询盘', exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('描述新的工作目标')).toHaveCount(0);
+  const greeting = await page.getByText('Hello，Alex，今天想完成什么工作？').boundingBox();
+  const statuses = await page.getByRole('region', { name: '询盘状态' }).boundingBox();
+  expect(greeting).not.toBeNull();
+  expect(statuses).not.toBeNull();
+  expect(greeting!.y + greeting!.height).toBeLessThan(statuses!.y);
   const cases = [
     ['待办询盘', '德国陶瓷杯采购询盘'],
     ['进行中', '墨西哥帆布袋试单'],
@@ -93,24 +99,22 @@ test('加载更多后打开详情，返回恢复查询、已加载记录和滚�
     .toBeGreaterThan(position - 10);
 });
 
-test('新建与重开后列表和统计同步，输入草稿在页面切换后保留', async ({ page }) => {
+test('新建与重开后列表和统计同步，侧栏新建保留客户原文', async ({ page }) => {
   const goal = 'Please quote 250 glass bottles for Tokyo.';
-  await page.getByLabel('描述新的工作目标').fill(goal);
   await rows(page).getByRole('button', { name: '英国展会礼品袋方案', exact: true }).click();
   await page.getByRole('button', { name: '重新打开', exact: true }).click();
   await expect(page.getByLabel(/补充要求或客户反馈/)).toBeEnabled();
   await workbench(page).click();
-  await expect(page.getByLabel('描述新的工作目标')).toHaveValue(goal);
   await expect(page.getByRole('button', { name: '已结束 0', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '进行中 2', exact: true })).toBeVisible();
-  await page.getByLabel('描述新的工作目标').press('Control+Enter');
+  await page.getByRole('button', { name: '新建工作', exact: true }).click();
+  await page.getByLabel('客户原文').fill(goal);
   await expect(page.getByLabel('客户原文')).toHaveValue(goal);
   await page.getByRole('button', { name: '创建并打开工作', exact: true }).click();
   const current = page.locator('.inquiry-mount:not([hidden])');
   await current.getByRole('button', { name: '查看客户原始询盘', exact: true }).click();
   await expect(current.getByLabel('编辑客户原始询盘')).toHaveValue(goal);
   await workbench(page).click();
-  await expect(page.getByLabel('描述新的工作目标')).toHaveValue('');
   await expect(rows(page)).toHaveCount(5);
   await expect(page.getByRole('button', { name: '待办询盘 2', exact: true })).toBeVisible();
 });

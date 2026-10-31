@@ -37,21 +37,13 @@ import type {
 } from '../api/types';
 import { EmptyState, ErrorNotice, Loading, Modal, StatusBadge } from '../components/ui';
 import { ReplyEditor, type DraftState } from './inquiry-replies';
-import { MaterialsPanel } from './inquiry-materials';
+import { InquiryResult } from './InquiryResult';
+import { InquiryRunActivity } from './InquiryRunActivity';
+import { resultSnapshot, type SavedResult } from './inquiry-canvas-model';
 import { InquiryCanvas } from './InquiryCanvas';
 import { ResizeHandle } from '../components/ResizeHandle';
 import './inquiry.css';
 
-const stages = ['读懂询盘', '准备方案', '完成回复'];
-const resultTabs = ['需求与风险', '方案与报价', '客户回复', '资料依据'];
-const phaseNames: Record<string, string> = {
-  understanding: '理解客户需求',
-  retrieving: '查阅已发布资料',
-  calculating: '计算方案报价',
-  composing: '准备双语回复',
-  validating: '审校业务内容',
-  committing: '保存完整版本',
-};
 const money = (v: number | null | undefined) =>
   v == null
     ? '待确认'
@@ -96,27 +88,28 @@ export function InquiryWorkspace({
   const initial = useRef(
     readPref(prefKey, {
       input: '',
-      tab: 0,
-      stage: 0,
+      deferredResults: [] as number[],
       revision: null as number | null,
       lastRunId: '',
       selectedAssets: null as string[] | null,
-      rightPane: 'chat' as 'chat' | 'results',
       assistantWidth: null as number | null,
     }),
   );
   const [input, setInput] = useState(initial.current.input);
-  const [tab, setTab] = useState(initial.current.tab);
-  const [stage, setStage] = useState(initial.current.stage);
+  const [deferredResults, setDeferredResults] = useState<number[]>(
+    initial.current.deferredResults || [],
+  );
+  const [savedResults, setSavedResults] = useState<number[]>([]);
+  const [saveResultRequest, setSaveResultRequest] = useState<{
+    result: SavedResult;
+    seq: number;
+  } | null>(null);
   const [revisionNumber, setRevisionNumber] = useState<number | null>(initial.current.revision);
   const [lastRunId, setLastRunId] = useState(initial.current.lastRunId);
   const [selectedAssets, setSelectedAssets] = useState<string[] | null>(
     initial.current.selectedAssets ?? null,
   );
   const [mobilePane, setMobilePane] = useState<'chat' | 'results'>('chat');
-  const [rightPane, setRightPane] = useState<'chat' | 'results'>(
-    initial.current.rightPane || 'chat',
-  );
   const [documentRequest, setDocumentRequest] = useState<{ id: string; seq: number } | null>(null);
   const openDocument = (id: string) => {
     setMobilePane('chat');
@@ -124,7 +117,6 @@ export function InquiryWorkspace({
   };
   const showAIChat = () => {
     setResultsOpen(true);
-    setRightPane('chat');
     setMobilePane('results');
   };
   const [resultsOpen, setResultsOpen] = useState(true);
@@ -138,7 +130,7 @@ export function InquiryWorkspace({
   const assistantRef = useRef<HTMLElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
   const [modal, setModal] = useState<
-    'original' | 'history' | 'waiting' | 'close' | 'accept' | 'relations' | null
+    'original' | 'waiting' | 'close' | 'accept' | 'relations' | null
   >(null);
   const [source, setSource] = useState<SourceRef | null>(null);
   const [error, setError] = useState<unknown>();
@@ -185,7 +177,7 @@ export function InquiryWorkspace({
   useEffect(() => {
     const messages = messagesRef.current;
     if (messages) messages.scrollTop = messages.scrollHeight;
-  }, [detail.data?.messages.length, run?.id, rightPane, mobilePane, resultsOpen]);
+  }, [detail.data?.messages.length, run?.id, selectedNumber, mobilePane, resultsOpen]);
   const running = !!inquiry?.activeRunId || (!!run && ['queued', 'running'].includes(run.status));
   const readOnly =
     history ||
@@ -200,25 +192,13 @@ export function InquiryWorkspace({
   useEffect(() => {
     writePref(prefKey, {
       input,
-      tab,
-      stage,
+      deferredResults,
       revision: revisionNumber,
       lastRunId,
       selectedAssets,
-      rightPane,
       assistantWidth,
     });
-  }, [
-    input,
-    tab,
-    stage,
-    revisionNumber,
-    lastRunId,
-    selectedAssets,
-    rightPane,
-    assistantWidth,
-    prefKey,
-  ]);
+  }, [input, deferredResults, revisionNumber, lastRunId, selectedAssets, assistantWidth, prefKey]);
   useEffect(() => {
     if (
       run &&
@@ -228,7 +208,6 @@ export function InquiryWorkspace({
       handledRun.current = `${run.id}:${run.status}`;
       void refresh();
       if (run.status === 'succeeded') {
-        setNotice(`V${run.outputRevision} 已保存到此询盘`);
         setRevisionNumber(null);
         setReview(null);
         setSelectedAssets(null);
@@ -385,26 +364,47 @@ export function InquiryWorkspace({
     );
   const canWrite = !readOnly && !busy;
   const canSend = canWrite && (!revision || !draftsPending);
+  const resultMessage =
+    revision &&
+    [...(detail.data?.messages || [])]
+      .reverse()
+      .find((message) => message.role === 'assistant' && message.runId === revision.runId);
+  const resultPreview = revision ? (
+    <InquiryResult
+      key={revision.number}
+      revision={revision}
+      draftState={draftState}
+      draftsPending={draftsPending}
+      base={base}
+      path={path}
+      scope={scope}
+      readOnly={readOnly}
+      busy={busy}
+      history={history}
+      selectedAssets={selectedAssets}
+      onSelectAssets={setSelectedAssets}
+      onSource={setSource}
+      openDocument={openDocument}
+      onAccept={() => setModal('accept')}
+      saved={savedResults.includes(revision.number)}
+      deferred={deferredResults.includes(revision.number)}
+      onDefer={() => setDeferredResults((values) => [...values, revision.number])}
+      onSave={() => {
+        if (!canWrite || draftsPending) return;
+        const result = resultSnapshot(revision, draftState.texts);
+        setSaveResultRequest((old) => ({ result, seq: (old?.seq || 0) + 1 }));
+        setMobilePane('chat');
+      }}
+    />
+  ) : null;
   return (
     <div className={`iw-page iw-canvas-page ${resultsOpen ? '' : 'iw-focus-chat'}`}>
       <header className="iw-heading">
-        <div>
-          <div className="iw-eyebrow">
-            <span>{inquiry.customer}</span>
-          </div>
-          <div className="iw-title">
-            <h1>{inquiry.title}</h1>
-            <StatusBadge status={inquiry.businessStatus} />
-          </div>
+        <div className="iw-title">
+          <h1>{inquiry.title}</h1>
+          <StatusBadge status={inquiry.businessStatus} />
         </div>
         <div className="iw-actions">
-          <button className="button" onClick={() => setModal('history')}>
-            <History size={14} />
-            版本记录{' '}
-            <span className="iw-version">
-              {inquiry.currentRevision ? `V${inquiry.currentRevision}` : '暂无'}
-            </span>
-          </button>
           <button
             className="button"
             disabled={!revision || draftsPending || busy}
@@ -517,6 +517,8 @@ export function InquiryWorkspace({
             path={path}
             readOnly={readOnly}
             openRequest={documentRequest}
+            saveResultRequest={saveResultRequest}
+            onSavedResultsChange={setSavedResults}
             replyText={
               draftState.revision === revision?.number ? draftState.texts?.['en-US'] : undefined
             }
@@ -527,9 +529,7 @@ export function InquiryWorkspace({
             }}
             onRevision={(number) => {
               setRevisionNumber(number === inquiry.currentRevision ? null : number);
-              setTab(0);
-              setRightPane('results');
-              setMobilePane('results');
+              showAIChat();
             }}
             onOpenChat={showAIChat}
             conversation={
@@ -613,40 +613,16 @@ export function InquiryWorkspace({
           ref={assistantRef}
           className="iw-results iw-assistant"
           id={`results-${inquiryId}`}
-          aria-label="AI 助手与业务结果"
+          aria-label="AI 助手"
         >
-          <div className="iw-side-tabs" role="tablist" aria-label="AI 面板">
-            {(['chat', 'results'] as const).map((pane, index) => (
-              <button
-                key={pane}
-                role="tab"
-                id={`${inquiryId}-side-${pane}`}
-                aria-controls={`${inquiryId}-side-panel-${pane}`}
-                aria-selected={rightPane === pane}
-                tabIndex={rightPane === pane ? 0 : -1}
-                onClick={() => setRightPane(pane)}
-                onKeyDown={(e) => {
-                  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-                    e.preventDefault();
-                    const next = index ? 'chat' : 'results';
-                    setRightPane(next);
-                    document.getElementById(`${inquiryId}-side-${next}`)?.focus();
-                  }
-                }}
-              >
-                {pane === 'chat' ? <MessageSquare size={14} /> : <LayoutGrid size={14} />}
-                {pane === 'chat' ? 'AI 对话' : '业务结果'}
-              </button>
-            ))}
+          <div className="iw-assistant-heading">
+            <h2>
+              <MessageSquare size={14} />
+              AI 对话
+            </h2>
             <span>仅当前询盘</span>
           </div>
-          <div
-            className="iw-ai-chat"
-            role="tabpanel"
-            id={`${inquiryId}-side-panel-chat`}
-            aria-labelledby={`${inquiryId}-side-chat`}
-            hidden={rightPane !== 'chat'}
-          >
+          <div className="iw-ai-chat">
             <div className="iw-messages" ref={messagesRef}>
               <button className="iw-original" onClick={() => openDocument('original')}>
                 <FileText size={16} />
@@ -671,71 +647,67 @@ export function InquiryWorkspace({
                 </div>
               )}
               {detail.data?.messages.map((message) => (
-                <article className={`iw-message ${message.role}`} key={message.id}>
-                  <div className="iw-message-meta">
-                    <span>{message.role === 'user' ? '你' : 'Navowork'}</span>
-                    <time>{date(message.createdAt)}</time>
-                  </div>
-                  <p>{message.text}</p>
-                </article>
+                <div key={message.id}>
+                  <article className={`iw-message ${message.role}`}>
+                    <div className="iw-message-meta">
+                      <span>{message.role === 'user' ? '你' : 'Navowork'}</span>
+                      <time>{date(message.createdAt)}</time>
+                    </div>
+                    <p>{message.text}</p>
+                  </article>
+                  {message.id === resultMessage?.id && resultPreview}
+                </div>
               ))}
+              {!resultMessage && resultPreview}
               {run && (
-                <div className="iw-run">
-                  <div className="iw-run-title">
-                    <Sparkles size={14} />
-                    <strong>{running ? phaseNames[run.phase] : '本次运行'}</strong>
-                    <StatusBadge status={run.status} />
-                  </div>
-                  <div className="iw-run-steps">
-                    {Object.entries(phaseNames).map(([phase, title], index) => (
-                      <span
-                        key={phase}
-                        className={
-                          Object.keys(phaseNames).indexOf(run.phase) >= index ? 'reached' : ''
-                        }
-                        title={title}
-                      />
-                    ))}
-                  </div>
-                  <details className="iw-run-details">
-                    <summary>运行详情</summary>
-                    <small>runId: {run.id}</small>
-                  </details>
-                  {running && <p>可以切换其他询盘，结果会保存在这里。</p>}
+                <div
+                  className={`iw-run ${['queued', 'running'].includes(run.status) ? 'iw-run-active' : ''}`}
+                  data-status={run.status}
+                  role="region"
+                  aria-label="AI 处理进度"
+                >
+                  <InquiryRunActivity key={run.id} run={run} />
+                  {running && <p className="iw-run-hint">可以切换其他询盘，结果会保存在这里。</p>}
                   {run.error && <ErrorNotice error={run.error.message} />}{' '}
                   {run.clarification?.questions.map((q) => (
                     <p key={q.id}>
                       <TriangleAlert size={13} /> {q.question}
                     </p>
                   ))}
-                  {run.status === 'failed' && (
-                    <button
-                      className="button"
-                      disabled={!canWrite}
-                      onClick={() => {
-                        setInput(run.instruction);
-                        setNotice('已恢复本次指令，确认后可重新处理。');
-                      }}
-                    >
-                      恢复指令并重试
-                    </button>
-                  )}
-                  {running && (
-                    <button
-                      className="button button-ghost"
-                      disabled={busy}
-                      onClick={() =>
-                        operate(async () => {
-                          await api.post(`${base}/runs/${run.id}/cancel`);
-                          await runQuery.refetch();
-                          await refresh();
-                        })
-                      }
-                    >
-                      <Square size={12} />
-                      取消本次运行
-                    </button>
-                  )}
+                  <div className="iw-run-actions">
+                    <details className="iw-run-details">
+                      <summary>运行详情</summary>
+                      <small>runId: {run.id}</small>
+                    </details>
+                    {run.status === 'failed' && (
+                      <button
+                        className="button"
+                        disabled={!canWrite}
+                        onClick={() => {
+                          setInput(run.instruction);
+                          setNotice('已恢复本次指令，确认后可重新处理。');
+                        }}
+                      >
+                        恢复指令并重试
+                      </button>
+                    )}
+                    {running && (
+                      <button
+                        className="button button-ghost iw-run-cancel"
+                        disabled={busy}
+                        onClick={() =>
+                          operate(async () => {
+                            await api.post(`${base}/runs/${run.id}/cancel`);
+                            await runQuery.refetch();
+                            await refresh();
+                          })
+                        }
+                      >
+                        <Square size={12} />
+                        取消本次运行
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
               <ErrorNotice error={runQuery.error} onRetry={() => void runQuery.refetch()} />
@@ -756,14 +728,24 @@ export function InquiryWorkspace({
                 disabled={!canWrite}
                 onKeyDown={(e) => {
                   if (
-                    (e.metaKey || e.ctrlKey) &&
-                    e.key === 'Enter' &&
-                    !e.nativeEvent.isComposing &&
-                    canSend
-                  ) {
-                    e.preventDefault();
-                    void startRun();
+                    e.key !== 'Enter' ||
+                    e.nativeEvent.isComposing ||
+                    e.nativeEvent.keyCode === 229
+                  )
+                    return;
+                  e.preventDefault();
+                  if (e.ctrlKey) {
+                    const textarea = e.currentTarget;
+                    textarea.setRangeText(
+                      '\n',
+                      textarea.selectionStart,
+                      textarea.selectionEnd,
+                      'end',
+                    );
+                    setInput(textarea.value);
+                    return;
                   }
+                  if (canSend) void startRun();
                 }}
               />
               <div className="iw-composer-foot">
@@ -781,12 +763,12 @@ export function InquiryWorkspace({
                     : input
                       ? '草稿已暂存'
                       : '仅当前询盘'}
-                  <span className="iw-send-shortcut"> · ⌘ / Ctrl + Enter</span>
+                  <span className="iw-send-shortcut"> · Enter 发送 · Ctrl + Enter 换行</span>
                 </span>
                 <button
                   className="button button-primary iw-send-button"
                   aria-label={inquiry.currentRevision ? '处理反馈' : '开始处理'}
-                  aria-keyshortcuts="Meta+Enter Control+Enter"
+                  aria-keyshortcuts="Enter"
                   title={inquiry.currentRevision ? '处理反馈' : '开始处理'}
                   disabled={!canSend}
                   onClick={() => startRun()}
@@ -817,385 +799,12 @@ export function InquiryWorkspace({
               </button>
             </div>
           </div>
-          <div
-            className="iw-business-results"
-            role="tabpanel"
-            id={`${inquiryId}-side-panel-results`}
-            aria-labelledby={`${inquiryId}-side-results`}
-            hidden={rightPane !== 'results'}
-          >
-            <div className="iw-panel-head">
-              <h2>
-                业务结果{' '}
-                <span className="iw-version">{revision ? `V${revision.number}` : '等待分析'}</span>
-              </h2>
-              <span className="iw-small-label">
-                {revision ? date(revision.createdAt) : '成功运行后生成'}
-              </span>
-            </div>
-            <div className="iw-stage-bar" aria-label="工作阶段">
-              {stages.map((label, i) => (
-                <button
-                  key={label}
-                  className={stage === i ? 'selected' : ''}
-                  aria-pressed={stage === i}
-                  onClick={() => {
-                    setStage(i);
-                    setTab(i);
-                    if (i === 2 && revision) openDocument(`reply:${revision.number}`);
-                    setMobilePane(i === 2 && revision ? 'chat' : 'results');
-                  }}
-                >
-                  <span>0{i + 1}</span>
-                  <strong>{label}</strong>
-                  {i < 2 && <ChevronRight size={12} />}
-                </button>
-              ))}
-            </div>
-            {revision?.risks
-              .filter((r) => r.status !== 'resolved' && r.severity !== 'info')
-              .slice(0, 1)
-              .map((r) => (
-                <div className="iw-pinned-risk" key={r.id}>
-                  <TriangleAlert size={17} />
-                  <div>
-                    <strong>{r.message}</strong>
-                    <p>{r.suggestedAction}</p>
-                  </div>
-                  <button onClick={() => setTab(0)} aria-label="查看全部风险">
-                    <ChevronRight size={16} />
-                  </button>
-                </div>
-              ))}
-            <div className="iw-result-tabs" role="tablist" aria-label="业务结果">
-              {resultTabs.map((label, i) => (
-                <button
-                  key={label}
-                  id={`${inquiryId}-result-tab-${i}`}
-                  role="tab"
-                  aria-selected={tab === i}
-                  aria-controls={`${inquiryId}-result-${i}`}
-                  tabIndex={tab === i ? 0 : -1}
-                  onKeyDown={(e) => {
-                    if (['ArrowLeft', 'ArrowRight'].includes(e.key)) {
-                      e.preventDefault();
-                      const next = (i + (e.key === 'ArrowRight' ? 1 : 3)) % 4;
-                      setTab(next);
-                      if (next === 2 && revision) openDocument(`reply:${revision.number}`);
-                      document.getElementById(`${inquiryId}-result-tab-${next}`)?.focus();
-                    }
-                  }}
-                  onClick={() => {
-                    setTab(i);
-                    if (i === 2 && revision) {
-                      openDocument(`reply:${revision.number}`);
-                      setMobilePane('chat');
-                    }
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <div className="iw-result-content">
-              {!revision ? (
-                <EmptyState
-                  title="还没有业务结果"
-                  description="点击「开始处理」分析客户原文。只有成功保存的完整版本会出现在这里。"
-                />
-              ) : (
-                <>
-                  <div
-                    hidden={tab !== 0}
-                    role="tabpanel"
-                    id={`${inquiryId}-result-0`}
-                    aria-labelledby={`${inquiryId}-result-tab-0`}
-                  >
-                    <div className="iw-section-heading">
-                      <span className="iw-kicker">CUSTOMER REQUIREMENTS</span>
-                      <h3>客户要什么</h3>
-                    </div>
-                    <dl className="iw-facts">
-                      {[
-                        ['产品', revision.requirements.requestedProduct],
-                        [
-                          '需求数量',
-                          revision.requirements.quantity == null
-                            ? null
-                            : `${revision.requirements.quantity} 件`,
-                        ],
-                        ['规格', revision.requirements.specification],
-                        ['目的地', revision.requirements.destination],
-                        ['期望到货', revision.requirements.requestedArrival],
-                        ['定制要求', revision.requirements.customization],
-                      ].map(([label, value]) => (
-                        <div key={label}>
-                          <dt>{label}</dt>
-                          <dd className={!value ? 'unknown' : ''}>{value || '待确认'}</dd>
-                        </div>
-                      ))}
-                    </dl>
-                    {revision.requirements.missingFields.length > 0 && (
-                      <div className="iw-note">
-                        待补信息：{revision.requirements.missingFields.join('、')}
-                      </div>
-                    )}
-                    <div className="iw-section-heading">
-                      <span className="iw-kicker">OPEN QUESTIONS</span>
-                      <h3>核对后，再向前一步</h3>
-                    </div>
-                    <div className="iw-risk-list">
-                      {revision.risks.length ? (
-                        revision.risks.map((r) => (
-                          <article key={r.id}>
-                            <TriangleAlert size={16} />
-                            <div>
-                              <div>
-                                <strong>{r.message}</strong>
-                                <span>
-                                  {r.status === 'resolved'
-                                    ? '已解决'
-                                    : r.severity === 'error'
-                                      ? '阻断'
-                                      : '待确认'}
-                                </span>
-                              </div>
-                              <p>{r.suggestedAction}</p>
-                            </div>
-                          </article>
-                        ))
-                      ) : (
-                        <p className="iw-muted">此版本没有返回风险项。</p>
-                      )}
-                    </div>
-                    <div className="iw-inline-note">
-                      <BookOpen size={14} />
-                      客户要求与商家事实分开保留，备选方案需要客户确认。
-                    </div>
-                  </div>
-                  <div
-                    hidden={tab !== 1}
-                    role="tabpanel"
-                    id={`${inquiryId}-result-1`}
-                    aria-labelledby={`${inquiryId}-result-tab-1`}
-                  >
-                    <div className="iw-section-heading">
-                      <span className="iw-kicker">PROPOSAL & QUOTATION</span>
-                      <h3>把方案的边界说清楚</h3>
-                    </div>
-                    <div className="iw-proposal">
-                      <div>
-                        <span>客户原要求</span>
-                        <strong>{revision.proposal.requestedSku || '尚未确定 SKU'}</strong>
-                      </div>
-                      <ArrowRight size={16} />
-                      <div>
-                        <span>当前方案</span>
-                        <strong>{revision.proposal.selectedSku || '等待选择方案'}</strong>
-                      </div>
-                      <span className="iw-proposal-state">
-                        {revision.proposal.status === 'accepted'
-                          ? '已记录客户接受'
-                          : revision.proposal.status === 'proposed'
-                            ? '备选 · 待客户确认'
-                            : '需求待准备'}
-                      </span>
-                    </div>
-                    {revision.proposal.differences.map((d) => (
-                      <p className="iw-note" key={d}>
-                        {d}
-                      </p>
-                    ))}
-                    {revision.quote ? (
-                      <>
-                        <div className="iw-quote-card">
-                          <div className="iw-quote-top">
-                            <span>商品小计 · USD</span>
-                            <span>草稿报价</span>
-                          </div>
-                          <strong className="iw-quote-amount">
-                            {money(revision.quote.goodsSubtotalMinor)}
-                          </strong>
-                          <p>
-                            {revision.quote.quantity.toLocaleString()} 件 ×{' '}
-                            {money(revision.quote.unitPriceMinor)} / 件
-                          </p>
-                          <dl className="iw-costs">
-                            <div>
-                              <dt>运费</dt>
-                              <dd>{money(revision.quote.freightMinor)}</dd>
-                            </div>
-                            <div>
-                              <dt>税费</dt>
-                              <dd>{money(revision.quote.taxMinor)}</dd>
-                            </div>
-                            <div>
-                              <dt>最终总额</dt>
-                              <dd>{money(revision.quote.totalMinor)}</dd>
-                            </div>
-                          </dl>
-                        </div>
-                        <dl className="iw-facts">
-                          <div>
-                            <dt>生产时间</dt>
-                            <dd>
-                              {revision.quote.timing.productionDays == null
-                                ? '待确认'
-                                : `${revision.quote.timing.productionDays} 天`}
-                            </dd>
-                          </div>
-                          <div>
-                            <dt>出库时间</dt>
-                            <dd>
-                              {revision.quote.timing.dispatchDays == null
-                                ? '待确认'
-                                : `${revision.quote.timing.dispatchDays} 天`}
-                            </dd>
-                          </div>
-                          <div>
-                            <dt>起算条件</dt>
-                            <dd>
-                              {revision.quote.timing.startsAfter === 'payment_conditions_met'
-                                ? '付款条件满足后'
-                                : revision.quote.timing.startsAfter}
-                            </dd>
-                          </div>
-                          <div>
-                            <dt>运输 / 到货</dt>
-                            <dd>
-                              {revision.quote.timing.transitDays == null
-                                ? '待确认，不承诺到货日期'
-                                : `${revision.quote.timing.transitDays} 天运输`}
-                            </dd>
-                          </div>
-                        </dl>
-                      </>
-                    ) : (
-                      <EmptyState
-                        title="本版本没有有效报价"
-                        description="需要有效商品、数量和价格依据后才能形成报价。"
-                      />
-                    )}
-                    {revision.proposal.status === 'proposed' && (
-                      <button
-                        className="button"
-                        disabled={!canWrite}
-                        onClick={() => setModal('accept')}
-                      >
-                        <Check size={14} />
-                        记录客户接受该方案
-                      </button>
-                    )}
-                  </div>
-                  <div
-                    hidden={tab !== 2}
-                    role="tabpanel"
-                    id={`${inquiryId}-result-2`}
-                    aria-labelledby={`${inquiryId}-result-tab-2`}
-                  >
-                    <div className="iw-section-heading">
-                      <span className="iw-kicker">CUSTOMER REPLY</span>
-                      <h3>双语回复草稿</h3>
-                      <p>在画板标签页中打开并编辑，修改会同步到这里。</p>
-                    </div>
-                    <div className="iw-reply-preview">
-                      {draftState.texts?.['en-US'] ?? revision.replies['en-US']}
-                    </div>
-                    <button
-                      className="button"
-                      onClick={() => openDocument(`reply:${revision.number}`)}
-                    >
-                      <FileText size={14} />
-                      打开回复草稿编辑
-                    </button>
-                  </div>
-                  <div
-                    hidden={tab !== 3}
-                    role="tabpanel"
-                    id={`${inquiryId}-result-3`}
-                    aria-labelledby={`${inquiryId}-result-tab-3`}
-                  >
-                    <div className="iw-section-heading">
-                      <span className="iw-kicker">EVIDENCE, NOT ASSUMPTIONS</span>
-                      <h3>每一项结论，都有出处</h3>
-                      <p>此版本使用的固定来源，更新资料不会改写历史依据。</p>
-                    </div>
-                    <div className="iw-sources">
-                      {revision.sourceRefs.map((s) => (
-                        <button key={s.sourceVersionId} onClick={() => setSource(s)}>
-                          <span className="iw-source-icon">
-                            <FileText size={18} />
-                          </span>
-                          <div>
-                            <strong>{s.title}</strong>
-                            <p>
-                              V{s.version} ·{' '}
-                              {s.locator.row
-                                ? `第 ${s.locator.row} 行`
-                                : s.locator.section || s.locator.field || '原始资料'}
-                            </p>
-                          </div>
-                          <ChevronRight size={15} />
-                        </button>
-                      ))}
-                    </div>
-                    {!revision.sourceRefs.length && (
-                      <EmptyState
-                        title="暂无引用来源"
-                        description="查阅已发布资料后，固定版本引用会展示在这里。"
-                      />
-                    )}
-                    <div className="iw-section-heading">
-                      <h3>本次审校记录</h3>
-                    </div>
-                    {revision.checks.map((c, index) => (
-                      <div className="iw-check" key={index}>
-                        {c.status === 'passed' ? <Check size={14} /> : <TriangleAlert size={14} />}
-                        <span>{c.label}</span>
-                        <small>
-                          {c.status === 'passed'
-                            ? '通过'
-                            : c.status === 'error'
-                              ? '错误'
-                              : '待确认'}
-                        </small>
-                      </div>
-                    ))}
-                    <p className="iw-muted">规则版本：{revision.ruleSetVersion}</p>
-                    <MaterialsPanel
-                      base={base}
-                      path={path}
-                      scope={scope}
-                      revision={revision}
-                      readOnly={readOnly || busy}
-                      pending={draftsPending}
-                      draftVersions={draftState.versions}
-                      selectedAssets={history ? null : selectedAssets}
-                      onSelect={setSelectedAssets}
-                    />
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
         </section>
       </div>
       {modal === 'original' && (
         <Modal title="客户原始询盘" onClose={() => setModal(null)}>
           <p className="iw-muted">客户：{inquiry.customer} · 原文留档</p>
           <pre className="iw-original-full">{inquiry.originalText}</pre>
-        </Modal>
-      )}
-      {modal === 'history' && (
-        <Modal title="版本记录与比较" wide onClose={() => setModal(null)}>
-          <HistoryPanel
-            revisions={detail.data?.revisions || []}
-            selected={selectedNumber || 0}
-            onSelect={(n) => {
-              setRevisionNumber(n === inquiry.currentRevision ? null : n);
-              setModal(null);
-            }}
-          />
         </Modal>
       )}
       {modal === 'waiting' && (
@@ -1393,108 +1002,5 @@ function SourceDrawer({
         )
       )}
     </Modal>
-  );
-}
-
-function HistoryPanel({
-  revisions,
-  selected,
-  onSelect,
-}: {
-  revisions: Revision[];
-  selected: number;
-  onSelect: (number: number) => void;
-}) {
-  const ordered = [...revisions].sort((a, b) => b.number - a.number);
-  const [oldNumber, setOldNumber] = useState(ordered[1]?.number || ordered[0]?.number || 0);
-  const current = ordered[0];
-  const previous = ordered.find((r) => r.number === oldNumber);
-  if (!current)
-    return (
-      <EmptyState
-        title="还没有成功版本"
-        description="成功处理后会保存完整快照，切换阶段不会新增版本。"
-      />
-    );
-  return (
-    <div className="iw-history">
-      <div className="iw-history-list">
-        {ordered.map((r) => (
-          <button
-            className={selected === r.number ? 'selected' : ''}
-            key={r.number}
-            onClick={() => onSelect(r.number)}
-          >
-            <span>V{r.number}</span>
-            <div>
-              <strong>{r.changeSummary.join('；') || '完整业务快照'}</strong>
-              <p>{date(r.createdAt)} · 点击查看只读快照</p>
-            </div>
-            <ChevronRight size={14} />
-          </button>
-        ))}
-      </div>
-      <div className="iw-compare">
-        <h3>与当前 V{current.number} 比较</h3>
-        <label>
-          对比版本{' '}
-          <select value={oldNumber} onChange={(e) => setOldNumber(Number(e.target.value))}>
-            {ordered.map((r) => (
-              <option key={r.number} value={r.number}>
-                V{r.number}
-              </option>
-            ))}
-          </select>
-        </label>
-        {previous && (
-          <table>
-            <thead>
-              <tr>
-                <th>字段</th>
-                <th>V{previous.number}</th>
-                <th>V{current.number}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                [
-                  '数量',
-                  previous.quote?.quantity ?? previous.requirements.quantity,
-                  current.quote?.quantity ?? current.requirements.quantity,
-                ],
-                ['SKU', previous.proposal.selectedSku, current.proposal.selectedSku],
-                [
-                  '商品小计',
-                  money(previous.quote?.goodsSubtotalMinor),
-                  money(current.quote?.goodsSubtotalMinor),
-                ],
-                ['方案确认', previous.proposal.status, current.proposal.status],
-                [
-                  '出库天数',
-                  previous.quote?.timing.dispatchDays,
-                  current.quote?.timing.dispatchDays,
-                ],
-                [
-                  '风险',
-                  previous.risks.map((r) => r.message).join('；'),
-                  current.risks.map((r) => r.message).join('；'),
-                ],
-                [
-                  '来源',
-                  previous.sourceRefs.map((r) => r.sourceVersionId).join('、'),
-                  current.sourceRefs.map((r) => r.sourceVersionId).join('、'),
-                ],
-              ].map(([label, a, b]) => (
-                <tr className={a !== b ? 'changed' : ''} key={label}>
-                  <th>{label}</th>
-                  <td>{a ?? '待确认'}</td>
-                  <td>{b ?? '待确认'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </div>
   );
 }

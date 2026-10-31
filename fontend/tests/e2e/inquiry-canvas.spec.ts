@@ -46,10 +46,7 @@ test('画板只预览，双击打开唯一标签，编辑草稿同步预览并�
   await expect(field).toHaveValue(text);
   await field.fill('请重新核对定制规格和最终数量。');
   await work.getByRole('button', { name: '交给助手更新版本', exact: true }).click();
-  await expect(work.getByRole('tab', { name: 'AI 对话', exact: true })).toHaveAttribute(
-    'aria-selected',
-    'true',
-  );
+  await expect(work.getByRole('heading', { name: 'AI 对话', exact: true })).toBeVisible();
   await expect(work.getByLabel('补充要求或客户反馈')).toHaveValue(/请重新核对定制规格和最终数量/);
 });
 

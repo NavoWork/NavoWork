@@ -94,7 +94,7 @@ test('深色覆盖工作台、弹窗和延迟加载资源，切换不丢失报�
   await page.goto('/');
   await theme(page).selectOption('dark');
   await login(page);
-  await page.getByRole('button', { name: '演示体验报价工作流' }).click();
+  await page.goto('/workbench');
   await page.getByLabel('工厂基础报价').fill('46');
   await expect(page.getByTestId('unit-price')).toHaveText('$9.03');
   await expect(page.locator('.tw-canvas')).toHaveCSS('background-color', 'rgb(25, 27, 32)');
@@ -111,7 +111,7 @@ test('深色覆盖工作台、弹窗和延迟加载资源，切换不丢失报�
   await page.keyboard.press('Escape');
   await page.goto('/inquiries');
   await page.getByRole('button', { name: '墨西哥帆布袋试单', exact: true }).click();
-  await expect(page.locator('.iw-stage-bar')).toHaveCSS('background-color', 'rgb(25, 27, 32)');
+  await expect(page.locator('.iw-answer-result')).toHaveCSS('background-color', 'rgb(25, 27, 32)');
 });
 
 test('移动端可切换主题和打开侧栏，无页面横向溢出', async ({ page }) => {
@@ -123,7 +123,7 @@ test('移动端可切换主题和打开侧栏，无页面横向溢出', async ({
   await page.getByRole('button', { name: '打开导航' }).click();
   await expect(page.locator('.sidebar .navo-logo-dark')).toBeVisible();
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: '演示体验报价工作流' }).click();
+  await page.goto('/workbench');
   await theme(page).selectOption('light');
   await expect(page.getByTestId('unit-price')).toHaveText('$8.69');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

@@ -9,11 +9,10 @@ import {
   FileText,
   Hourglass,
   Layers3,
-  Paperclip,
   Search,
   X,
 } from 'lucide-react';
-import { api, mode } from '../../api';
+import { api } from '../../api';
 import type { BusinessStatus, Inquiry, Page, Session } from '../../api/types';
 import { EmptyState, ErrorNotice, Loading, StatusBadge, statusLabels } from '../../components/ui';
 
@@ -35,16 +34,12 @@ const updatedAt = new Intl.DateTimeFormat('zh-CN', {
 export function WorkHome({
   session,
   active,
-  goal,
-  onGoalChange,
   onCreate,
   onOpen,
 }: {
   session: Session;
   active: boolean;
-  goal: string;
-  onGoalChange: (goal: string) => void;
-  onCreate: (initialText?: string) => void;
+  onCreate: () => void;
   onOpen: (inquiry: Inquiry) => void;
 }) {
   const navigate = useNavigate();
@@ -131,6 +126,8 @@ export function WorkHome({
 
   return (
     <div ref={root} className="wh-page wh-dashboard">
+      <p className="wh-greeting">Hello，{session.user.name}，今天想完成什么工作？</p>
+
       <section className="overview-grid wh-status-grid" aria-label="询盘状态">
         {statuses.map(({ key: value, label, icon: Icon }) => (
           <button
@@ -154,64 +151,6 @@ export function WorkHome({
         ))}
       </section>
       <ErrorNotice error={summary.error} onRetry={() => void summary.refetch()} />
-
-      <section className="wh-compose" aria-labelledby="start-work-heading">
-        <div className="wh-compose-heading">
-          <h2 id="start-work-heading">开始新工作</h2>
-          {mode === 'mock' && (
-            <button
-              className="wh-demo-link"
-              aria-label="演示体验报价工作流"
-              onClick={() => navigate('/workbench')}
-            >
-              <span>演示</span>体验报价工作流
-              <ArrowRight size={14} />
-            </button>
-          )}
-        </div>
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (goal.trim()) onCreate(goal);
-          }}
-        >
-          <textarea
-            aria-label="描述新的工作目标"
-            placeholder="描述你想完成的工作，或粘贴客户邮件…"
-            value={goal}
-            onChange={(event) => onGoalChange(event.target.value)}
-            onKeyDown={(event) => {
-              if (
-                (event.metaKey || event.ctrlKey) &&
-                event.key === 'Enter' &&
-                !event.nativeEvent.isComposing &&
-                goal.trim()
-              ) {
-                event.preventDefault();
-                onCreate(goal);
-              }
-            }}
-            maxLength={20000}
-            rows={2}
-          />
-          <div className="wh-compose-actions">
-            <button className="button button-ghost" type="button" onClick={() => onCreate(goal)}>
-              <Paperclip size={16} />
-              粘贴客户邮件
-            </button>
-            <span className="wh-compose-shortcut">⌘ / Ctrl + Enter</span>
-            <button
-              className="button button-primary"
-              aria-label="开始新工作"
-              disabled={!goal.trim()}
-              title="开始工作（⌘ / Ctrl + Enter）"
-            >
-              开始工作
-              <ArrowRight size={16} />
-            </button>
-          </div>
-        </form>
-      </section>
 
       <section
         ref={listPanel}
@@ -342,7 +281,9 @@ export function WorkHome({
                 <EmptyState
                   title={filtered ? '没有找到匹配的工作' : '开始你的第一项工作'}
                   description={
-                    filtered ? '试试其他关键词，或清除筛选。' : '描述目标或粘贴客户邮件，即可开始。'
+                    filtered
+                      ? '试试其他关键词，或清除筛选。'
+                      : '点击“新建工作”，粘贴客户邮件或描述工作目标。'
                   }
                 />
                 {filtered ? (
@@ -350,7 +291,7 @@ export function WorkHome({
                     清除筛选
                   </button>
                 ) : (
-                  <button className="button button-primary" onClick={() => onCreate(goal)}>
+                  <button className="button button-primary" onClick={onCreate}>
                     新建工作
                   </button>
                 )}

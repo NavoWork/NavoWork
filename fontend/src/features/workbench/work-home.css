@@ -1,4 +1,4 @@
-/* One place to see the queue, start a job, and return to every inquiry. */
+/* Overview and inquiry list for the work dashboard. */
 .wh-dashboard {
   display: flex;
   flex-direction: column;
@@ -65,79 +65,15 @@
 .stat-card.selected .wh-stat-arrow {
   color: var(--navo-color-selection-text);
 }
-.wh-compose {
-  padding: 20px 22px 16px;
-  border: 1px solid var(--navo-color-border-subtle);
-  border-radius: 12px;
-  background: var(--navo-color-surface);
-}
-.wh-compose:focus-within {
-  border-color: var(--navo-color-border-control);
-}
-.wh-compose-heading,
-.wh-compose-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.wh-compose-heading {
-  justify-content: space-between;
-}
-.wh-compose h2 {
-  font-size: 14px;
-  letter-spacing: 0;
-}
-.wh-compose textarea {
+.wh-greeting {
   display: block;
-  width: 100%;
-  min-height: 84px;
-  max-height: 240px;
-  margin: 10px 0 8px;
-  padding: 8px 0;
-  resize: vertical;
-  border: 0;
-  border-radius: 2px;
-  background: transparent;
+  margin: 0;
+  text-align: center;
   color: var(--navo-color-text);
-  font-size: 15px;
-  line-height: 1.8;
-}
-.wh-compose textarea::placeholder {
-  color: var(--navo-color-text-muted);
-}
-.wh-compose-actions .button {
-  min-height: 36px;
-  font-size: 12px;
-}
-.wh-compose-actions .button-ghost {
-  padding-left: 0;
-  color: var(--navo-color-text-secondary);
-}
-.wh-compose-shortcut {
-  margin-left: auto;
-  color: var(--navo-color-text-muted);
-  font-size: 10px;
-  white-space: nowrap;
-}
-.wh-demo-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 28px;
-  padding: 2px 0;
-  border: 0;
-  background: transparent;
-  color: var(--navo-color-text-muted);
-  font-size: 11px;
-}
-.wh-demo-link > span {
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: var(--navo-color-surface-muted);
-  font-size: 10px;
-}
-.wh-demo-link:hover {
-  color: var(--navo-color-link);
+  font-size: clamp(18px, 1.5vw, 22px);
+  font-weight: 550;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 .wh-work-panel {
   scroll-margin-top: 20px;
@@ -355,26 +291,6 @@
   .wh-stat-arrow {
     right: 16px;
     bottom: 16px;
-  }
-  .wh-compose {
-    padding: 16px;
-  }
-  .wh-compose h2 {
-    font-size: 13px;
-  }
-  .wh-demo-link {
-    gap: 5px;
-    font-size: 10px;
-  }
-  .wh-compose textarea {
-    min-height: 90px;
-    font-size: 14px;
-  }
-  .wh-compose-shortcut {
-    display: none;
-  }
-  .wh-compose-actions .button-primary {
-    margin-left: auto;
   }
   .wh-work-heading {
     flex-wrap: wrap;

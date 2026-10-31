@@ -275,11 +275,9 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
   const [restoreAttempt, setRestoreAttempt] = useState(0);
   const [storageUnavailable, setStorageUnavailable] = useState(false);
   const [create, setCreate] = useState(false);
-  const [createText, setCreateText] = useState('');
   const [mobile, setMobile] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [settings, setSettings] = useState(false);
-  const [homeGoal, setHomeGoal] = useState('');
   const homeUrl = useRef('/');
   const [error, setError] = useState<unknown>();
   const [offline, setOffline] = useState(!navigator.onLine);
@@ -365,14 +363,13 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
     const shortcut = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setCreateText(homeGoal);
         setCreate(true);
       }
       if (e.key === 'Escape') setMobile(false);
     };
     window.addEventListener('keydown', shortcut);
     return () => window.removeEventListener('keydown', shortcut);
-  }, [homeGoal]);
+  }, []);
   const changed = useCallback(() => {
     void qc.invalidateQueries({ queryKey: ['home', session.workspace.id] });
   }, [qc, session.workspace.id]);
@@ -423,7 +420,6 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
           aria-label="新建工作"
           aria-keyshortcuts="Meta+K Control+K"
           onClick={() => {
-            setCreateText(homeGoal);
             setCreate(true);
             setMobile(false);
           }}
@@ -572,13 +568,8 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
             <WorkHome
               session={session}
               active={!id && !isTrade && page === 'home'}
-              goal={homeGoal}
-              onGoalChange={setHomeGoal}
               onOpen={open}
-              onCreate={(text = '') => {
-                setCreateText(text);
-                setCreate(true);
-              }}
+              onCreate={() => setCreate(true)}
             />
           </div>
           {isTrade && (
@@ -609,15 +600,9 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
       {create && (
         <CreateInquiry
           session={session}
-          initialText={createText}
-          onClose={() => {
-            setCreate(false);
-            setCreateText('');
-          }}
+          onClose={() => setCreate(false)}
           onCreated={(i) => {
             setCreate(false);
-            setCreateText('');
-            setHomeGoal('');
             open(i);
             changed();
           }}

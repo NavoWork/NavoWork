@@ -52,6 +52,7 @@ import {
   revisionDocuments,
   saveCanvasFile,
   type CanvasState,
+  type SavedResult,
   type DocumentKind,
   type WorkspaceDocument,
   type WorkspaceFile,
@@ -69,6 +70,7 @@ const icons = {
   source: FileText,
   file: Paperclip,
   note: NotebookPen,
+  result: FileText,
   revision: History,
 };
 const kindLabels: Record<DocumentKind, string> = {
@@ -81,6 +83,7 @@ const kindLabels: Record<DocumentKind, string> = {
   source: '引用资料',
   file: '附件',
   note: '笔记',
+  result: '对话成果',
   revision: '版本快照',
 };
 type PreviewNode = Node<
@@ -155,6 +158,8 @@ interface Props {
   replyEditor: ReactNode;
   replyText?: string;
   openRequest: { id: string; seq: number } | null;
+  saveResultRequest: { result: SavedResult; seq: number } | null;
+  onSavedResultsChange: (revisions: number[]) => void;
   onOriginalSaved: () => Promise<void>;
   onInstruction: (text: string) => void;
   onOpenChat: () => void;
@@ -180,6 +185,8 @@ function CanvasWorkspace({
   replyEditor,
   replyText,
   openRequest,
+  saveResultRequest,
+  onSavedResultsChange,
   onOriginalSaved,
   onInstruction,
   onOpenChat,
@@ -187,10 +194,14 @@ function CanvasWorkspace({
 }: Props) {
   const [initial] = useState(() => {
     try {
-      return { state: readCanvas(scope), error: '' };
+      const saved = readCanvas(scope);
+      return {
+        state: { ...saved, initialRevision: saved.initialRevision ?? inquiry.currentRevision },
+        error: '',
+      };
     } catch {
       return {
-        state: initialCanvas(),
+        state: { ...initialCanvas(), initialRevision: inquiry.currentRevision },
         error: '本机画板草稿无法读取，原存储已保留。当前更改暂不保存。',
       };
     }
@@ -212,6 +223,9 @@ function CanvasWorkspace({
   const directoryToggleRef = useRef<HTMLButtonElement>(null);
   const measurements = useRef<Record<string, { width: number; height: number }>>({});
   const flow = useReactFlow<PreviewNode>();
+  useEffect(() => {
+    onSavedResultsChange((state.results || []).map((result) => result.revision));
+  }, [state.results, onSavedResultsChange]);
   const sourceRefs = revision?.sourceRefs ?? [];
   const sources = useQueries({
     queries: sourceRefs.map((source) => ({
@@ -244,6 +258,27 @@ function CanvasWorkspace({
     }
   }, [state, scope, initial.error]);
   const docs = revisionDocuments(inquiry, revision, messages, revisions, replyText);
+  const initialRevision = revisions.find((r) => r.number === state.initialRevision);
+  const initialDocuments = revisionDocuments(
+    inquiry,
+    initialRevision,
+    messages,
+    revisions.filter((r) => r.number <= (state.initialRevision || 0)),
+  );
+  for (const document of initialDocuments) {
+    if (!docs.some((doc) => doc.id === document.id)) docs.push(document);
+  }
+  docs.push(
+    ...(state.results || []).map((result) => ({
+      id: `result:${result.revision}`,
+      title: result.title,
+      kind: 'result' as const,
+      folder: 'notes',
+      text: result.text,
+      caption: `V${result.revision} · 已确认保留`,
+      revision: revisions.find((r) => r.number === result.revision),
+    })),
+  );
   sourceRefs.forEach((ref, index) => {
     const doc = docs.find((d) => d.id === `source:${ref.sourceVersionId}`);
     if (doc && sources[index]?.data) {
@@ -306,6 +341,9 @@ function CanvasWorkspace({
   const active = state.active === 'canvas' || tabs.includes(state.active) ? state.active : 'canvas';
   const activeDoc = docs.find((d) => d.id === active);
   function open(id: string) {
+    const doc = docs.find((document) => document.id === id);
+    if (doc?.kind === 'reply' && doc.revision?.number !== revision?.number)
+      onRevision(doc.revision!.number);
     setState((s) => ({ ...s, active: id, tabs: s.tabs.includes(id) ? s.tabs : [...s.tabs, id] }));
   }
   useEffect(() => {
@@ -374,22 +412,32 @@ function CanvasWorkspace({
     }
   }
   // Put the main working documents first; supporting files continue below them.
-  const ordered = [...docs].sort((a, b) => {
-    const rank = (kind: DocumentKind) =>
-      ({
-        original: 0,
-        requirements: 1,
-        quote: 2,
-        conversation: 3,
-        risks: 4,
-        reply: 5,
-        source: 6,
-        file: 7,
-        note: 8,
-        revision: 9,
-      })[kind];
-    return rank(a.kind) - rank(b.kind);
-  });
+  const initialIds = new Set(initialDocuments.map((doc) => doc.id));
+  const ordered = docs
+    .filter(
+      (doc) =>
+        initialIds.has(doc.id) ||
+        ['file', 'note', 'result'].includes(doc.kind) ||
+        doc.id.startsWith('bundle:') ||
+        state.positions[doc.id] !== undefined,
+    )
+    .sort((a, b) => {
+      const rank = (kind: DocumentKind) =>
+        ({
+          original: 0,
+          requirements: 1,
+          quote: 2,
+          conversation: 3,
+          risks: 4,
+          reply: 5,
+          source: 6,
+          file: 7,
+          note: 8,
+          result: 9,
+          revision: 10,
+        })[kind];
+      return rank(a.kind) - rank(b.kind);
+    });
   const nodes: PreviewNode[] = ordered.map((doc, index) => ({
     id: doc.id,
     type: 'preview',
@@ -414,12 +462,45 @@ function CanvasWorkspace({
       [`requirements:${n}`, `risks:${n}`],
     ];
     for (const [source, target] of pairs)
-      edges.push({ id: `${source}-${target}`, source, target, ...edgeOptions });
+      if (nodes.some((node) => node.id === source) && nodes.some((node) => node.id === target))
+        edges.push({ id: `${source}-${target}`, source, target, ...edgeOptions });
   }
+  useEffect(() => {
+    if (!saveResultRequest || readOnly) return;
+    try {
+      if (initial.error) throw new Error(initial.error);
+      const result = saveResultRequest.result;
+      const id = `result:${result.revision}`;
+      const position = state.positions[id] || {
+        x: Math.max(0, ...nodes.map((node) => node.position.x)) + 350,
+        y: 68,
+      };
+      const next: CanvasState = {
+        ...state,
+        active: 'canvas',
+        results: state.results?.some((saved) => saved.revision === result.revision)
+          ? state.results
+          : [...(state.results || []), result],
+        positions: { ...state.positions, [id]: position },
+      };
+      localStorage.setItem(canvasKey(scope), JSON.stringify(next));
+      setState(next);
+      setSelected(id);
+      setError(undefined);
+      void flow.setCenter(position.x + 150, position.y + 118, { zoom: 0.9, duration: 300 });
+    } catch {
+      setError('成果节点未能保存，请恢复浏览器存储后重试。对话内容已保留。');
+    }
+  }, [saveResultRequest]);
   function focus(doc: WorkspaceDocument) {
+    const node = nodes.find((n) => n.id === doc.id);
+    if (!node) {
+      open(doc.id);
+      return;
+    }
     setSelected(doc.id);
     setState((s) => ({ ...s, active: 'canvas' }));
-    const pos = nodes.find((n) => n.id === doc.id)!.position;
+    const pos = node.position;
     void flow.setCenter(pos.x + 151, pos.y + 116, { zoom: 0.9, duration: 300 });
   }
   const tabIds = ['canvas', ...tabs];
@@ -735,9 +816,7 @@ function CanvasWorkspace({
               />
               <Panel position="top-left" className="ic-board-label">
                 <span>INQUIRY CANVAS</span>
-                <small>
-                  {revision ? '单击预览 · 双击打开编辑' : '双击打开 · 处理后自动添加需求与方案'}
-                </small>
+                <small>单击预览 · 双击打开 · 对话成果确认后添加</small>
               </Panel>
               <Panel position="top-right">
                 <button
@@ -789,7 +868,7 @@ function CanvasWorkspace({
               const doc = docs.find((d) => d.id === id)!;
               const original = revisionDocuments(
                 inquiry,
-                revision,
+                doc.revision || revision,
                 messages,
                 revisions,
                 replyText,
@@ -904,16 +983,20 @@ function CanvasWorkspace({
                       </label>
                       <FilePreview file={doc.file} base={base} scope={scope} />
                     </div>
-                  ) : doc.kind === 'revision' ? (
+                  ) : doc.kind === 'revision' || doc.kind === 'result' ? (
                     <div className="ic-document-sheet">
-                      <div className="ic-document-eyebrow">VERSION SNAPSHOT</div>
+                      <div className="ic-document-eyebrow">
+                        {doc.kind === 'result' ? 'SAVED CONVERSATION RESULT' : 'VERSION SNAPSHOT'}
+                      </div>
                       <h2>{doc.title}</h2>
                       <p className="ic-document-subtitle">{doc.caption} · 版本快照只读</p>
                       <pre className="ic-source-content">{doc.text}</pre>
-                      <button className="button" onClick={() => onRevision(doc.revision!.number)}>
-                        <History size={14} />
-                        查看此版本业务结果
-                      </button>
+                      {doc.revision && (
+                        <button className="button" onClick={() => onRevision(doc.revision!.number)}>
+                          <History size={14} />
+                          在对话中查看此版本
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <div className="ic-document-sheet">

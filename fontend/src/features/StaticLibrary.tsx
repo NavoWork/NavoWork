@@ -949,8 +949,9 @@ function detectKind(file: File): AssetKind {
 
 function AssetLibrary() {
   const [assets, setAssets] = useState(libraryAssets);
-  const [space, setSpace] = useState<AssetSpace>('company');
+  const [space, setSpace] = useState<AssetSpace>('personal');
   const [folder, setFolder] = useState('all');
+  const [foldersOpen, setFoldersOpen] = useState(false);
   const [kind, setKind] = useState<AssetKind | 'all'>('all');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<SortOrder>('updated');
@@ -982,6 +983,7 @@ function AssetLibrary() {
     );
   const reset = () => {
     setFolder('all');
+    setFoldersOpen(false);
     setKind('all');
     setFavorites(false);
     setQuery('');
@@ -1005,7 +1007,7 @@ function AssetLibrary() {
       {notice && <Notice text={notice} onClose={() => setNotice('')} />}
       <div className="asset-space-bar">
         <div className="asset-spaces" aria-label="资产空间">
-          {(['company', 'personal'] as const).map((item) => (
+          {(['personal', 'company'] as const).map((item) => (
             <button
               key={item}
               aria-pressed={space === item}
@@ -1023,140 +1025,173 @@ function AssetLibrary() {
         </div>
         <SearchBox label="搜索文件" value={query} onChange={setQuery} />
       </div>
-      <div className="asset-folders" aria-label="资产文件夹">
-        {folders.map((item) => (
+      <div className="asset-browser">
+        <aside className={`asset-folder-sidebar${foldersOpen ? ' is-open' : ''}`}>
+          <h2 className="asset-folder-heading">文件夹</h2>
           <button
-            key={item}
-            aria-pressed={folder === item}
-            onClick={() => setFolder(folder === item ? 'all' : item)}
+            className="asset-folder-toggle"
+            aria-expanded={foldersOpen}
+            aria-controls="asset-folder-list"
+            onClick={() => setFoldersOpen(!foldersOpen)}
           >
-            <span className="asset-folder-icon">
-              <Folder size={23} strokeWidth={1.4} fill="currentColor" />
-            </span>
-            <span>
-              <strong>{item}</strong>
-              <small>{spaceAssets.filter((asset) => asset.folder === item).length} 个文件</small>
-            </span>
+            <FolderOpen size={17} />
+            <span>文件夹 · {folder === 'all' ? '全部文件' : folder}</span>
             <ChevronRight size={15} />
           </button>
-        ))}
-      </div>
-      <section className="asset-files" aria-label={`${spaceLabels[space]}文件`}>
-        <div className="asset-files-heading">
-          <div className="library-section-title">
-            {folder !== 'all' && (
-              <button
-                className="library-back"
-                aria-label="返回全部文件"
-                onClick={() => setFolder('all')}
-              >
-                <ArrowLeft size={16} />
-              </button>
-            )}
-            {folder === 'all' ? '全部文件' : folder}
-            <span>{filtered.length}</span>
-          </div>
-          <div className="library-toolbar-controls">
+          <nav className="asset-folders" id="asset-folder-list" aria-label="资产文件夹">
             <button
-              className="library-favorite-filter"
-              aria-pressed={favorites}
-              onClick={() => setFavorites(!favorites)}
+              className="asset-folder-all"
+              aria-pressed={folder === 'all'}
+              onClick={() => {
+                setFolder('all');
+                setFoldersOpen(false);
+              }}
             >
-              <Star size={15} fill={favorites ? 'currentColor' : 'none'} />
-              收藏
+              <LayoutGrid size={17} />
+              <span className="asset-folder-name">全部文件</span>
+              <span className="asset-folder-count">{spaceAssets.length}</span>
             </button>
-            <SortSelect value={sort} onChange={setSort} />
-            <div className="library-segmented" aria-label="文件视图">
+            {folders.map((item) => (
               <button
-                aria-label="网格视图"
-                aria-pressed={view === 'grid'}
-                onClick={() => setView('grid')}
+                key={item}
+                aria-pressed={folder === item}
+                onClick={() => {
+                  setFolder(item);
+                  setFoldersOpen(false);
+                }}
               >
-                <LayoutGrid size={16} />
+                <Folder size={17} className="asset-folder-icon" />
+                <span className="asset-folder-name">{item}</span>
+                <span className="asset-folder-count">
+                  {spaceAssets.filter((asset) => asset.folder === item).length}
+                </span>
               </button>
+            ))}
+          </nav>
+        </aside>
+        <section className="asset-files" aria-label={`${spaceLabels[space]}文件`}>
+          <div className="asset-files-heading">
+            <div className="library-section-title">
+              {folder !== 'all' && (
+                <button
+                  className="library-back"
+                  aria-label="返回全部文件"
+                  onClick={() => setFolder('all')}
+                >
+                  <ArrowLeft size={16} />
+                </button>
+              )}
+              {folder === 'all' ? '全部文件' : folder}
+              <span>{filtered.length}</span>
+            </div>
+            <div className="library-toolbar-controls">
               <button
-                aria-label="列表视图"
-                aria-pressed={view === 'list'}
-                onClick={() => setView('list')}
+                className="library-favorite-filter"
+                aria-pressed={favorites}
+                onClick={() => setFavorites(!favorites)}
               >
-                <List size={17} />
+                <Star size={15} fill={favorites ? 'currentColor' : 'none'} />
+                收藏
               </button>
+              <SortSelect value={sort} onChange={setSort} />
+              <div className="library-segmented" aria-label="文件视图">
+                <button
+                  aria-label="网格视图"
+                  aria-pressed={view === 'grid'}
+                  onClick={() => setView('grid')}
+                >
+                  <LayoutGrid size={16} />
+                </button>
+                <button
+                  aria-label="列表视图"
+                  aria-pressed={view === 'list'}
+                  onClick={() => setView('list')}
+                >
+                  <List size={17} />
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-        <div className="asset-type-filters" aria-label="文件类型">
-          {assetKinds.map((item) => (
-            <button key={item.id} aria-pressed={kind === item.id} onClick={() => setKind(item.id)}>
-              {item.label}
-            </button>
-          ))}
-        </div>
-        {view === 'list' && filtered.length > 0 && (
-          <div className="asset-list-header">
-            <span>文件名称</span>
-            <span>大小</span>
-            <span>更新时间</span>
-            <span />
+          <div className="asset-type-filters" aria-label="文件类型">
+            {assetKinds.map((item) => (
+              <button
+                key={item.id}
+                aria-pressed={kind === item.id}
+                onClick={() => setKind(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
           </div>
-        )}
-        <div className={`library-asset-${view}`}>
-          {filtered.map((asset) => {
-            const Icon = typeIcons[asset.kind];
-            return (
-              <div className="library-asset-card" key={asset.id}>
-                <button
-                  className="library-asset-open"
-                  onClick={() => setSelected(asset)}
-                  aria-label={`预览 ${asset.name}`}
-                >
-                  {view === 'grid' ? (
-                    <div className="library-thumbnail">
-                      <AssetArtwork asset={asset} />
-                      <span className="asset-extension">
-                        {asset.name.split('.').pop()?.toUpperCase()}
+          {view === 'list' && filtered.length > 0 && (
+            <div className="asset-list-header">
+              <span>文件名称</span>
+              <span>大小</span>
+              <span>更新时间</span>
+              <span />
+            </div>
+          )}
+          <div className={`library-asset-${view}`}>
+            {filtered.map((asset) => {
+              const Icon = typeIcons[asset.kind];
+              return (
+                <div className="library-asset-card" key={asset.id}>
+                  <button
+                    className="library-asset-open"
+                    onClick={() => setSelected(asset)}
+                    aria-label={`预览 ${asset.name}`}
+                  >
+                    {view === 'grid' ? (
+                      <div className="library-thumbnail">
+                        <AssetArtwork asset={asset} />
+                        <span className="asset-extension">
+                          {asset.name.split('.').pop()?.toUpperCase()}
+                        </span>
+                        <span className="asset-open-hint">
+                          <ArrowUpRight size={17} />
+                        </span>
+                      </div>
+                    ) : (
+                      <span className={`asset-list-icon kind-${asset.kind}`}>
+                        <Icon size={22} />
                       </span>
-                      <span className="asset-open-hint">
-                        <ArrowUpRight size={17} />
+                    )}
+                    <span className="library-asset-info">
+                      <strong title={asset.name}>{asset.name}</strong>
+                      <span>
+                        {view === 'grid' ? (
+                          <>
+                            <Icon size={12} />
+                            {asset.size}
+                            <span className="library-dot">·</span>
+                            {asset.updated.slice(5).replace('-', '/')}
+                          </>
+                        ) : (
+                          asset.folder
+                        )}
                       </span>
-                    </div>
-                  ) : (
-                    <span className={`asset-list-icon kind-${asset.kind}`}>
-                      <Icon size={22} />
                     </span>
+                  </button>
+                  {view === 'list' && (
+                    <>
+                      <span className="asset-list-size">{asset.size}</span>
+                      <time dateTime={asset.updated}>
+                        {asset.updated.slice(5).replace('-', '/')}
+                      </time>
+                    </>
                   )}
-                  <span className="library-asset-info">
-                    <strong title={asset.name}>{asset.name}</strong>
-                    <span>
-                      {view === 'grid' ? (
-                        <>
-                          <Icon size={12} />
-                          {asset.size}
-                          <span className="library-dot">·</span>
-                          {asset.updated.slice(5).replace('-', '/')}
-                        </>
-                      ) : (
-                        asset.folder
-                      )}
-                    </span>
-                  </span>
-                </button>
-                {view === 'list' && (
-                  <>
-                    <span className="asset-list-size">{asset.size}</span>
-                    <time dateTime={asset.updated}>{asset.updated.slice(5).replace('-', '/')}</time>
-                  </>
-                )}
-                <Favorite
-                  active={asset.starred}
-                  title={asset.name}
-                  onClick={() => toggleStar(asset.id)}
-                />
-              </div>
-            );
-          })}
-        </div>
-        {!filtered.length && <LibraryEmpty title="没有找到相关文件" onReset={reset} />}
-      </section>
+                  <Favorite
+                    active={asset.starred}
+                    title={asset.name}
+                    onClick={() => toggleStar(asset.id)}
+                  />
+                </div>
+              );
+            })}
+          </div>
+          {!filtered.length && <LibraryEmpty title="没有找到相关文件" onReset={reset} />}
+        </section>
+      </div>
       {selected && <AssetPreview asset={selected} onClose={() => setSelected(null)} />}
       {uploading && (
         <ImportDialog
