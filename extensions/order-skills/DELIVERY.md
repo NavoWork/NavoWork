@@ -1,5 +1,7 @@
 # W2 独立能力交付记录
 
+当前增量：已针对主模块稳定提交 `d23ab0a9ecba4dffd4ce0aa97bd496bf668aa156` 完成真实合同绑定及兼容测试。完整回归 **73 项全部通过，0 skipped**；其中新增 20 项为 pinned 合同/ToolService 兼容性测试。初次交付记录保留在下方，协议补充见文末。
+
 日期：2026-10-31（Asia/Shanghai）。共同基线核验为 `4e34ce0958912fc3326358589a520cbf38c5103e`，提交信息为合入 `origin/lirui` 的合并提交。开发分支 `codex/order-skills`，managed worktree：`C:\Users\Justike\.codex\worktrees\b981\NavoWork`。本交付只包含 `extensions/order-skills/`；未修改共享 checkout、backend、fontend、contracts、根配置或 test，也未复制未提交 agent-kit。
 
 三个产品内 Skill、输入/输出 JSON Schema、领域检查函数、JSON CLI、宿主薄适配层、synthetic examples 和离线测试已完成。资源入口 `manifest.json`，使用命令见 README，接入端口及主链路待办见 INTEGRATION。
@@ -54,3 +56,25 @@ Context7 MCP 入口在本会话工具清单中不可用；已查阅 Python 官�
 - https://docs.python.org/3/library/typing.html#typing.Protocol
 
 本分支交付后由主协调链自行审查/合入；本任务不合入 justike，不推送或创建 PR。
+
+## d23ab0a 稳定协议兼容增量
+
+增量基于本分支首个提交 `a81e35254c0553813c886b8c3c4d4d086dea7653`，仍只修改 `extensions/order-skills/`。未合并 d23ab0a：用只读 Git object 获取其已提交内容，未读取/复制主线未提交实现，未操作共享 checkout 的分支或暂存区。
+
+新增 `order_skills/agentkit.py` 直接导入已提交的真实 ExecutionContext/FileRef/Citation/ToolCall/ToolResult/Question，并通过 CaseContextPort、FileStorePort、ArtifactPort 与既有 ToolService 绑定。引用使用原生 locator 字典及捕获时 sha256，来源只接受宿主列出的 file_id，读取调用真实 read_document 工具。域值/来源业务角色/批准范围及当前版本须由宿主注入 domain_policy 核验，缺 policy blocked。Case/read/write/generation 由宿主上下文与 assert_current 控制；工具参数不可提供 context/权限。
+
+结果符合真实 ToolResult 的 extra=forbid 合同：文件在 outputs，引用与阻断详情在 data.order_skills；保留原生 artifacts/warnings/questions/retryable/code。ToolCall 提供幂等键，未向 ExecutionContext 添加字段。条件性反馈、草稿语义和早期缺证场景保持原有行为。
+
+`tests/committed_agentkit.py` 在测试进程内用 git show 读取 pinned revision 的实际模块代码，测试不落盘复制来源，也不把 schema/DTO 手写一份代替合同。实际导入并运行了 d23ab0a 的 ToolService.call 与四个 Port 的协议检查。业务宿主是显式内存替身；新增可选草稿工具的两个测试也只是注册替身，不是真实渲染、数据库事务或生产 ACL 测试。
+
+实际运行：
+
+```powershell
+# 工作目录：C:\Users\Justike\.codex\worktrees\b981\NavoWork\extensions\order-skills
+& $orderPy -m unittest discover -s tests -p test_agentkit_compat.py -v
+& $orderPy tools/verify.py --qa-deps .qa/deps --require-qa
+```
+
+最终完整输出：`Ran 73 tests in 2.291s` / `OK`，无 skipped。原生三类 result.data 也已用发布的 output schema 校验；PI 元信息不会导致 additionalProperties 冲突。新增验证覆盖真实模型额外字段拒绝、dict locator/引用往返、真实 ToolService 按 ID 读取、缺文件工具 blocked、缺策略 blocked、权限/Case/generation/来源哈希/业务版本冲突、定位/摘录不匹配拒绝、原生 Question、拒绝权限/shell 注入，以及可选已注册工具替身的原生输出和部分完成信息透传。
+
+待主模块接入项仍独立：注册三个扩展操作与 Skills、注入真实业务 policy 与 backend ports、实现/注册通用文档草稿工具并验证 ArtifactTransaction/幂等/CAS、Worker/workbench 接入、真实模型运行和文件视觉检查。d23ab0a 当前没有本任务所需通用新文档草稿工具，实际 create_file=True 明确 TOOL_UNAVAILABLE/blocked，不使用报价生成器冒充 PI。LocalAdapter.assert_current 的只读/写权限语义限制已写入 INTEGRATION，模块不绕过宿主 fence。

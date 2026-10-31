@@ -26,7 +26,9 @@ def nullable(schema):
 def schemas():
     string = {"type": "string", "minLength": 1}
     boolean = {"type": "boolean"}
-    evidence = object_schema({name: string for name in ("case_id", "source_id", "locator", "quote", "role")})
+    evidence = object_schema({**{name: string for name in ("case_id", "source_id", "quote", "role")},
+                              "locator": {"anyOf": [string, {"type": "object", "minProperties": 1}]},
+                              "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}})
     located_field = object_schema({"value": nullable(string), "raw": nullable(string), "evidence": nullable(ref("evidence"))})
     statement = object_schema({"decision": {"enum": ["full", "partial", "conditional", "rejected", None]},
                                "conditions": {"type": "array", "items": string},
@@ -78,12 +80,25 @@ def schemas():
                 "pending_confirmations": {"type": "array", "items": pending}, "findings": findings,
                 "signed": {"const": False}, "payment_received": {"const": False}, "production_released": {"const": False},
                 "file_generation": {"const": "host_tool_required"}, "notice": string}
+    native_citation = object_schema({"file_id": string, "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+                                     "locator": {"type": "object"}, "excerpt": {**string, "maxLength": 4000}},
+                                    ("file_id", "sha256", "locator", "excerpt"))
+    binding_metadata = object_schema({"operation": string, "contract_revision": string,
+                                      "citations": {"type": "array", "items": native_citation},
+                                      "blockers": {"type": "array", "items": {"type": "object"}},
+                                      "host_draft_data": {"type": "object"}},
+                                     ("operation", "contract_revision", "citations", "blockers"))
+
+    def result_schema(props):
+        return object_schema({**props, "order_skills": ref("bindingMetadata")}, props)
+
     return {"evidence": evidence, "field": located_field, "statement": statement,
             "feedback": feedback, "line": line, "document": document, "baseline": baseline,
             "finding": finding, "modification": modification, "basis": basis, "difference": difference,
             "sampleRequest": sample_input, "orderRequest": order_input, "piRequest": pi_input,
-            "sampleResult": object_schema(sample_props, sample_props),
-            "poResult": object_schema(po_props, po_props), "piResult": object_schema(pi_props, pi_props)}
+            "bindingMetadata": binding_metadata,
+            "sampleResult": result_schema(sample_props),
+            "poResult": result_schema(po_props), "piResult": result_schema(pi_props)}
 
 
 def dump(path, value):

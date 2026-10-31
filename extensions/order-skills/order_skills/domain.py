@@ -63,9 +63,11 @@ def finding(code, path, message, severity="review", **details):
 def located(evidence, case_id):
     if not isinstance(evidence, dict):
         return False
-    return evidence.get("case_id") == case_id and all(
+    locator = evidence.get("locator")
+    locator_ok = (isinstance(locator, str) and bool(locator.strip())) or (isinstance(locator, dict) and bool(locator))
+    return locator_ok and evidence.get("case_id") == case_id and all(
         isinstance(evidence.get(k), str) and evidence[k].strip()
-        for k in ("source_id", "locator", "quote", "role"))
+        for k in ("source_id", "quote", "role"))
 
 
 def decimal(value, path):

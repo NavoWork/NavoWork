@@ -1,10 +1,11 @@
 """Thin host boundary. Generic parameters are the HOST's existing contract types.
 
-No substitute ExecutionContext/FileRef/Citation/ToolResult is shipped here. The
-uncommitted agent-kit ABI is deliberately not imported or inferred.
+No substitute ExecutionContext/FileRef/Citation/ToolResult is shipped here.
+agentkit.py provides the concrete binding to the committed Agent Kit contracts.
 """
 
 from copy import deepcopy
+import json
 from typing import Protocol, TypeVar
 
 from .domain import InvalidInput, compare_po, prepare_pi, review_sample
@@ -44,7 +45,7 @@ class HostBindings(Protocol[ExecutionContext, FileRef, Citation, ToolResult]):
     def create_document_draft(self, context: ExecutionContext, *, operation: str,
                               data: dict, citations: list[Citation]) -> list[FileRef]:
         """Use generic file tools, preserve draft labels/conflicts, enforce
-        idempotency/base versions from ExecutionContext and return HOST FileRefs.
+        host-provided idempotency/base versions and return HOST FileRefs.
         Missing renderer/format support must raise HostBlocked. Never publish.
         """
         ...
@@ -56,7 +57,8 @@ def evidence_in(value):
     """Collect located candidate evidence; host still validates each reference."""
     if isinstance(value, dict):
         if all(isinstance(value.get(k), str) and value[k].strip()
-               for k in ("source_id", "locator", "quote", "role", "case_id")):
+               for k in ("source_id", "quote", "role", "case_id")) and (
+                   isinstance(value.get("locator"), (str, dict)) and value["locator"]):
             yield value
         for item in value.values():
             yield from evidence_in(item)
@@ -91,7 +93,7 @@ def run(operation: str, request: dict, context: ExecutionContext,
         data = OPERATIONS[operation](request)
         seen = set()
         for evidence in evidence_in(request):
-            key = tuple(evidence[k] for k in ("case_id", "source_id", "locator", "quote", "role"))
+            key = json.dumps(evidence, sort_keys=True, ensure_ascii=True, allow_nan=False)
             if key not in seen:
                 citations.append(host.citation(context, evidence))
                 seen.add(key)

@@ -229,10 +229,6 @@
           "type": "string",
           "minLength": 1
         },
-        "locator": {
-          "type": "string",
-          "minLength": 1
-        },
         "quote": {
           "type": "string",
           "minLength": 1
@@ -240,6 +236,22 @@
         "role": {
           "type": "string",
           "minLength": 1
+        },
+        "locator": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "object",
+              "minProperties": 1
+            }
+          ]
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
         }
       },
       "required": [],

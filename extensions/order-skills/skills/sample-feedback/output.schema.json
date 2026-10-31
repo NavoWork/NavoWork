@@ -63,6 +63,9 @@
         },
         "production_release": {
           "const": "not_evaluated"
+        },
+        "order_skills": {
+          "$ref": "#/$defs/bindingMetadata"
         }
       },
       "required": [
@@ -124,10 +127,6 @@
           "type": "string",
           "minLength": 1
         },
-        "locator": {
-          "type": "string",
-          "minLength": 1
-        },
         "quote": {
           "type": "string",
           "minLength": 1
@@ -135,6 +134,22 @@
         "role": {
           "type": "string",
           "minLength": 1
+        },
+        "locator": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "object",
+              "minProperties": 1
+            }
+          ]
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
         }
       },
       "required": [],
@@ -261,6 +276,66 @@
         "path",
         "message",
         "severity"
+      ],
+      "additionalProperties": false
+    },
+    "bindingMetadata": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contract_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "citations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "file_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "locator": {
+                "type": "object"
+              },
+              "excerpt": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000
+              }
+            },
+            "required": [
+              "file_id",
+              "sha256",
+              "locator",
+              "excerpt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "host_draft_data": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "operation",
+        "contract_revision",
+        "citations",
+        "blockers"
       ],
       "additionalProperties": false
     }
