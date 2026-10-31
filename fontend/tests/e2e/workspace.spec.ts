@@ -2,15 +2,14 @@ import { test, expect, type Page } from '@playwright/test';
 async function login(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: '进入演示工作空间' }).click();
-  await expect(page.getByRole('heading', { name: /把手上的事，向前推进/ })).toBeVisible();
-  await page.getByRole('button', { name: '全部询盘', exact: true }).click();
+  await expect(page.getByRole('heading', { name: /我的工作/ })).toBeVisible();
 }
 async function home(page: Page) {
   await page
     .getByRole('navigation', { name: '主导航' })
     .getByRole('button', { name: '工作台', exact: true })
     .click();
-  await page.getByRole('button', { name: '全部询盘', exact: true }).click();
+  await expect(page.getByRole('heading', { name: /我的工作/ })).toBeVisible();
 }
 async function openMexico(page: Page) {
   await page.getByRole('button', { name: '墨西哥帆布袋试单', exact: true }).click();
@@ -214,5 +213,5 @@ test('浏览器存储被禁用与异常链接不会使页面崩溃', async ({ pa
     window.dispatchEvent(new PopStateEvent('popstate'));
   });
   await expect(page.getByText('询盘链接格式不正确，请从工作台重新打开。')).toBeVisible();
-  await expect(page.getByRole('heading', { name: /把手上的事，向前推进/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /我的工作/ })).toBeVisible();
 });

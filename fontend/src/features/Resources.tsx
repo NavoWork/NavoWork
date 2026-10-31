@@ -4,7 +4,6 @@ import {
   ArrowDownToLine,
   ArrowRight,
   BookOpen,
-  Boxes,
   Check,
   CheckCircle2,
   ChevronRight,
@@ -12,29 +11,19 @@ import {
   FileImage,
   FileText,
   FolderOpen,
-  Layers3,
   Loader2,
   Package,
   Plus,
   Search,
   ShieldCheck,
-  Sparkles,
   Upload,
   X,
 } from 'lucide-react';
-import {
-  api,
-  ApiError,
-  type Asset,
-  type Capability,
-  type ImportPreview,
-  type Session,
-  type Source,
-} from '../api';
+import { api, ApiError, type Asset, type ImportPreview, type Session, type Source } from '../api';
 import { EmptyState, ErrorNotice, Loading, Modal, StatusBadge } from '../components/ui';
 import './resources.css';
 
-type ResourcePage = 'knowledge' | 'assets' | 'capabilities';
+type ResourcePage = 'knowledge' | 'assets';
 type KnowledgeTab = 'knowledge' | 'products';
 const titles: Record<ResourcePage, [string, string, string]> = {
   knowledge: ['YOUR SHARED KNOWLEDGE', '知识 Wiki', '把商品与业务经验，变成每次回复的可靠依据。'],
@@ -42,11 +31,6 @@ const titles: Record<ResourcePage, [string, string, string]> = {
     'READY FOR YOUR NEXT REPLY',
     '资产库',
     '集中管理商品素材与证据文件，保留每一次引用的版本。',
-  ],
-  capabilities: [
-    'ONE WORKSPACE, MANY CAPABILITIES',
-    '能力目录',
-    '在同一个询盘里，调用完成这件事需要的专业能力。',
   ],
 };
 const csvTemplate =
@@ -81,15 +65,14 @@ export function Resources({ page, session }: { page: ResourcePage; session: Sess
   const endpoint = page === 'knowledge' ? tab : page;
   const resources = useQuery({
     queryKey: [...scope, endpoint],
-    queryFn: ({ signal }) =>
-      api.get<{ items: (Source | Asset | Capability)[] }>(`${base}/${endpoint}`, signal),
+    queryFn: ({ signal }) => api.get<{ items: (Source | Asset)[] }>(`${base}/${endpoint}`, signal),
     staleTime: 15_000,
     retry: false,
   });
   const items = resources.data?.items;
   const filtered = items?.filter(
     (item) =>
-      ('title' in item ? item.title : item.name).toLowerCase().includes(query.toLowerCase()) ||
+      item.title.toLowerCase().includes(query.toLowerCase()) ||
       ('skuScope' in item && item.skuScope.join(' ').toLowerCase().includes(query.toLowerCase())),
   );
   const [kicker, title, description] = titles[page];
@@ -111,17 +94,15 @@ export function Resources({ page, session }: { page: ResourcePage; session: Sess
           <h1>{title}</h1>
           <p>{description}</p>
         </div>
-        {page !== 'capabilities' && (
-          <button
-            className="button button-primary"
-            onClick={() =>
-              setModal(page === 'assets' ? 'upload' : tab === 'products' ? 'import' : 'knowledge')
-            }
-          >
-            {page === 'assets' || tab === 'products' ? <Upload size={14} /> : <Plus size={15} />}{' '}
-            {page === 'assets' ? '上传素材' : tab === 'products' ? '导入商品 CSV' : '新建知识'}
-          </button>
-        )}
+        <button
+          className="button button-primary"
+          onClick={() =>
+            setModal(page === 'assets' ? 'upload' : tab === 'products' ? 'import' : 'knowledge')
+          }
+        >
+          {page === 'assets' || tab === 'products' ? <Upload size={14} /> : <Plus size={15} />}{' '}
+          {page === 'assets' ? '上传素材' : tab === 'products' ? '导入商品 CSV' : '新建知识'}
+        </button>
       </header>
       {notice && (
         <div className="resource-notice" role="status">
@@ -153,7 +134,7 @@ export function Resources({ page, session }: { page: ResourcePage; session: Sess
             </>
           ) : (
             <span className="resource-total">
-              {page === 'assets' ? '全部素材' : '内置能力'} <span>{items?.length ?? '—'}</span>
+              全部素材 <span>{items?.length ?? '—'}</span>
             </span>
           )}
         </div>
@@ -164,7 +145,7 @@ export function Resources({ page, session }: { page: ResourcePage; session: Sess
             placeholder={
               page === 'assets'
                 ? '搜索素材名称或 SKU'
-                : `搜索${page === 'knowledge' ? (tab === 'knowledge' ? '知识' : '商品') : '能力'}`
+                : `搜索${tab === 'knowledge' ? '知识' : '商品'}`
             }
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -180,15 +161,6 @@ export function Resources({ page, session }: { page: ResourcePage; session: Sess
               : '先检查 CSV，再确认发布。每个价阶单独一行；未发布的数据不会进入商品目录。'}
           </p>
           <span className="muted">{admin ? '管理员' : '成员 · 发布需管理员'}</span>
-        </div>
-      )}
-      {page === 'capabilities' && (
-        <div className="resource-explainer">
-          <Layers3 size={18} />
-          <p>
-            能力共享当前询盘的上下文。关闭必需能力会阻止新运行；每次执行的步骤与结果在询盘中查看。
-          </p>
-          <span className="muted">{admin ? '可管理能力' : '仅管理员可启停'}</span>
         </div>
       )}
       {resources.isPending ? (
@@ -289,20 +261,6 @@ export function Resources({ page, session }: { page: ResourcePage; session: Sess
               ))}
             </div>
           )}
-          {page === 'capabilities' && (
-            <div className="capability-grid">
-              {(filtered as Capability[]).map((item, index) => (
-                <CapabilityCard
-                  key={item.id}
-                  item={item}
-                  index={index}
-                  base={base}
-                  admin={admin}
-                  onChanged={() => changed('能力配置已保存。')}
-                />
-              ))}
-            </div>
-          )}
         </>
       )}
       <footer className="resource-footer">
@@ -310,11 +268,7 @@ export function Resources({ page, session }: { page: ResourcePage; session: Sess
         <span>
           {session.workspace.name} / {title}
         </span>
-        <span>
-          {page === 'capabilities'
-            ? '每次运行保留能力版本与执行记录'
-            : '文件与资料仅在有权限的工作空间内使用'}
-        </span>
+        <span>文件与资料仅在有权限的工作空间内使用</span>
       </footer>
       {modal === 'knowledge' && (
         <KnowledgeEditor
@@ -980,72 +934,5 @@ function AssetPreview({
         </div>
       </div>
     </Modal>
-  );
-}
-
-function CapabilityCard({
-  item,
-  index,
-  base,
-  admin,
-  onChanged,
-}: {
-  item: Capability;
-  index: number;
-  base: string;
-  admin: boolean;
-  onChanged: () => void;
-}) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<unknown>(null);
-  const lock = useRef(false);
-  const icons = [Sparkles, Search, Boxes, FileText, ShieldCheck, FolderOpen];
-  const Icon = icons[index % icons.length];
-  async function toggle() {
-    if (lock.current) return;
-    lock.current = true;
-    setBusy(true);
-    setError(null);
-    try {
-      await api.patch<Capability>(`${base}/capabilities/${item.id}`, { enabled: !item.enabled });
-      onChanged();
-    } catch (e) {
-      setError(e);
-    } finally {
-      lock.current = false;
-      setBusy(false);
-    }
-  }
-  return (
-    <article className={`capability-card ${!item.enabled ? 'disabled-capability' : ''}`}>
-      <div className="capability-top">
-        <span className="capability-icon">
-          <Icon size={23} strokeWidth={1.35} />
-        </span>
-        <span className="badge">{item.required ? '必需能力' : '可选能力'}</span>
-      </div>
-      <h3>{item.name}</h3>
-      <p>{item.description}</p>
-      <div className="capability-bottom">
-        <span>
-          V{item.version} · {item.category}
-        </span>
-        <label className="capability-switch-label">
-          <span>{busy ? '保存中' : item.enabled ? '已启用' : '已停用'}</span>
-          <button
-            role="switch"
-            aria-label={`${item.name}开关`}
-            aria-checked={item.enabled}
-            className="capability-switch"
-            disabled={!admin || busy}
-            onClick={() => void toggle()}
-            title={!admin ? '仅管理员可更改' : undefined}
-          >
-            <span />
-          </button>
-        </label>
-      </div>
-      <ErrorNotice error={error} />
-    </article>
   );
 }

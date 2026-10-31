@@ -535,7 +535,7 @@ function route(
           currentRevision: i!.currentRevision,
         });
       if (s.capabilities.some((c) => c.required && !c.enabled))
-        fail('TOOL_UNAVAILABLE', '必需能力已停用，请在能力目录启用后重试', 503);
+        fail('TOOL_UNAVAILABLE', '必需能力已停用，请联系管理员启用后重试', 503);
       if (!['analyze', 'revise', 'accept_proposal'].includes(b.action))
         fail('INVALID_INPUT', '未知运行动作', 400);
       if (b.action === 'accept_proposal') {

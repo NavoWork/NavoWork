@@ -1,309 +1,379 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import {
+  ArrowDown,
   ArrowRight,
-  ArrowUp,
-  Check,
-  ChevronRight,
-  Clock3,
-  FileSpreadsheet,
+  CheckCheck,
+  CircleDashed,
   FileText,
-  FolderOpen,
-  GitBranch,
-  Package,
+  Hourglass,
+  Layers3,
   Paperclip,
-  Plus,
-  ShieldCheck,
-  Sparkles,
+  Search,
+  X,
 } from 'lucide-react';
-import { api } from '../../api';
-import type { Inquiry, Page, Session } from '../../api/types';
-import { ErrorNotice, Loading } from '../../components/ui';
-import { caseId, calculate, initialState, usd } from './model';
-import { readWorkbench } from './use-workbench';
+import { api, mode } from '../../api';
+import type { BusinessStatus, Inquiry, Page, Session } from '../../api/types';
+import { EmptyState, ErrorNotice, Loading, StatusBadge, statusLabels } from '../../components/ui';
+
+const statuses = [
+  { key: 'todo', label: '待办询盘', icon: CircleDashed },
+  { key: 'active', label: '进行中', icon: Layers3 },
+  { key: 'waiting', label: '待确认', icon: Hourglass },
+  { key: 'done', label: '已结束', icon: CheckCheck },
+] as const;
+const updatedAt = new Intl.DateTimeFormat('zh-CN', {
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  timeZone: 'Asia/Shanghai',
+  hour12: false,
+});
 
 export function WorkHome({
   session,
+  active,
+  goal,
+  onGoalChange,
   onCreate,
   onOpen,
 }: {
   session: Session;
+  active: boolean;
+  goal: string;
+  onGoalChange: (goal: string) => void;
   onCreate: (initialText?: string) => void;
   onOpen: (inquiry: Inquiry) => void;
 }) {
   const navigate = useNavigate();
-  const [goal, setGoal] = useState('');
-  const [demo] = useState(() => {
-    try {
-      return readWorkbench(`${session.user.id}:${session.workspace.id}:${caseId}`);
-    } catch {
-      return initialState();
+  const location = useLocation();
+  const lastSearch = useRef(location.pathname === '/' ? location.search : '');
+  if (active) lastSearch.current = location.search;
+  const params = new URLSearchParams(lastSearch.current);
+  const selected = params.get('status') || '';
+  const status: BusinessStatus | '' = statuses.some((item) => item.key === selected)
+    ? (selected as BusinessStatus)
+    : '';
+  const query = params.get('q') || '';
+  const [debounced, setDebounced] = useState(query.trim());
+  const root = useRef<HTMLDivElement>(null);
+  const listPanel = useRef<HTMLElement>(null);
+  const scrollPosition = useRef(0);
+  const base = `/workspaces/${session.workspace.id}/inquiries`;
+  const key = ['home', session.workspace.id, session.user.id];
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(query.trim()), query.trim() ? 250 : 0);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  // Keep the list mounted, and restore its own scroll position after leaving a detail or resource.
+  useLayoutEffect(() => {
+    if (!active) return;
+    const scroller = root.current?.closest<HTMLElement>('.content-scroll');
+    if (!scroller) return;
+    scroller.scrollTop = scrollPosition.current;
+    const remember = () => {
+      scrollPosition.current = scroller.scrollTop;
+    };
+    scroller.addEventListener('scroll', remember);
+    return () => scroller.removeEventListener('scroll', remember);
+  }, [active]);
+
+  const summary = useQuery({
+    queryKey: [...key, 'summary'],
+    queryFn: ({ signal }) => api.get<Record<BusinessStatus, number>>(`${base}/summary`, signal),
+    enabled: active,
+  });
+  const list = useInfiniteQuery({
+    queryKey: [...key, 'list', status, debounced],
+    initialPageParam: '',
+    queryFn: ({ signal, pageParam }) =>
+      api.get<Page<Inquiry>>(
+        `${base}?${new URLSearchParams({ limit: '20', q: debounced, status, cursor: pageParam })}`,
+        signal,
+      ),
+    getNextPageParam: (page) => page.nextCursor || undefined,
+    enabled: active,
+  });
+  const items = list.data?.pages.flatMap((page) => page.items) || [];
+  const count = list.data?.pages[0].matchedCount;
+  const searching = query.trim() !== debounced;
+  const filtered = Boolean(status || query);
+  const totals = summary.isError ? undefined : summary.data;
+
+  function filter(nextStatus: BusinessStatus | '', nextQuery = query) {
+    const next = new URLSearchParams(lastSearch.current);
+    if (nextStatus) next.set('status', nextStatus);
+    else next.delete('status');
+    if (nextQuery) next.set('q', nextQuery);
+    else next.delete('q');
+    navigate({ pathname: '/', search: next.toString() }, { replace: true });
+  }
+
+  function selectStatus(nextStatus: BusinessStatus) {
+    filter(status === nextStatus ? '' : nextStatus);
+    const panel = listPanel.current;
+    const scroller = root.current?.closest<HTMLElement>('.content-scroll');
+    if (
+      panel &&
+      scroller &&
+      panel.getBoundingClientRect().top > scroller.getBoundingClientRect().bottom - 160
+    ) {
+      panel.scrollIntoView({
+        block: 'start',
+        behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+      });
     }
-  });
-  const demoPrice = calculate(demo.current.costs);
-  const nextStep = demo.proposal
-    ? '审核包装变更'
-    : demo.current.approved
-      ? '整理交付草稿，补充生产批准'
-      : '核对成本，审核报价';
-  const recent = useQuery({
-    queryKey: ['home', session.workspace.id, 'work-jobs'],
-    queryFn: ({ signal }) =>
-      api.get<Page<Inquiry>>(`/workspaces/${session.workspace.id}/inquiries?limit=20`, signal),
-  });
-  const working = recent.data?.items.filter((i) => i.businessStatus !== 'done').slice(0, 2) || [];
-  const waiting = recent.data?.items.find((i) => i.businessStatus === 'waiting');
-  const date = new Intl.DateTimeFormat('zh-CN', {
-    month: 'long',
-    day: 'numeric',
-    weekday: 'long',
-    timeZone: 'Asia/Shanghai',
-  }).format(new Date());
+  }
+
   return (
-    <div className="wh-page">
-      <header className="wh-greeting">
-        <div>
-          <span className="tw-eyebrow">YOUR WORK, MOVING FORWARD</span>
-          <h1>把手上的事，向前推进。</h1>
-          <p>{session.user.name}，欢迎回来。从一个目标开始，直到成果可以交付。</p>
-        </div>
-        <span className="wh-date">
-          <span className="tw-live-dot" />
-          {date}
-        </span>
-      </header>
-      <section className="wh-start" aria-label="开始新工作">
-        <div className="wh-start-heading">
-          <span>
-            <Sparkles size={17} />
-            今天，需要完成什么？
-          </span>
-          <span>从资料开始，不必先填订单</span>
+    <div ref={root} className="wh-page wh-dashboard">
+      <section className="overview-grid wh-status-grid" aria-label="询盘状态">
+        {statuses.map(({ key: value, label, icon: Icon }) => (
+          <button
+            key={value}
+            className={`stat-card ${status === value ? 'selected' : ''}`}
+            aria-pressed={status === value}
+            aria-controls="work-list"
+            aria-label={`${label} ${totals?.[value] ?? (summary.isError ? '暂不可用' : '加载中')}`}
+            title={`筛选${label}工作`}
+            onClick={() => selectStatus(value)}
+          >
+            <span className="wh-stat-label">
+              <Icon size={17} />
+              {label}
+            </span>
+            <span className="wh-stat-value">
+              {totals ? String(totals[value]).padStart(2, '0') : '—'}
+            </span>
+            <ArrowRight className="wh-stat-arrow" size={16} aria-hidden="true" />
+          </button>
+        ))}
+      </section>
+      <ErrorNotice error={summary.error} onRetry={() => void summary.refetch()} />
+
+      <section className="wh-compose" aria-labelledby="start-work-heading">
+        <div className="wh-compose-heading">
+          <h2 id="start-work-heading">开始新工作</h2>
+          {mode === 'mock' && (
+            <button
+              className="wh-demo-link"
+              aria-label="演示体验报价工作流"
+              onClick={() => navigate('/workbench')}
+            >
+              <span>演示</span>体验报价工作流
+              <ArrowRight size={14} />
+            </button>
+          )}
         </div>
         <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            onCreate(goal);
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (goal.trim()) onCreate(goal);
           }}
         >
           <textarea
             aria-label="描述新的工作目标"
-            placeholder="例如：帮我给德国客户做 3,000 个定制背包的报价…"
+            placeholder="描述你想完成的工作，或粘贴客户邮件…"
             value={goal}
-            onChange={(e) => setGoal(e.target.value)}
+            onChange={(event) => onGoalChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (
+                (event.metaKey || event.ctrlKey) &&
+                event.key === 'Enter' &&
+                !event.nativeEvent.isComposing &&
+                goal.trim()
+              ) {
+                event.preventDefault();
+                onCreate(goal);
+              }
+            }}
             maxLength={20000}
             rows={2}
           />
-          <div className="wh-start-actions">
+          <div className="wh-compose-actions">
             <button className="button button-ghost" type="button" onClick={() => onCreate(goal)}>
-              <Paperclip size={14} />
+              <Paperclip size={16} />
               粘贴客户邮件
             </button>
-            <span>
-              <kbd>⌘</kbd>
-              <kbd>K</kbd> 新建工作
-            </span>
-            <button className="wh-start-submit" aria-label="开始新工作">
-              <ArrowUp size={18} />
+            <span className="wh-compose-shortcut">⌘ / Ctrl + Enter</span>
+            <button
+              className="button button-primary"
+              aria-label="开始新工作"
+              disabled={!goal.trim()}
+              title="开始工作（⌘ / Ctrl + Enter）"
+            >
+              开始工作
+              <ArrowRight size={16} />
             </button>
           </div>
         </form>
-        <div className="wh-prompts">
-          <span>试试演示</span>
-          <button onClick={() => navigate('/workbench')}>
-            <FileSpreadsheet size={13} />
-            询盘 → 客户报价
-            <ArrowRight size={11} />
-          </button>
-          <button onClick={() => navigate('/workbench?mode=review')}>
-            <GitBranch size={13} />
-            客户变更 → 联动修订
-            <ArrowRight size={11} />
-          </button>
-          <button onClick={() => navigate('/workbench?artifact=production')}>
-            <Package size={13} />
-            确认 PO → 生产资料
-            <ArrowRight size={11} />
-          </button>
-        </div>
       </section>
-      <div className="wh-section-heading">
-        <h2>
-          继续工作 <span>{working.length + 1}</span>
-        </h2>
-        <button onClick={() => navigate('/inquiries')}>
-          查看全部询盘 <ArrowRight size={13} />
-        </button>
-      </div>
-      <ErrorNotice error={recent.error} onRetry={() => void recent.refetch()} />
-      <div className="wh-jobs">
-        <button className="wh-job wh-featured-job" onClick={() => navigate('/workbench')}>
-          <div className="wh-job-top">
-            <span className="wh-job-icon">
-              <Package size={20} />
-            </span>
-            <span className="tw-chip">演示工作流</span>
-            <span className="wh-job-arrow">
-              <ArrowRight size={16} />
-            </span>
-          </div>
-          <span className="tw-eyebrow">QUOTATION / 德国</span>
-          <h3>
-            {demo.current.packaging === '定制彩盒' ? '完成包装变更与重新报价' : '完成定制背包报价'}
-          </h3>
-          <p>Michael Weber · {demo.current.costs.quantity.toLocaleString()} 件 · FOB Ningbo</p>
-          <div className="wh-artifact-preview">
-            <FileSpreadsheet size={16} />
-            <span>
-              <strong>可计算成本表 · V{demo.current.version}</strong>
-              <small>
-                {demoPrice ? `${usd(demoPrice.unitPrice)} / 件` : '成本待修正'} ·{' '}
-                {demo.current.approved ? '内部已审核' : '草稿待审核'}
-              </small>
-            </span>
-            <span className="wh-file-extension">XLSX</span>
-          </div>
-          <div className="wh-job-bottom">
-            <span>
-              <span className="tw-live-dot" />
-              下一步：{nextStep}
-            </span>
-            <ChevronRight size={14} />
-          </div>
-        </button>
-        {recent.isPending && <Loading label="正在读取最近工作" />}
-        {working.map((inquiry, index) => (
-          <button className="wh-job" key={inquiry.id} onClick={() => onOpen(inquiry)}>
-            <div className="wh-job-top">
-              <span className={`wh-job-icon shade-${index}`}>
-                <FileText size={20} />
-              </span>
-              <span className="tw-chip neutral">
-                {inquiry.currentRevision ? '处理中' : '待开始'}
-              </span>
-              <span className="wh-job-arrow">
-                <ArrowRight size={16} />
-              </span>
-            </div>
-            <span className="tw-eyebrow">
-              {inquiry.currentRevision ? 'FOLLOW UP' : 'NEW INQUIRY'} /{' '}
-              {inquiry.destination || '待确认'}
-            </span>
-            <h3>{inquiry.title}</h3>
-            <p>{inquiry.customer}</p>
-            <div className="wh-artifact-preview">
-              <FileText size={16} />
-              <span>
-                <strong>
-                  {inquiry.currentRevision
-                    ? `回复与方案 · V${inquiry.currentRevision}`
-                    : '客户原始需求'}
-                </strong>
-                <small>
-                  {inquiry.currentRevision ? '继续上次成果' : '整理需求，建立工作上下文'}
-                </small>
-              </span>
-            </div>
-            <div className="wh-job-bottom">
-              <span>
-                <Clock3 size={11} />
-                {inquiry.nextAction}
-              </span>
-              <ChevronRight size={14} />
-            </div>
-          </button>
-        ))}
-      </div>
-      <div className="wh-lower-grid">
-        <section className="wh-decisions">
-          <div className="wh-section-heading">
-            <h2>需要我决定</h2>
-            <span className="wh-small-label">你的判断，让工作继续</span>
-          </div>
-          <button
-            className="wh-decision-row"
-            onClick={() =>
-              navigate(
-                demo.current.approved ? '/workbench?artifact=production' : '/workbench?mode=review',
-              )
-            }
-          >
-            <span className="wh-decision-icon">
-              <ShieldCheck size={17} />
-            </span>
-            <div>
-              <h3>
-                {demo.current.approved
-                  ? '补充生产放行所需确认'
-                  : demo.proposal
-                    ? '审核四份成果的包装变更'
-                    : '核对报价与变更影响'}
-              </h3>
-              <p>德国定制背包 · 演示场景 · 内部审核不代表生产放行</p>
-            </div>
-            <span className="tw-chip amber">进入审核</span>
-            <ArrowRight size={15} />
-          </button>
-          {waiting && (
-            <button className="wh-decision-row" onClick={() => onOpen(waiting)}>
-              <span className="wh-decision-icon neutral">
-                <Clock3 size={17} />
-              </span>
-              <div>
-                <h3>{waiting.waiting?.waitingReason || waiting.title}</h3>
-                <p>
-                  {waiting.customer} · {waiting.waiting?.nextAction}
-                </p>
-              </div>
-              <span className="tw-chip neutral">待补充</span>
-              <ArrowRight size={15} />
+
+      <section
+        ref={listPanel}
+        id="work-list"
+        className="wh-work-panel"
+        aria-labelledby="work-heading"
+      >
+        <div className="wh-work-heading">
+          <h1 id="work-heading">
+            我的工作{' '}
+            <span aria-live="polite">{searching || list.isPending ? '…' : (count ?? '—')}</span>
+          </h1>
+          <label className="search-field wh-search">
+            <Search size={17} aria-hidden="true" />
+            <input
+              aria-label="搜索询盘或客户"
+              placeholder="搜索询盘或客户"
+              value={query}
+              onChange={(event) => filter(status, event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape' && query) {
+                  event.preventDefault();
+                  filter(status, '');
+                }
+              }}
+            />
+            {query && (
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="清除搜索"
+                onClick={() => filter(status, '')}
+              >
+                <X size={15} />
+              </button>
+            )}
+          </label>
+        </div>
+        <div className="wh-list-toolbar">
+          <div className="wh-list-filters" aria-label="工作筛选">
+            <button
+              className={`wh-all-filter ${!status ? 'selected' : ''}`}
+              aria-pressed={!status}
+              onClick={() => filter('')}
+            >
+              全部
             </button>
+            {status && (
+              <span className="wh-filter-chip">
+                {statusLabels[status]}
+                <button
+                  className="icon-button"
+                  aria-label="清除状态筛选"
+                  onClick={() => filter('')}
+                >
+                  <X size={13} />
+                </button>
+              </span>
+            )}
+          </div>
+          <span className="wh-sort-label">最近更新优先</span>
+        </div>
+        <div
+          aria-busy={list.isFetching || searching}
+          className={searching ? 'wh-searching' : undefined}
+        >
+          <ErrorNotice error={list.error} onRetry={() => void list.refetch()} />
+          {list.isPending ? (
+            <Loading label="正在获取工作" />
+          ) : items.length ? (
+            <table className="inquiry-table wh-work-table">
+              <thead>
+                <tr>
+                  <th scope="col">工作 / 客户</th>
+                  <th scope="col">状态</th>
+                  <th scope="col">下一步</th>
+                  <th scope="col">最近更新</th>
+                  <th scope="col">
+                    <span className="sr-only">打开工作</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((inquiry) => (
+                  <tr key={inquiry.id} onClick={() => onOpen(inquiry)}>
+                    <td className="wh-title-cell">
+                      <div className="inquiry-title-cell">
+                        <span className="inquiry-avatar">
+                          <FileText size={18} />
+                        </span>
+                        <div>
+                          <button
+                            className="inquiry-title"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onOpen(inquiry);
+                            }}
+                          >
+                            {inquiry.title}
+                          </button>
+                          <div className="inquiry-meta">{inquiry.customer}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="wh-state-cell">
+                      <StatusBadge status={inquiry.businessStatus} />
+                    </td>
+                    <td className="wh-next-cell">
+                      {inquiry.waiting?.nextAction ||
+                        inquiry.nextAction ||
+                        (inquiry.businessStatus === 'done' ? '查看历史记录' : '查看详情')}
+                    </td>
+                    <td className="wh-time-cell">
+                      <time dateTime={inquiry.updatedAt}>
+                        {updatedAt.format(new Date(inquiry.updatedAt))}
+                      </time>
+                    </td>
+                    <td className="wh-open-cell" aria-hidden="true">
+                      <ArrowRight size={16} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            !list.error && (
+              <div className="wh-empty">
+                <EmptyState
+                  title={filtered ? '没有找到匹配的工作' : '开始你的第一项工作'}
+                  description={
+                    filtered ? '试试其他关键词，或清除筛选。' : '描述目标或粘贴客户邮件，即可开始。'
+                  }
+                />
+                {filtered ? (
+                  <button className="button" onClick={() => filter('', '')}>
+                    清除筛选
+                  </button>
+                ) : (
+                  <button className="button button-primary" onClick={() => onCreate(goal)}>
+                    新建工作
+                  </button>
+                )}
+              </div>
+            )
           )}
-          <div className="wh-decision-note">
-            <ShieldCheck size={13} />
-            报价、规格与生产批准，各有自己的确认边界。
-          </div>
-        </section>
-        <section className="wh-workflow-note">
-          <span className="tw-eyebrow">ONE WORKSPACE. REAL OUTCOMES.</span>
-          <h2>
-            从零散资料，
-            <br />
-            到可以交付的成果。
-          </h2>
-          <div className="wh-mini-flow">
+        </div>
+        {list.hasNextPage && (
+          <div className="wh-list-more">
+            <button
+              className="button"
+              disabled={list.isFetchingNextPage || searching}
+              onClick={() => void list.fetchNextPage()}
+            >
+              {list.isFetchingNextPage ? '加载中…' : '加载更多'}
+              <ArrowDown size={15} />
+            </button>
             <span>
-              <FolderOpen size={16} />
-              资料
-            </span>
-            <i />
-            <span>
-              <FileSpreadsheet size={16} />
-              成果
-            </span>
-            <i />
-            <span>
-              <Check size={16} />
-              交付
+              已显示 {items.length} / {count}
             </span>
           </div>
-          <p>
-            一处编辑，追溯每个来源；
-            <br />
-            一项变更，检查所有关联文件。
-          </p>
-        </section>
-      </div>
-      <footer className="wh-footer">
-        <span>
-          <span className="tw-live-dot" />
-          工作始终围绕同一个业务上下文展开。
-        </span>
-        <span>
-          Navowork <span>/</span> 一个人，一张工作台。
-        </span>
-      </footer>
+        )}
+      </section>
     </div>
   );
 }

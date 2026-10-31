@@ -3,7 +3,6 @@ import { readFile } from 'node:fs/promises';
 async function openReply(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: '进入演示工作空间' }).click();
-  await page.getByRole('button', { name: '全部询盘', exact: true }).click();
   await page
     .locator('.inquiry-table')
     .getByRole('button', { name: '墨西哥帆布袋试单', exact: true })

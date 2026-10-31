@@ -4,10 +4,10 @@ import { readFile } from 'node:fs/promises';
 async function login(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: '进入演示工作空间' }).click();
-  await expect(page.getByRole('heading', { name: '把手上的事，向前推进。' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /我的工作/ })).toBeVisible();
 }
 async function openWorkbench(page: Page) {
-  await page.locator('.wh-featured-job').click();
+  await page.getByRole('button', { name: '演示体验报价工作流' }).click();
   await expect(page.getByTestId('unit-price')).toHaveText('$8.69');
 }
 async function changePackaging(page: Page) {
@@ -66,8 +66,10 @@ test('包装变更受缺失价格和依赖门禁保护，并保留可回看的�
   await page.reload();
   await expect(page.getByTestId('unit-price')).toHaveText('$9.21');
   await page.getByRole('button', { name: '返回工作台', exact: true }).click();
-  await expect(page.locator('.wh-featured-job')).toContainText('V2');
-  await expect(page.locator('.wh-featured-job')).toContainText('$9.21 / 件');
+  await expect(page.getByRole('heading', { name: /我的工作/ })).toBeVisible();
+  await page.getByRole('button', { name: '演示体验报价工作流' }).click();
+  await expect(page.getByRole('button', { name: '版本记录 V2' })).toBeVisible();
+  await expect(page.getByTestId('unit-price')).toHaveText('$9.21');
 });
 
 test('内部报价审核与生产批准分离，已审版本修改后重新审核', async ({ page }) => {
@@ -128,7 +130,9 @@ test('真实导入材料、重载后可读，交付包与 PDF 预览可用', asy
 
 test('390px 下所有面板无页面横向溢出，弹窗可键盘关闭', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.locator('.wh-jobs .wh-job')).toHaveCount(3);
+  await expect(page.locator('.wh-status-grid .stat-card')).toHaveCount(4);
+  await expect(page.getByRole('button', { name: '待办询盘 1', exact: true })).toBeVisible();
+  await expect(page.locator('.wh-work-table tbody tr')).toHaveCount(4);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: 'docs/screenshots/trade-home-mobile.png' });
   await openWorkbench(page);
@@ -146,7 +150,7 @@ test('390px 下所有面板无页面横向溢出，弹窗可键盘关闭', async
 
 test('桌面展示和任意目标不被误执行为包装变更', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await expect(page.locator('.wh-job')).toHaveCount(3);
+  await expect(page.locator('.wh-work-table tbody tr')).toHaveCount(4);
   await page.screenshot({ path: 'docs/screenshots/trade-home-desktop.png' });
   await openWorkbench(page);
   await page.getByLabel('当前工作目标').fill('不要把包装换成彩盒，只检查运费');

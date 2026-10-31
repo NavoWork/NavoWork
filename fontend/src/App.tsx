@@ -32,14 +32,16 @@ import {
 import { api, mode, setMockFault } from './api';
 import type { Inquiry, Session } from './api/types';
 import { ErrorNotice, IconButton, Loading, Modal } from './components/ui';
-import { Home } from './features/Home';
 import { CreateInquiry } from './features/CreateInquiry';
 import { InquiryWorkspace } from './features/InquiryWorkspace';
 import { WorkHome } from './features/workbench/WorkHome';
 import { BrandMark } from './components/BrandMark';
 import { ThemeSwitch } from './theme/ThemeSwitch';
 const Resources = lazy(() =>
-  import('./features/Resources').then((module) => ({ default: module.Resources })),
+  import('./features/StaticLibrary').then((module) => ({ default: module.StaticLibrary })),
+);
+const SkillMarket = lazy(() =>
+  import('./features/SkillMarket').then((module) => ({ default: module.SkillMarket })),
 );
 const TradeWorkbench = lazy(() =>
   import('./features/workbench/TradeWorkbench').then((module) => ({
@@ -277,11 +279,18 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
   const [mobile, setMobile] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [settings, setSettings] = useState(false);
-  const [refresh, setRefresh] = useState(0);
+  const [homeGoal, setHomeGoal] = useState('');
+  const homeUrl = useRef('/');
   const [error, setError] = useState<unknown>();
   const [offline, setOffline] = useState(!navigator.onLine);
   const [logoutBusy, setLogoutBusy] = useState(false);
   const path = location.pathname;
+  if (path === '/') homeUrl.current = `/${location.search}`;
+  useEffect(() => {
+    if (path === '/inquiries') {
+      navigate({ pathname: '/', search: location.search, hash: location.hash }, { replace: true });
+    }
+  }, [path, location.search, location.hash, navigate]);
   const isTrade = path === '/workbench';
   const [tradeOpened, setTradeOpened] = useState(isTrade);
   useEffect(() => {
@@ -289,25 +298,22 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
   }, [isTrade]);
   const { id, invalid: invalidPath } = parseInquiryPath(path);
   const page =
-    path === '/inquiries'
-      ? 'inquiries'
-      : path === '/knowledge'
-        ? 'knowledge'
-        : path === '/assets'
-          ? 'assets'
-          : path === '/capabilities'
-            ? 'capabilities'
-            : 'home';
+    path === '/knowledge'
+      ? 'knowledge'
+      : path === '/assets'
+        ? 'assets'
+        : path === '/capabilities'
+          ? 'capabilities'
+          : 'home';
   const activeTitle = isTrade
     ? '德国客户 · 定制背包'
     : id
       ? tabs.find((t) => t.id === id)?.title || '询盘详情'
       : {
           home: '工作台',
-          inquiries: '全部询盘',
-          knowledge: '知识 Wiki',
+          knowledge: '知识库',
           assets: '资产库',
-          capabilities: '能力目录',
+          capabilities: '技能市场',
         }[page];
   useEffect(() => {
     try {
@@ -359,22 +365,22 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
     const shortcut = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
+        setCreateText(homeGoal);
         setCreate(true);
       }
       if (e.key === 'Escape') setMobile(false);
     };
     window.addEventListener('keydown', shortcut);
     return () => window.removeEventListener('keydown', shortcut);
-  }, []);
+  }, [homeGoal]);
   const changed = useCallback(() => {
-    setRefresh((n) => n + 1);
     void qc.invalidateQueries({ queryKey: ['home', session.workspace.id] });
   }, [qc, session.workspace.id]);
   function closeTab(t: Tab) {
     setTabs((old) => old.filter((x) => x.id !== t.id));
     if (id === t.id) {
       const rest = tabs.filter((x) => x.id !== t.id);
-      navigate(rest.length ? `/inquiries/${encodeURIComponent(rest.at(-1)!.id)}` : '/');
+      navigate(rest.length ? `/inquiries/${encodeURIComponent(rest.at(-1)!.id)}` : homeUrl.current);
     }
   }
   async function logout() {
@@ -391,10 +397,9 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
   }
   const nav = [
     { path: '/', name: '工作台', icon: LayoutDashboard },
-    { path: '/inquiries', name: '全部询盘', icon: FileText },
-    { path: '/knowledge', name: '知识 Wiki', icon: BookOpen },
+    { path: '/knowledge', name: '知识库', icon: BookOpen },
     { path: '/assets', name: '资产库', icon: Box },
-    { path: '/capabilities', name: '能力目录', icon: Command },
+    { path: '/capabilities', name: '技能市场', icon: Command },
   ];
   return (
     <div
@@ -405,7 +410,7 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
         <div className="sidebar-brand-row">
           <Brand
             onClick={() => {
-              navigate('/');
+              navigate(homeUrl.current);
               setMobile(false);
             }}
           />
@@ -418,6 +423,7 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
           aria-label="新建工作"
           aria-keyshortcuts="Meta+K Control+K"
           onClick={() => {
+            setCreateText(homeGoal);
             setCreate(true);
             setMobile(false);
           }}
@@ -433,7 +439,7 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
               className={`nav-item ${!id && !isTrade && (n.path === '/' ? page === 'home' : path === n.path) ? 'active' : ''}`}
               aria-current={!id && !isTrade && path === n.path ? 'page' : undefined}
               onClick={() => {
-                navigate(n.path);
+                navigate(n.path === '/' ? homeUrl.current : n.path);
                 setMobile(false);
                 setError(undefined);
               }}
@@ -461,7 +467,7 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
                 label="关闭德国背包工作标签"
                 onClick={() => {
                   setTradeOpened(false);
-                  if (isTrade) navigate('/');
+                  if (isTrade) navigate(homeUrl.current);
                 }}
               >
                 <X size={12} />
@@ -499,14 +505,13 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
             <strong>{session.workspace.name}</strong>
             <ShieldCheck size={13} />
           </div>
-          <span>{mode === 'mock' ? '合成测试资料 · 仅用于体验' : '团队资料 · 按授权访问'}</span>
         </div>
         <div className="user-panel">
           <div className="avatar">{session.user.name.slice(0, 1).toUpperCase()}</div>
           <div>
             {session.user.name}
             <br />
-            <small>{session.user.role === 'admin' ? '工作空间管理员' : '工作空间成员'}</small>
+            <small>{session.user.role === 'admin' ? '管理员' : '成员'}</small>
           </div>
           <IconButton label="退出登录" onClick={logout} disabled={logoutBusy}>
             <LogOut size={14} />
@@ -563,34 +568,33 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
               changed();
             }}
           />
-          {!id && !isTrade && page === 'home' && (
+          <div hidden={Boolean(id) || isTrade || page !== 'home'}>
             <WorkHome
               session={session}
+              active={!id && !isTrade && page === 'home'}
+              goal={homeGoal}
+              onGoalChange={setHomeGoal}
               onOpen={open}
               onCreate={(text = '') => {
                 setCreateText(text);
                 setCreate(true);
               }}
             />
-          )}
+          </div>
           {isTrade && (
             <FeatureBoundary>
               <Suspense fallback={<Loading label="正在打开工作画布" />}>
-                <TradeWorkbench session={session} />
+                <TradeWorkbench session={session} onBack={() => navigate(homeUrl.current)} />
               </Suspense>
             </FeatureBoundary>
           )}
-          <div hidden={Boolean(id) || isTrade || page !== 'inquiries'}>
-            <Home
-              session={session}
-              refreshKey={refresh}
-              onOpen={open}
-              onCreate={() => setCreate(true)}
-            />
-          </div>
-          {!id && !isTrade && page !== 'home' && page !== 'inquiries' && (
+          {!id && !isTrade && page !== 'home' && (
             <Suspense fallback={<Loading label="正在打开资源" />}>
-              <Resources key={page} page={page} session={session} />
+              {page === 'capabilities' ? (
+                <SkillMarket />
+              ) : (
+                <Resources key={page} page={page} session={session} />
+              )}
             </Suspense>
           )}{' '}
           {tabs.map((t) => (
@@ -613,6 +617,7 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
           onCreated={(i) => {
             setCreate(false);
             setCreateText('');
+            setHomeGoal('');
             open(i);
             changed();
           }}
