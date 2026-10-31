@@ -12,6 +12,7 @@ import { EmptyState } from '../components/ui';
 import { MaterialsPanel } from './inquiry-materials';
 import type { DraftState } from './inquiry-replies';
 import { money } from './inquiry-canvas-model';
+import { artifactPreview } from './BusinessArtifact';
 
 export function InquiryResult({
   revision,
@@ -55,6 +56,14 @@ export function InquiryResult({
   const canWrite = !readOnly && !busy;
   const errors = revision.checks.filter((check) => check.status === 'error').length;
   const openRisks = revision.risks.filter((risk) => risk.status !== 'resolved');
+  const requirements: [string, unknown][] = [
+    ['产品', revision.requirements.requestedProduct],
+    ['需求数量', revision.requirements.quantity == null ? null : `${revision.requirements.quantity} 件`],
+    ['规格', revision.requirements.specification],
+    ['目的地', revision.requirements.destination],
+    ['期望到货', revision.requirements.requestedArrival],
+    ['定制要求', revision.requirements.customization],
+  ];
   return (
     <section className="iw-answer-result" aria-label={`V${revision.number} 本轮成果`}>
       <header className="iw-answer-result-head">
@@ -90,22 +99,10 @@ export function InquiryResult({
             <h3>客户要什么</h3>
           </div>
           <dl className="iw-facts">
-            {[
-              ['产品', revision.requirements.requestedProduct],
-              [
-                '需求数量',
-                revision.requirements.quantity == null
-                  ? null
-                  : `${revision.requirements.quantity} 件`,
-              ],
-              ['规格', revision.requirements.specification],
-              ['目的地', revision.requirements.destination],
-              ['期望到货', revision.requirements.requestedArrival],
-              ['定制要求', revision.requirements.customization],
-            ].map(([label, value]) => (
+            {requirements.map(([label, value]) => (
               <div key={label}>
                 <dt>{label}</dt>
-                <dd className={!value ? 'unknown' : ''}>{value || '待确认'}</dd>
+                <dd className={value == null || value === '' ? 'unknown' : ''}>{artifactPreview(value)}</dd>
               </div>
             ))}
           </dl>

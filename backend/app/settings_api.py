@@ -12,7 +12,7 @@ from .models import Item, now
 SKILLS = [
     {"id": "requirements", "name": "询盘与需求", "description": "整理客户需求，标出缺项并起草澄清回复。", "tools": ["get_case_context", "read_evidence", "update_requirements", "update_risks", "update_customer_profile", "update_reply"]},
     {"id": "specification", "name": "产品规格", "description": "从已知要求编制规格书与供应商询价单。", "tools": ["save_artifact_draft"]},
-    {"id": "supplier-costing", "name": "供应商与核价", "description": "登记供应商原件，检查 MOQ 和费用口径，计算成本。", "tools": ["register_supplier_offer", "calculate_quote"]},
+    {"id": "supplier-costing", "name": "供应商与核价", "description": "读取知识库中的工厂资料，匹配需求并核价，保留版本依据。", "tools": ["register_knowledge_offer", "register_supplier_offer", "calculate_quote"]},
     {"id": "quotation", "name": "客户报价", "description": "按汇率与目标毛利生成报价草稿及商务条款。", "tools": ["calculate_quote", "save_artifact_draft"]},
     {"id": "changes", "name": "业务变更", "description": "分析数量、材料和包装变化，保留旧版并形成修订草稿。", "tools": ["analyze_change", "record_change_action", "save_artifact_draft"]},
     {"id": "sample-feedback", "name": "样品反馈", "description": "整理尺寸、工艺与包装意见，区分条件接受和最终确认。", "tools": ["load_skill", "review_order_skill", "save_artifact_draft"]},

@@ -64,6 +64,7 @@ TOOLS = [
     schema("update_risks", "根据已读取原件更新当前风险节点，entries为风险数组，每条包含message,severity(info/warning/error),category,suggestedAction,evidenceRefs。只写实际发现的业务风险，不生成其他节点。", {"entries": {"type": "array", "items": O}}, ["entries"]),
     schema("update_customer_profile", "更新客户来源与背景候选。fields支持company,country,business,email,website,linkedin,channel,summary。没有核验的工商或信用信息保持待核实，不伪造搜索结果。", {"fields": O}, ["fields"]),
     schema("register_supplier_offer", "从已读取且sourceRole=supplier_quote的本询盘原件登记报价。金额必须来自原文，缺费用不填零。字段supplier,baseCny,packagingCny,localCny,moq,leadDays均须有依据。", {"evidence_id": S, "offer": O}, ["evidence_id", "offer"]),
+    schema("register_knowledge_offer", "从已read_knowledge读取的最新工厂知识登记本次核价依据，无需用户重复上传。先核对产品、规格、适用数量和费用口径；offer含supplier,baseCny,packagingCny,localCny,moq,leadDays，金额须来自该版本正文，缺项不得补零。保留知识版本及原文，不修改知识库。", {"version_id": S, "offer": O}, ["version_id", "offer"]),
     schema("calculate_quote", "确定性核价，只保存成本节点，不自动出客户报价。必须选择有原件的offer_id，使用用户明确值或公司定价设置。quantity需满足MOQ；exchange_rate为CNY/USD，margin为百分数20表示20%。", {"offer_id": S, "quantity": {"type": "integer"}, "exchange_rate": S, "margin": S}, ["offer_id", "quantity"]),
     schema("save_artifact_draft", "创建或修订指定单一成果草稿。kind支持spec/rfq/comparison/quotation/sample/sample_feedback/po_check/pi/production/ta/qc/followup。打样申请统一用sample。先读取现有版本并传base_version（首次0）。仅生成用户要求节点；quotation必须使用calculate_quote结果。sample_feedback和po_check先review_order_skill，以确定性结果形成真实报告草稿。不得声明已批准/已签约/已付款/已放行，PI可在未批样时形成待确认草稿。", {"kind": S, "title": S, "content": O, "base_version": {"type": "integer"}}, ["kind", "title", "content", "base_version"]),
     schema("update_reply", "生成或改写当前客户邮件草稿，locale=en-US或es-MX；只能写已核实条件，不能宣称已发送。", {"locale": S, "text": S}, ["locale", "text"]),
@@ -148,7 +149,7 @@ class BusinessHost:
             cached = data.get("toolResults", {}).get(call_id)
             if cached is not None:
                 return cached
-            trace = {"id": call_id, "name": name, "label": LABELS.get(name, name), "status": "running", "startedAt": now()}
+            trace = {"id": call_id, "name": name, "label": "读取工厂知识并关联核价依据" if name == "register_knowledge_offer" else LABELS.get(name, name), "status": "running", "startedAt": now()}
             data["toolCalls"] = [*data.get("toolCalls", []), trace][-80:]
             run.payload = encode(data)
             self.event(db, run, "run.tool_started", trace)
@@ -219,6 +220,8 @@ class BusinessHost:
     def check_target(self, target, name, args):
         if not target:
             return
+        if name == "register_knowledge_offer" and target != "quote":
+            raise ValueError("本轮只允许更新所选节点")
         write_targets = {"update_requirements": {"requirements"}, "update_risks": {"risks", "customer"}, "update_customer_profile": {"customer"}, "update_reply": {"reply"}, "calculate_quote": {"quote"}, "register_supplier_offer": {"quote"}, "analyze_change": set(), "save_knowledge_draft": set(), "save_artifact_to_library": set()}
         if name in ("save_artifact_draft", "review_order_skill"):
             from .revision_history import NODE_ARTIFACTS
@@ -253,7 +256,7 @@ class BusinessHost:
             latest = {}
             for row in items(db, kind):
                 value = item_view(row)
-                if value.get("status") == "revoked" or (kind == "asset" and value.get("space", "company") != "company"):
+                if row.workspace_id != case.workspace_id or (kind == "asset" and value.get("space", "company") != "company"):
                     continue
                 key = value.get("sourceId") or value.get("id") or row.id
                 if key not in latest or row.version > latest[key].version:
@@ -261,17 +264,22 @@ class BusinessHost:
             results = []
             for row in latest.values():
                 value = item_view(row)
+                if value.get("status") == "revoked":
+                    continue
                 search_text = " ".join(str(value.get(k, "")) for k in ("title", "name", "folder", "content", "textContent", "sourceRole")).lower()
                 if query and not any(word in search_text for word in query.split()):
                     continue
-                results.append({"versionId": row.id, "title": value.get("title") or value.get("name"), "folder": value.get("folder"), "version": row.version, "sourceRole": value.get("sourceRole"), "sourceGroup": value.get("sourceGroup"), "stage": value.get("stage"), "requiresExplicitSelection": value.get("requiresExplicitSelection"), "excerpt": (value.get("content") or value.get("textContent") or "")[:200]})
+                results.append({"versionId": row.id, "title": value.get("title") or value.get("name"), "folder": value.get("folder"), "version": row.version, "status": value.get("status"), "sourceRole": value.get("sourceRole"), "sourceGroup": value.get("sourceGroup"), "stage": value.get("stage"), "requiresExplicitSelection": value.get("requiresExplicitSelection"), "excerpt": (value.get("content") or value.get("textContent") or "")[:200]})
             return {"items": results[:40], "summary": f"找到 {len(results)} 份相关资料"}
         if name == "read_knowledge":
             self.require_skill(db, "knowledge-assets")
             row = self.scoped_row(db, case, args["version_id"], "resource")
             value = item_view(row)
-            ref = {"sourceVersionId": row.id, "sourceId": value["sourceId"], "version": row.version, "title": value["title"], "locator": {}, "supports": ["reference"]}
+            ref = {"sourceVersionId": row.id, "sourceId": value["sourceId"], "version": row.version, "title": value["title"], "contentHash": hashlib.sha256(value.get("content", "").encode()).hexdigest(), "locator": {}, "supports": ["reference"]}
             state["sourceRefs"] = [r for r in state.get("sourceRefs", []) if r["sourceVersionId"] != row.id] + [ref]
+            job_data = decode(job.payload)
+            job_data["sourceRefs"] = [r for r in job_data.get("sourceRefs", []) if r["sourceVersionId"] != row.id] + [ref]
+            job.payload = encode(job_data)
             return {**value, "versionId": row.id, "content": value.get("content", "")[:16000], "summary": f"已读取《{value['title']}》V{row.version}"}
         if name in ("read_asset", "attach_asset"):
             self.require_skill(db, "knowledge-assets")
@@ -344,6 +352,23 @@ class BusinessHost:
             case.payload = encode({**decode(case.payload), "customerContext": value})
             create_item(db, "customer_profile", {"caseId": case.id, **value, "status": "needs_review", "createdBy": user.id, "createdAt": now()}, case_id=case.id)
             return {"summary": "已更新客户背景候选资料"}
+        if name == "register_knowledge_offer":
+            self.require_skill(db, "supplier-costing")
+            self.require_skill(db, "knowledge-assets")
+            from .factory_knowledge import require_current_factory_source
+            row = self.scoped_row(db, case, args["version_id"], "resource")
+            value = require_current_factory_source(db, case, row)
+            read_ref = next((ref for ref in state.get("sourceRefs", []) if ref["sourceVersionId"] == row.id), None)
+            if not read_ref:
+                raise ValueError("请先读取工厂知识正文并核对适用产品、规格和数量")
+            require_current_factory_source(db, case, row, read_ref.get("contentHash"))
+            source = next((r for r in items(db, "evidence", case_id=case.id) if item_view(r).get("knowledgeSourceVersionId") == row.id and item_view(r).get("sha256") == read_ref["contentHash"]), None)
+            if not source:
+                source = create_item(db, "evidence", {"title": value["title"], "sourceRole": "supplier_quote", "text": value["content"], "blobId": None, "sha256": hashlib.sha256(value["content"].encode()).hexdigest(), "knowledgeSourceVersionId": row.id, "knowledgeStatus": value.get("status"), "parseStatus": "succeeded", "createdBy": user.id, "createdAt": now()}, case_id=case.id, status="observed")
+                db.flush()
+            state["inputRefs"] = list(dict.fromkeys([*state.get("inputRefs", []), source.id]))
+            result = self.execute(db, run, job, user, case, state, "register_supplier_offer", {"evidence_id": source.id, "offer": dict(args["offer"])})
+            return {**result, "summary": f"已关联《{value['title']}》V{row.version}，供本次核价审查"}
         if name == "register_supplier_offer":
             self.require_skill(db, "supplier-costing")
             source = self.scoped_row(db, case, args["evidence_id"], "evidence")
@@ -361,6 +386,15 @@ class BusinessHost:
             if int(offer["moq"]) < 1 or int(offer["leadDays"]) < 0:
                 raise ValueError("MOQ或交期无效")
             data = {**offer, "evidenceSourceId": source.id, "currency": "CNY", "status": "observed", "createdBy": user.id, "createdAt": now()}
+            knowledge_id = item_view(source).get("knowledgeSourceVersionId")
+            if knowledge_id:
+                from .factory_knowledge import require_current_factory_source
+                knowledge_row = self.scoped_row(db, case, knowledge_id, "resource")
+                knowledge = require_current_factory_source(db, case, knowledge_row, item_view(source).get("sha256"))
+                data["factorySource"] = {"sourceVersionId": knowledge_row.id, "sourceId": knowledge["sourceId"], "version": knowledge_row.version, "title": knowledge["title"], "status": knowledge.get("status"), "contentHash": item_view(source)["sha256"]}
+                existing = next((item_view(r) for r in items(db, "supplier_offer", case_id=case.id) if item_view(r).get("evidenceSourceId") == source.id and all(item_view(r).get(key) == data.get(key) for key in ("supplier", "baseCny", "packagingCny", "localCny", "moq", "leadDays"))), None)
+                if existing:
+                    return {**existing, "summary": "已复用同版本工厂核价依据"}
             row = create_item(db, "supplier_offer", data, case_id=case.id, status="observed")
             db.flush()
             return {**item_view(row), "summary": f"已登记 {offer['supplier']} 报价"}
@@ -371,6 +405,12 @@ class BusinessHost:
             row = self.scoped_row(db, case, args["offer_id"], "supplier_offer")
             offer = item_view(row)
             self.scoped_row(db, case, offer["evidenceSourceId"], "evidence")
+            factory_source = offer.get("factorySource")
+            if factory_source:
+                from .factory_knowledge import require_current_factory_source
+                knowledge_row = self.scoped_row(db, case, factory_source["sourceVersionId"], "resource")
+                require_current_factory_source(db, case, knowledge_row, factory_source.get("contentHash"))
+                state["sourceRefs"] = [ref for ref in state.get("sourceRefs", []) if ref["sourceVersionId"] != knowledge_row.id] + [{**factory_source, "locator": {}, "supports": ["cost", "quotation"]}]
             if int(args["quantity"]) < int(offer["moq"]):
                 raise ValueError(f"数量低于供应商MOQ {offer['moq']}")
             user_cost = decode(job.payload).get("costInputs", {})
@@ -380,8 +420,12 @@ class BusinessHost:
             if not result:
                 raise ValueError("核价参数不完整或无效，请提供汇率、毛利率和数量")
             state.update(quote=result, costInputs=cost, selectedSupplierOfferId=row.id)
+            state["factorySource"] = factory_source
             old = self.latest_artifacts(db, case).get("cost", {})
             state["artifacts"]["cost"] = {"kind": "cost", "title": "成本核算表", "baseVersion": old.get("version", 0), "content": {"input": cost, "result": result, "selectedSupplierOfferId": row.id, "status": "draft", "formula": "ceil_cent((base+packaging+local)/exchangeRate/(1-margin/100))"}}
+            if factory_source:
+                state["artifacts"]["cost"]["content"]["factorySource"] = factory_source
+                state["factorySource"] = factory_source
             return {"status": "needs_review", "result": result, "inputs": cost, "summary": f"成本已核算，参考单价 USD {result['unitPriceUsd']}"}
         if name == "save_artifact_draft":
             kind = "sample" if args["kind"] == "sample_request" else args["kind"]
@@ -397,6 +441,8 @@ class BusinessHost:
                 if not calculated:
                     raise ValueError("客户报价须先调用calculate_quote核算")
                 content.update(quote=calculated, quantity=calculated["quantity"], currency="USD", selectedSupplierOfferId=state["selectedSupplierOfferId"])
+                if state.get("factorySource"):
+                    content["factorySource"] = state["factorySource"]
                 company = config.get("company", {})
                 defaults = {"seller": company.get("name"), "contactEmail": company.get("contactEmail"), "incoterm": company.get("defaultIncoterm"), "namedPlace": company.get("defaultPort"), "paymentTerms": company.get("paymentTerms"), "incotermsVersion": "2020", "validUntil": (datetime.now(timezone.utc) + timedelta(days=int(config.get("pricing", {}).get("quotationValidityDays", 14)))).date().isoformat()}
                 for key, value in defaults.items():
@@ -642,6 +688,11 @@ def finish_business_work(host, summary, waiting=False):
         data = decode(run.payload)
         state = data.get("businessState", {})
         drafts = state.get("artifacts", {})
+        if state.get("factorySource"):
+            from .factory_knowledge import require_current_factory_source
+            ref = state["factorySource"]
+            row = host.scoped_row(db, case, ref["sourceVersionId"], "resource")
+            require_current_factory_source(db, case, row, ref.get("contentHash"))
         changed = bool(drafts or state.get("extracted") or state.get("replies") or state.get("change") or "risks" in state)
         current = next((item_view(r) for r in items(db, "revision", case_id=case.id) if r.version == case.current_revision), None)
         if changed:

@@ -81,6 +81,7 @@ export interface Risk {
   status: 'open' | 'read' | 'resolved';
   evidenceRefs: string[];
 }
+export type RequirementDetail = string | number | boolean | null | RequirementDetail[] | { [key: string]: RequirementDetail };
 export interface Revision {
   parentRevision?: number;
   restoredFromRevision?: number;
@@ -92,11 +93,11 @@ export interface Revision {
   runId: string;
   requirements: {
     requestedProduct: string | null;
-    specification: string | null;
+    specification: RequirementDetail;
     quantity: number | null;
     destination: string | null;
     requestedArrival: string | null;
-    customization: string | null;
+    customization: RequirementDetail;
     certificationRequests: string[];
     missingFields: string[];
     evidenceRefs: string[];

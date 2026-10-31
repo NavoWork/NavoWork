@@ -197,6 +197,8 @@ def sop_case_routes(request: Request, db: Session, user: User, case: Case, tail:
         change_rows = [item_view(i) for i in items(db, "change_set", case_id=case.id)]
         open_changes = [i for i in change_rows if i.get("status") not in ("applied", "rejected", "cancelled")]
         release_reasons = _check_release(db, case)
+        from .factory_knowledge import quotation_knowledge_status
+        factory_source = quotation_knowledge_status(db, case)
         stages = [
             ("qualify_inquiry", bool(items(db, "customer_profile", case_id=case.id)) or bool(revisions)),
             ("confirm_requirements", "spec" in kinds),
@@ -208,7 +210,7 @@ def sop_case_routes(request: Request, db: Session, user: User, case: Case, tail:
             ("manage_shipment", "shipment" in kinds),
             ("reconcile_payment", "payment" in kinds),
         ]
-        return {"caseId": case.id, "currentRevision": case.current_revision, "stages": [{"kind": kind, "status": "needs_review" if present else "not_started"} for kind, present in stages], "openChangeCount": len(open_changes), "productionRelease": {"status": "blocked" if release_reasons else "ready_for_manual_release", "missing": release_reasons}}
+        return {"caseId": case.id, "currentRevision": case.current_revision, "stages": [{"kind": kind, "status": "needs_update" if kind == "prepare_quote" and factory_source and factory_source["outdated"] else "needs_review" if present else "not_started"} for kind, present in stages], "factorySource": factory_source, "openChangeCount": len(open_changes), "productionRelease": {"status": "blocked" if release_reasons else "ready_for_manual_release", "missing": release_reasons}}
     if group == "evidence":
         if len(tail) == 1:
             if method == "GET":
@@ -457,6 +459,16 @@ def sop_case_routes(request: Request, db: Session, user: User, case: Case, tail:
             if scope == "commercial_quotation_approval" and body.get("decision") == "approved":
                 quote_value = item_view(target_row)
                 quote_content = quote_value.get("content", {})
+                if quote_content.get("factorySource"):
+                    from .factory_knowledge import require_current_factory_source
+                    ref = quote_content["factorySource"]
+                    source = db.get(Item, ref.get("sourceVersionId"))
+                    try:
+                        if not source or source.kind != "resource" or source.workspace_id != case.workspace_id:
+                            raise ValueError("工厂核价依据已失效")
+                        require_current_factory_source(db, case, source, ref.get("contentHash"))
+                    except ValueError as error:
+                        fail("FACTORY_KNOWLEDGE_CHANGED", str(error), 422)
                 offer_id = quote_content.get("selectedSupplierOfferId")
                 offer = db.get(Item, str(offer_id)) if offer_id else None
                 validation = _artifact_validation(quote_value)

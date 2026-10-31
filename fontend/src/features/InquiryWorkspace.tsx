@@ -41,6 +41,7 @@ import { ReplyEditor, type DraftState } from './inquiry-replies';
 import { InquiryResult } from './InquiryResult';
 import { InquiryRunActivity } from './InquiryRunActivity';
 import { InquiryProgress } from './InquiryProgress';
+import { createKnowledgeQuoteRun } from './knowledge-quote';
 import { SuggestedMessages } from './SuggestedMessages';
 import type { WorkspaceConfiguration } from './WorkspaceSettings';
 import { resultSnapshot, type SavedResult } from './inquiry-canvas-model';
@@ -322,6 +323,17 @@ export function InquiryWorkspace({
       await refresh();
     });
   }
+  async function prepareKnowledgeQuote() {
+    if (!inquiry || readOnly || busy) return;
+    showAIChat();
+    await operate(async () => {
+      const next = await createKnowledgeQuoteRun(path, base, inquiry);
+      setLastRunId(next.runId || next.id);
+      setRevisionNumber(null);
+      queryClient.setQueryData(['run', scope, next.runId || next.id], next);
+      await refresh();
+    });
+  }
   async function restoreRevision(number: number, target: string): Promise<number | undefined> {
     if (!inquiry || running || busy) return;
     let created: number | undefined;
@@ -543,7 +555,7 @@ export function InquiryWorkspace({
           AI 助手
         </button>
       </div>
-      <InquiryProgress path={path} scope={scope} readOnly={!canWrite} onInstruction={text => { setInput(text); showAIChat(); }} />
+      <InquiryProgress path={path} scope={scope} active={active} readOnly={!canWrite} onInstruction={text => { showAIChat(); chooseSuggestion(text); }} onPrepareQuote={mode === 'real' ? () => void prepareKnowledgeQuote() : undefined} onReviewQuote={() => openDocument('artifact:cost')} />
       <div
         ref={columnsRef}
         className={`iw-columns iw-show-${mobilePane}`}

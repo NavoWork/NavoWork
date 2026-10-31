@@ -1,7 +1,7 @@
 import { openDB } from 'idb';
 import type { Inquiry, Locale, Message, Revision, Source } from '../api/types';
 import { channelLabels } from './CustomerContextCard';
-import type { BusinessArtifact } from './BusinessArtifact';
+import { artifactPreview, type BusinessArtifact } from './BusinessArtifact';
 
 export type DocumentKind =
   | 'artifact'
@@ -177,15 +177,15 @@ export function revisionDocuments(
         folder: 'analysis',
         caption: `V${r.number} · 需求分析`,
         revision: r,
-        text: [
+        text: ([
           ['产品', r.requirements.requestedProduct],
           ['数量', r.requirements.quantity == null ? null : `${r.requirements.quantity} 件`],
           ['规格', r.requirements.specification],
           ['目的地', r.requirements.destination],
           ['到货要求', r.requirements.requestedArrival],
           ['定制', r.requirements.customization],
-        ]
-          .map(([k, v]) => `${k}：${v || '待确认'}`)
+        ] as [string, unknown][])
+          .map(([k, v]) => `${k}：${artifactPreview(v)}`)
           .join('\n'),
       },
       {

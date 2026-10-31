@@ -337,6 +337,11 @@ def create_run(request: Request, db: Session, user: User, case: Case, body: dict
     from .run_context import prepare_context, resume_run, route_intent, require_capability
     require_capability(db, "agent")
     if body.get("replyToRunId"):
+        if body.get("knowledgeQuote"):
+            pending = db.get(Run, str(body["replyToRunId"]))
+            pending_job = db.get(Job, pending.job_id) if pending and pending.case_id == case.id else None
+            if not pending_job or pending_job.kind != "prepare_quote":
+                fail("RUN_NEEDS_INPUT", "请先完成或取消当前任务，再开始知识库核价", 409)
         return resume_run(request, db, user, case, body, marker)
     if decode(case.payload).get("pendingRunId"):
         fail("RUN_NEEDS_INPUT", "请先回答当前任务的问题或取消该任务", 409)
@@ -348,7 +353,13 @@ def create_run(request: Request, db: Session, user: User, case: Case, body: dict
     kind = kind or route_intent(action, str(body.get("instruction", "")))
     from .agent_files import enabled as file_tools_enabled, confirmed_facts
     from .business_agent import configured as business_agent_configured
-    file_tools = file_tools_enabled() and interactive and kind in ("prepare_quote", "apply_change", "confirm_requirements")
+    if body.get("knowledgeQuote"):
+        if kind != "prepare_quote":
+            fail("INVALID_INPUT", "知识库核价只适用于成本报价阶段")
+        if not business_agent_configured():
+            fail("AGENT_NOT_CONFIGURED", "知识库自动核价需要连接 Agent。请在工作空间设置中检查模型连接。", 422)
+        body = {**body, "generationTarget": "quote"}
+    file_tools = file_tools_enabled() and interactive and not body.get("knowledgeQuote") and kind in ("prepare_quote", "apply_change", "confirm_requirements")
     business_agent = business_agent_configured() and not file_tools
     allowed = {"qualify_inquiry", "confirm_requirements", "prepare_quote", "manage_sample", "confirm_order", "prepare_production", "manage_shipment", "reconcile_payment", "handle_aftersales", "apply_change", "follow_up"}
     if kind not in allowed:
