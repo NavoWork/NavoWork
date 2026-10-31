@@ -34,6 +34,9 @@ def main(argv=None):
     selftest.add_argument("--seed", type=int, default=7319)
     probe = sub.add_parser("backend-probe", help="execute selected checked-in pure function ASTs, not the backend service")
     probe.add_argument("--output", type=Path)
+    compat = sub.add_parser("compat-check", help="exercise an explicitly supplied committed agent-kit revision")
+    compat.add_argument("--revision", required=True)
+    compat.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
     if args.operation == "list":
         print(json.dumps([{"id": s.id, "title": s.title, "coverage": s.coverage} for s in build_suite()], ensure_ascii=False, indent=2))
@@ -49,6 +52,13 @@ def main(argv=None):
         write_json(output / "report.json", result)
         print(f"Backend function observations: {output / 'report.json'}; product NOT ACCEPTED")
         return 0 if result["status"] == "completed" else 2
+    if args.operation == "compat-check":
+        from .compatibility import check_committed_protocol
+        output = args.output or default_output("compatibility")
+        result = check_committed_protocol(args.revision, output)
+        print(json.dumps(result["summary"]))
+        print(f"Report: {output.resolve() / 'report.json'}; product NOT ACCEPTED")
+        return 1 if result["status"] == "failed" else 2 if result["status"] == "blocked" else 0
     if args.operation == "self-test":
         from .selftest import self_test
         output = args.output or default_output("self-test")

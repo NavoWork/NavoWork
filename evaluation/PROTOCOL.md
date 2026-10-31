@@ -1,6 +1,6 @@
 # 独立适配器协议 navowork-eval/1
 
-此协议只位于 `evaluation/`，是共享 `ExecutionContext/FileRef/Citation/ToolResult` 冻结前的替身协议，不定义或修改产品 contracts。结构索引见 `protocol.schema.json`；业务不变量由 `checker.py` 检查。JSON Schema 用于接入方查阅，不依赖第三方验证器，也不能代替业务校验。
+此协议只位于 `evaluation/`，描述评测 envelope，不定义或修改产品 contracts。已对提交 `d23ab0a` 中的 `ExecutionContext/FileRef/Citation/ToolResult` 做实际兼容检查。结构索引见 `protocol.schema.json`；业务不变量由 `checker.py` 检查。JSON Schema 用于接入方查阅，不依赖第三方验证器，也不能代替业务校验。
 
 ## 调用边界
 
@@ -59,7 +59,7 @@ HTTP 请求将 workspace 替换为 `.`，每个 input 增加 `data_base64`。服
 
 E05 当前仅向被测端提供外 Case 的不透明引用，正文由评测宿主保管；真实权限验收还必须通过受信任的 setup 将该来源入库另一 Case，再用当前 Case 会话访问。返回未知 ID 的 404 不能单独证明真实 ACL 已验收。`faults` 同样是 shim/宿主的故障注入控制，应在真实导出调用处注入失败，不把标准答案或故障预期放进模型 Prompt。
 
-## 与主执行链映射（待冻结）
+## 与 d23ab0a 主执行链协议映射
 
 | 评测字段 | 未来主链路对象 | 接入要求 |
 | --- | --- | --- |
@@ -69,4 +69,14 @@ E05 当前仅向被测端提供外 Case 的不透明引用，正文由评测宿�
 | steps.status/reason/artifact | ToolResult | 区分失败/部分成功/阻断；不得只回成功文案 |
 | events | 工具/Run/Worker 日志 | 同一 run 和幂等键；独立核对外部日志 |
 
-尚无已提交 agent-kit 协议可在本基线上核对。兼容性结论只覆盖本协议的 module、stdio、HTTP 回环；主链路仍 blocked。接入后需要实际工具输出与数据库/版本/授权证据，不允许用本离线适配器替代主链路验收。
+`d23ab0a` 的核心 DTO 均拒绝额外字段。评测专属 quote、聚合状态、失败分支等必须放在 `ToolResult.data` 或评测 envelope，不能加到原 DTO 顶层。FileRef 没有 version 字段，宿主应维护 `(评测 source id, version) → file_id + sha256` 的注册关系；不能用同名文件猜测版本。Citation 不包含 case_id，必须通过宿主注册表和 FileStore 检查归属，再保留原生 locator，转换成评测定位时重新定位实际摘录，不能猜页码或字符范围。
+
+| 原生 ToolResult.status | 评测呈现要求 |
+| --- | --- |
+| success | 表示工具成功；按动作检查实际数据或文件，不代表批准/已发送 |
+| needs_info | 保留问题和缺项；缺价场景归为业务阻断，不产生正式价 |
+| needs_review | 保留草稿与待审含义，不转换成批准 |
+| blocked / conflict | 保留 code；权限拒绝/CAS/幂等冲突分别记录 |
+| error + outputs + retryable | 保留已经完成的文件及失败分支；可描述部分完成，不能丢失原生 error 或伪报全成功 |
+
+`compat-check --revision d23ab0a` 已直接执行该提交的 ToolService、LocalAdapter、实际读文件与生成文件工具，11 项通过；快照和所有引用源码 SHA-256 留在评测报告。该检查并非通用场景全部接入后的运行结果，仍缺正式 shim 的 locator/状态投影，以及实际数据库、后端权限、Worker 和模型追踪。主链路仍 blocked，不允许用本地工具或离线适配器替代完整验收。

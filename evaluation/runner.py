@@ -79,7 +79,7 @@ def run_suite(output: Path, *, seed=7319, selected=None, mode="offline", **adapt
         },
         "phases": {
             "independent_harness": {"status": "executed" if adapter != "unavailable" else "ready_runtime_blocked"},
-            "main_chain_integration": {"status": "blocked", "reason": "No frozen agent-kit/Worker compatibility evidence supplied; external shim success alone does not establish integration."},
+            "main_chain_integration": {"status": "blocked", "reason": "Authenticated backend/Worker end-to-end evidence is pending; committed protocol checks are recorded separately."},
         },
         "product_acceptance": {"status": "not_accepted", "reason": "Offline fixtures/adapter reports do not establish real Agent, backend integration, authorization enforcement or UI/visual acceptance."},
         "trust_boundary": "Adapter events and model receipts are self-reported unless independently reconciled with authenticated host/service logs. Local module/command transports are not an OS sandbox.",

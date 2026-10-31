@@ -16,6 +16,7 @@ $evalPython = 'C:/Users/Justike/.cache/codex-runtimes/codex-primary-runtime/depe
 & $evalPython -m evaluation run --adapter reference --seed 7319
 & $evalPython -m evaluation run
 & $evalPython -m evaluation backend-probe
+& $evalPython -m evaluation compat-check --revision d23ab0a
 ```
 
 `run` 未配置 runtime 时退出 2；存在场景失败退出 1；全部场景检查通过退出 0。这个退出码只针对离线/适配器场景，不代表产品发布批准。外部素材声明哈希审计独立记录在 `declared_fixture_integrity`，即使离线场景通过也不能忽略其失败。报告的 `product_acceptance` 明确保持 `not_accepted`。
@@ -58,7 +59,7 @@ module/command 是受信任适配器入口，不是 OS 沙箱：同一账号的�
 
 机器报告 schema `navowork-eval-report/1` 包括时间、HEAD、seed、模拟标记、实际输入清单/来源哈希、请求/响应哈希、执行事件计数、实际输出哈希、逐条失败、离线/真实模型/文件内容/文件视觉层、独立能力与主链路阶段。当前结果见 [DELIVERY.md](DELIVERY.md) 和 `reports/`。
 
-第一阶段：独立 CLI、替身协议、文件检查器、故障变异、适配器兼容性已实现。第二阶段：已提交主链路协议对齐、真实模型/工具注册/Worker/批准/权限与浏览器路径验收尚未进行，明确 blocked。当前基线上 `git log --all -- agent-kit` 无提交，不读取其他 checkout 的未提交文件。
+第一阶段：独立 CLI、评测协议、文件检查器、故障变异、传输兼容性已实现。第二阶段已针对随后提供的已提交 `d23ab0a` 做 11 项实际协议/本地工具兼容检查，全部通过；包括实际定价/文件生成、客户 ZIP、导出故障与恢复、版本/CAS、外 Case 已存在来源及宿主权限/代次栅栏。`compat-check` 只从指定 commit 的 Git 对象提取代码到忽略的 evaluation/runs，不读取其他 checkout 的未提交文件，也不合并其分支。真实模型、后端 Worker、认证会话、持久化批准及浏览器路径仍 blocked；详见 [兼容报告](reports/agentkit-compatibility.json)。
 
 `backend-probe` 从本 worktree 已提交后端源码 AST 仅提取指定函数，使用内存替身调用；会记录源码哈希和行号。它不启动后端、不访问业务数据库、不发模型请求，结果不能升级成真实服务复现。报告区分已观察的函数行为与未测的客户包/伪成功路径。
 

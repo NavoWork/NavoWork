@@ -1,67 +1,9 @@
-test_all_scenarios_positive_and_generated_variants (test_evaluation.EvaluationTests.test_all_scenarios_positive_and_generated_variants) ... incorrect startxref pointer(1)
-parsing for Object Streams
-incorrect startxref pointer(1)
-parsing for Object Streams
-incorrect startxref pointer(1)
-parsing for Object Streams
-incorrect startxref pointer(1)
-parsing for Object Streams
-ok
+test_all_scenarios_positive_and_generated_variants (test_evaluation.EvaluationTests.test_all_scenarios_positive_and_generated_variants) ... ok
 test_artifact_cost_and_version_are_checked (test_evaluation.EvaluationTests.test_artifact_cost_and_version_are_checked) ... ok
 test_bad_citation_excerpt (test_evaluation.EvaluationTests.test_bad_citation_excerpt) ... ok
 test_content_tampering_even_with_recomputed_hash (test_evaluation.EvaluationTests.test_content_tampering_even_with_recomputed_hash) ... ok
 test_declared_fixture_hashes_audited_without_normalizing (test_evaluation.EvaluationTests.test_declared_fixture_hashes_audited_without_normalizing) ... ok
-test_each_mutant_hits_designated_invariant (test_evaluation.EvaluationTests.test_each_mutant_hits_designated_invariant) ... incorrect startxref pointer(1)
-parsing for Object Streams
-incorrect startxref pointer(1)
-parsing for Object Streams
-incorrect startxref pointer(1)
-parsing for Object Streams
-incorrect startxref pointer(1)
-parsing for Object Streams
-incorrect startxref pointer(1)
-parsing for Object Streams
-incorrect startxref pointer(1)
-parsing for Object Streams
-incorrect startxref pointer(1)
-parsing for Object Streams
-incorrect startxref pointer(1)
-parsing for Object Streams
-incorrect startxref pointer(1)
-parsing for Object Streams
-incorrect startxref pointer(1)
-parsing for Object Streams
-incorrect startxref pointer(1)
-parsing for Object Streams
-incorrect startxref pointer(1)
-parsing for Object Streams
-incorrect startxref pointer(1)
-parsing for Object Streams
-incorrect startxref pointer(1)
-parsing for Object Streams
-incorrect startxref pointer(1)
-parsing for Object Streams
-incorrect startxref pointer(1)
-parsing for Object Streams
-incorrect startxref pointer(1)
-parsing for Object Streams
-incorrect startxref pointer(1)
-parsing for Object Streams
-incorrect startxref pointer(1)
-parsing for Object Streams
-incorrect startxref pointer(1)
-parsing for Object Streams
-incorrect startxref pointer(1)
-parsing for Object Streams
-incorrect startxref pointer(1)
-parsing for Object Streams
-incorrect startxref pointer(1)
-parsing for Object Streams
-incorrect startxref pointer(1)
-parsing for Object Streams
-incorrect startxref pointer(1)
-parsing for Object Streams
-ok
+test_each_mutant_hits_designated_invariant (test_evaluation.EvaluationTests.test_each_mutant_hits_designated_invariant) ... ok
 test_event_reordering_and_request_binding (test_evaluation.EvaluationTests.test_event_reordering_and_request_binding) ... ok
 test_foreign_source_bytes_never_staged (test_evaluation.EvaluationTests.test_foreign_source_bytes_never_staged) ... ok
 test_http_transport_materializes_bytes_and_binds_wire_hash (test_evaluation.EvaluationTests.test_http_transport_materializes_bytes_and_binds_wire_hash) ... ok
@@ -79,6 +21,6 @@ test_unavailable_runtime_reports_blocked_and_not_accepted (test_evaluation.Evalu
 test_zip_scanner_reads_nested_members (test_evaluation.EvaluationTests.test_zip_scanner_reads_nested_members) ... ok
 
 ----------------------------------------------------------------------
-Ran 21 tests in 7.532s
+Ran 21 tests in 6.576s
 
 OK

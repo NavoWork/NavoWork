@@ -46,9 +46,13 @@
 
 ## 第二阶段：主链路接入与产品验收
 
-**blocked / 产品未验收。** 本基线和本地 refs 的 `git log --all -- agent-kit` 无可核对的已提交协议；未读取或复制主执行 chat 的未提交内容。
+**部分兼容检查完成；后端主链路 blocked / 产品未验收。** 独立评测首提交为 `9a5400ce3852d99cf787adde6ecca875760062c6`。随后收到主执行 chat 提供的稳定提交 `d23ab0a`，仅从该 Git commit 读取 package 对象，在 `evaluation/runs/` 建临时快照；未合并 justike，也未读取或复制主执行 chat 的未提交内容。
 
-待主链路提供已提交协议和运行接口后：
+[agentkit-compatibility.json](reports/agentkit-compatibility.json) 记录对该提交直接执行的 11 项检查，全部通过：严格 DTO/原生状态往返、四个 Port 与真实 XLSX/PDF 定位、独立金额 oracle 与缺价、实际四份成果字节和金额、三次幂等与冲突、真实客户 ZIP 成本排除、部分导出及单分支重试、同名来源身份与旧字节、不可变版本及 CAS、未暴露 shell/外发/批准工具、已存在外 Case 来源拒绝及只读/代次栅栏。
+
+这 11 项执行了真实提交内的本地工具代码，但没有执行真实模型、后端 Worker 或浏览器，也没有视觉审阅。部分导出的原生状态为 `error`，同时保留 3 份成功输出和 `quotation.pdf` retryable 分支；兼容层不得改成全成功。当前通用评测场景还没有正式的 ToolResult/Citation 投影 shim。
+
+已提交协议核对完成，后续运行接口接入仍需：
 
 1. 对齐 ExecutionContext/FileRef/Citation/ToolResult，受信任 shim 注入身份、Case、固定版本与批准范围，禁止 Prompt 自授权限。
 2. 用真实文件工具、工具注册、Worker 与宿主日志运行相同场景；跨 Case 场景须先在外 Case 入库真实来源，不能仅以未知 ID 的 404 证明权限。
