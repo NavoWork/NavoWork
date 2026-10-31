@@ -383,6 +383,13 @@ def create_run(request: Request, db: Session, user: User, case: Case, body: dict
             fail("INVALID_INPUT", "未知生成节点")
     from .agent_files import enabled as file_tools_enabled, confirmed_facts
     file_tools = file_tools_enabled() and interactive and kind in ("prepare_quote", "apply_change", "confirm_requirements")
+    from .business_agent import configured as business_agent_configured
+    business_agent = business_agent_configured() and not file_tools
+    if business_agent:
+        from .settings_api import settings_values
+        if not settings_values(db).get("agent", {}).get("enabled", True):
+            fail("CAPABILITY_DISABLED", "Agent 已在设置中停用", 422)
+        context["businessAgent"] = True
     if file_tools:
         # Freeze actual case attachments at dispatch, including explicitly selected user-owned canvas files.
         evidence_rows = items(db, "evidence", case_id=case.id) if not body.get("inputRefs") else [db.get(Item, ref) for ref in body["inputRefs"]]
@@ -436,6 +443,9 @@ async def workspace_dispatch(workspace_id: str, rest: str, request: Request, db:
                 fail("INVALID_INPUT", "请求正文必须是对象")
     if not parts:
         fail("NOT_FOUND", "接口不存在", 404)
+    if parts == ["settings"]:
+        from .settings_api import settings_route
+        return settings_route(request, db, user, body)
     if parts[0] == "library":
         from .workspace_api import library_routes
         return library_routes(request, db, user, parts, body, form)
