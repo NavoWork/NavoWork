@@ -10,7 +10,7 @@ import type {
 } from './types';
 export const demoSession: Session = {
   user: { id: 'user_demo', name: 'Alex', role: 'admin' },
-  workspace: { id: 'ws_demo', name: 'EasyWork 示例工作空间' },
+  workspace: { id: 'ws_demo', name: 'Navowork 示例工作空间' },
 };
 export const sources: Source[] = [
   {

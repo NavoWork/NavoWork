@@ -652,7 +652,7 @@ function CsvImport({
             onClick={() =>
               saveBlob(
                 new Blob(['\ufeff', csvTemplate], { type: 'text/csv;charset=utf-8;' }),
-                'EasyWork-商品导入模板.csv',
+                'Navowork-商品导入模板.csv',
               )
             }
           >
