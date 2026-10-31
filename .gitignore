@@ -1,0 +1,10 @@
+# 构建产物（python3 build.py 生成）
+dist/
+
+# 系统 / 编辑器
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+node_modules/
