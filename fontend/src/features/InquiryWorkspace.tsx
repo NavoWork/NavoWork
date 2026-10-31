@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowRight,
@@ -12,6 +12,7 @@ import {
   FileText,
   GitBranch,
   History,
+  LayoutGrid,
   MessageSquare,
   PanelRightClose,
   PanelRightOpen,
@@ -37,6 +38,8 @@ import type {
 import { EmptyState, ErrorNotice, Loading, Modal, StatusBadge } from '../components/ui';
 import { ReplyEditor, type DraftState } from './inquiry-replies';
 import { MaterialsPanel } from './inquiry-materials';
+import { InquiryCanvas } from './InquiryCanvas';
+import { ResizeHandle } from '../components/ResizeHandle';
 import './inquiry.css';
 
 const stages = ['读懂询盘', '准备方案', '完成回复'];
@@ -98,6 +101,8 @@ export function InquiryWorkspace({
       revision: null as number | null,
       lastRunId: '',
       selectedAssets: null as string[] | null,
+      rightPane: 'chat' as 'chat' | 'results',
+      assistantWidth: null as number | null,
     }),
   );
   const [input, setInput] = useState(initial.current.input);
@@ -108,8 +113,29 @@ export function InquiryWorkspace({
   const [selectedAssets, setSelectedAssets] = useState<string[] | null>(
     initial.current.selectedAssets ?? null,
   );
-  const [mobilePane, setMobilePane] = useState<'chat' | 'results'>('results');
+  const [mobilePane, setMobilePane] = useState<'chat' | 'results'>('chat');
+  const [rightPane, setRightPane] = useState<'chat' | 'results'>(
+    initial.current.rightPane || 'chat',
+  );
+  const [documentRequest, setDocumentRequest] = useState<{ id: string; seq: number } | null>(null);
+  const openDocument = (id: string) => {
+    setMobilePane('chat');
+    setDocumentRequest((old) => ({ id, seq: (old?.seq || 0) + 1 }));
+  };
+  const showAIChat = () => {
+    setResultsOpen(true);
+    setRightPane('chat');
+    setMobilePane('results');
+  };
   const [resultsOpen, setResultsOpen] = useState(true);
+  const [assistantWidth, setAssistantWidth] = useState<number | null>(
+    typeof initial.current.assistantWidth === 'number' &&
+      Number.isFinite(initial.current.assistantWidth)
+      ? initial.current.assistantWidth
+      : null,
+  );
+  const columnsRef = useRef<HTMLDivElement>(null);
+  const assistantRef = useRef<HTMLElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
   const [modal, setModal] = useState<
     'original' | 'history' | 'waiting' | 'close' | 'accept' | 'relations' | null
@@ -159,7 +185,7 @@ export function InquiryWorkspace({
   useEffect(() => {
     const messages = messagesRef.current;
     if (messages) messages.scrollTop = messages.scrollHeight;
-  }, [detail.data?.messages.length, run?.id]);
+  }, [detail.data?.messages.length, run?.id, rightPane, mobilePane, resultsOpen]);
   const running = !!inquiry?.activeRunId || (!!run && ['queued', 'running'].includes(run.status));
   const readOnly =
     history ||
@@ -172,8 +198,27 @@ export function InquiryWorkspace({
     changedRef.current();
   }, [queryClient, scope]);
   useEffect(() => {
-    writePref(prefKey, { input, tab, stage, revision: revisionNumber, lastRunId, selectedAssets });
-  }, [input, tab, stage, revisionNumber, lastRunId, selectedAssets, prefKey]);
+    writePref(prefKey, {
+      input,
+      tab,
+      stage,
+      revision: revisionNumber,
+      lastRunId,
+      selectedAssets,
+      rightPane,
+      assistantWidth,
+    });
+  }, [
+    input,
+    tab,
+    stage,
+    revisionNumber,
+    lastRunId,
+    selectedAssets,
+    rightPane,
+    assistantWidth,
+    prefKey,
+  ]);
   useEffect(() => {
     if (
       run &&
@@ -252,6 +297,7 @@ export function InquiryWorkspace({
       });
       setLastRunId(r.runId || r.id);
       setInput('');
+      showAIChat();
       setModal(null);
       setRevisionNumber(null);
       queryClient.setQueryData(['run', scope, r.runId || r.id], r);
@@ -340,7 +386,7 @@ export function InquiryWorkspace({
   const canWrite = !readOnly && !busy;
   const canSend = canWrite && (!revision || !draftsPending);
   return (
-    <div className={`iw-page ${resultsOpen ? '' : 'iw-focus-chat'}`}>
+    <div className={`iw-page iw-canvas-page ${resultsOpen ? '' : 'iw-focus-chat'}`}>
       <header className="iw-heading">
         <div>
           <div className="iw-eyebrow">
@@ -369,10 +415,10 @@ export function InquiryWorkspace({
           </button>
           <button
             className="icon-button iw-results-toggle"
-            aria-label={resultsOpen ? '收起业务结果' : '展开业务结果'}
+            aria-label={resultsOpen ? '收起 AI 面板' : '展开 AI 面板'}
             aria-expanded={resultsOpen}
             aria-controls={`results-${inquiryId}`}
-            title={resultsOpen ? '收起业务结果' : '展开业务结果'}
+            title={resultsOpen ? '收起 AI 面板' : '展开 AI 面板'}
             onClick={() => setResultsOpen((value) => !value)}
           >
             {resultsOpen ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
@@ -438,14 +484,22 @@ export function InquiryWorkspace({
       )}
       <div className="iw-mobile-switch">
         <button aria-pressed={mobilePane === 'chat'} onClick={() => setMobilePane('chat')}>
-          对话
+          画板与资料
         </button>
         <button aria-pressed={mobilePane === 'results'} onClick={() => setMobilePane('results')}>
-          业务结果
+          AI 助手
         </button>
       </div>
-      <div className={`iw-columns iw-show-${mobilePane}`}>
-        <section className="iw-conversation">
+      <div
+        ref={columnsRef}
+        className={`iw-columns iw-show-${mobilePane}`}
+        style={
+          {
+            '--iw-assistant-width': assistantWidth === null ? undefined : `${assistantWidth}px`,
+          } as CSSProperties
+        }
+      >
+        <section className="iw-conversation iw-data-pane" aria-label="询盘画板与资料">
           <div className="iw-panel-head">
             <h2>
               <MessageSquare size={16} />
@@ -453,434 +507,54 @@ export function InquiryWorkspace({
             </h2>
             <span className="iw-small-label">仅当前询盘</span>
           </div>
-          <div className="iw-messages" ref={messagesRef}>
-            <button className="iw-original" onClick={() => setModal('original')}>
-              <FileText size={16} />
-              <div>
-                <strong>客户原始询盘</strong>
-                <p>
-                  {inquiry.originalText.slice(0, 110)}
-                  {inquiry.originalText.length > 110 ? '…' : ''}
-                </p>
-              </div>
-              <ChevronRight size={14} />
-            </button>
-            {!detail.data?.messages.length && (
-              <div className="iw-assistant-intro">
-                <span className="iw-ai-mark">
-                  <Sparkles size={16} />
-                </span>
-                <h3>先把需求读清楚。</h3>
-                <p>
-                  从客户原文开始，梳理产品、数量、目的地与时间要求。资料不足的地方，会保留为待确认。
-                </p>
-              </div>
-            )}
-            {detail.data?.messages.map((message) => (
-              <article className={`iw-message ${message.role}`} key={message.id}>
-                <div className="iw-message-meta">
-                  <span>{message.role === 'user' ? '你' : 'Navowork'}</span>
-                  <time>{date(message.createdAt)}</time>
-                </div>
-                <p>{message.text}</p>
-              </article>
-            ))}
-            {run && (
-              <div className="iw-run">
-                <div className="iw-run-title">
-                  <Sparkles size={14} />
-                  <strong>{running ? phaseNames[run.phase] : '本次运行'}</strong>
-                  <StatusBadge status={run.status} />
-                </div>
-                <div className="iw-run-steps">
-                  {Object.entries(phaseNames).map(([phase, title], index) => (
-                    <span
-                      key={phase}
-                      className={
-                        Object.keys(phaseNames).indexOf(run.phase) >= index ? 'reached' : ''
-                      }
-                      title={title}
-                    />
-                  ))}
-                </div>
-                <details className="iw-run-details">
-                  <summary>运行详情</summary>
-                  <small>runId: {run.id}</small>
-                </details>
-                {running && <p>可以切换其他询盘，结果会保存在这里。</p>}
-                {run.error && <ErrorNotice error={run.error.message} />}{' '}
-                {run.clarification?.questions.map((q) => (
-                  <p key={q.id}>
-                    <TriangleAlert size={13} /> {q.question}
-                  </p>
+          <InquiryCanvas
+            inquiry={inquiry}
+            revision={revision}
+            revisions={detail.data?.revisions || []}
+            messages={detail.data?.messages || []}
+            scope={scope}
+            base={base}
+            path={path}
+            readOnly={readOnly}
+            openRequest={documentRequest}
+            replyText={
+              draftState.revision === revision?.number ? draftState.texts?.['en-US'] : undefined
+            }
+            onOriginalSaved={refresh}
+            onInstruction={(text) => {
+              setInput(text);
+              showAIChat();
+            }}
+            onRevision={(number) => {
+              setRevisionNumber(number === inquiry.currentRevision ? null : number);
+              setTab(0);
+              setRightPane('results');
+              setMobilePane('results');
+            }}
+            onOpenChat={showAIChat}
+            conversation={
+              <div className="ic-document-sheet">
+                <div className="ic-document-eyebrow">CONVERSATION HISTORY</div>
+                <h2>沟通与处理记录</h2>
+                <p className="ic-document-subtitle">当前询盘的沟通留档，可在右侧继续与 AI 对话。</p>
+                {(detail.data?.messages || []).map((message) => (
+                  <article className="ic-history-message" key={message.id}>
+                    <header>
+                      <strong>{message.role === 'user' ? '你' : 'Navowork'}</strong>
+                      <time>{date(message.createdAt)}</time>
+                    </header>
+                    <p>{message.text}</p>
+                  </article>
                 ))}
-                {run.status === 'failed' && (
-                  <button
-                    className="button"
-                    disabled={!canWrite}
-                    onClick={() => {
-                      setInput(run.instruction);
-                      setNotice('已恢复本次指令，确认后可重新处理。');
-                    }}
-                  >
-                    恢复指令并重试
-                  </button>
-                )}
-                {running && (
-                  <button
-                    className="button button-ghost"
-                    disabled={busy}
-                    onClick={() =>
-                      operate(async () => {
-                        await api.post(`${base}/runs/${run.id}/cancel`);
-                        await runQuery.refetch();
-                        await refresh();
-                      })
-                    }
-                  >
-                    <Square size={12} />
-                    取消本次运行
-                  </button>
-                )}
-              </div>
-            )}
-            <ErrorNotice error={runQuery.error} onRetry={() => void runQuery.refetch()} />
-          </div>
-          <div className="iw-composer">
-            <label className="sr-only" htmlFor={`instruction-${inquiryId}`}>
-              补充要求或客户反馈
-            </label>
-            <textarea
-              id={`instruction-${inquiryId}`}
-              placeholder={
-                readOnly
-                  ? '请回到当前版本、恢复处理或等待运行完成'
-                  : '例如：客户希望先试单 300 件，请准备现货方案…'
-              }
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              disabled={!canWrite}
-              onKeyDown={(e) => {
-                if (
-                  (e.metaKey || e.ctrlKey) &&
-                  e.key === 'Enter' &&
-                  !e.nativeEvent.isComposing &&
-                  canSend
-                ) {
-                  e.preventDefault();
-                  void startRun();
-                }
-              }}
-            />
-            <div className="iw-composer-foot">
-              <button
-                className="icon-button"
-                aria-label="查看客户原始询盘"
-                title="客户原始询盘"
-                onClick={() => setModal('original')}
-              >
-                <Paperclip size={17} />
-              </button>
-              <span>
-                {revision && draftsPending ? '正在载入回复草稿…' : input ? '草稿已暂存' : '仅当前询盘'}
-                <span className="iw-send-shortcut"> · ⌘ / Ctrl + Enter</span>
-              </span>
-              <button
-                className="button button-primary iw-send-button"
-                aria-label={inquiry.currentRevision ? '处理反馈' : '开始处理'}
-                aria-keyshortcuts="Meta+Enter Control+Enter"
-                title={inquiry.currentRevision ? '处理反馈' : '开始处理'}
-                disabled={!canSend}
-                onClick={() => startRun()}
-              >
-                <ArrowUp size={18} />
-              </button>
-            </div>
-          </div>
-          <div className="iw-case-actions">
-            {inquiry.businessStatus === 'active' && (
-              <button
-                disabled={running || busy || (!!revision && draftsPending)}
-                onClick={() => setModal('waiting')}
-              >
-                标记待确认
-              </button>
-            )}
-            {inquiry.businessStatus !== 'done' && (
-              <button
-                disabled={running || busy || (!!revision && draftsPending)}
-                onClick={() => setModal('close')}
-              >
-                结束询盘
-              </button>
-            )}
-            <button onClick={() => setModal('relations')}>
-              <GitBranch size={12} /> 业务关联
-            </button>
-          </div>
-        </section>
-        <section className="iw-results" id={`results-${inquiryId}`}>
-          <div className="iw-panel-head">
-            <h2>
-              业务结果{' '}
-              <span className="iw-version">{revision ? `V${revision.number}` : '等待分析'}</span>
-            </h2>
-            <span className="iw-small-label">
-              {revision ? date(revision.createdAt) : '成功运行后生成'}
-            </span>
-          </div>
-          <div className="iw-stage-bar" aria-label="工作阶段">
-            {stages.map((label, i) => (
-              <button
-                key={label}
-                className={stage === i ? 'selected' : ''}
-                aria-pressed={stage === i}
-                onClick={() => {
-                  setStage(i);
-                  setTab(i);
-                  setMobilePane('results');
-                }}
-              >
-                <span>0{i + 1}</span>
-                <strong>{label}</strong>
-                {i < 2 && <ChevronRight size={12} />}
-              </button>
-            ))}
-          </div>
-          {revision?.risks
-            .filter((r) => r.status !== 'resolved' && r.severity !== 'info')
-            .slice(0, 1)
-            .map((r) => (
-              <div className="iw-pinned-risk" key={r.id}>
-                <TriangleAlert size={17} />
-                <div>
-                  <strong>{r.message}</strong>
-                  <p>{r.suggestedAction}</p>
-                </div>
-                <button onClick={() => setTab(0)} aria-label="查看全部风险">
-                  <ChevronRight size={16} />
+                <button className="button" onClick={showAIChat}>
+                  <MessageSquare size={14} />
+                  在右侧继续对话
                 </button>
               </div>
-            ))}
-          <div className="iw-result-tabs" role="tablist" aria-label="业务结果">
-            {resultTabs.map((label, i) => (
-              <button
-                key={label}
-                id={`${inquiryId}-result-tab-${i}`}
-                role="tab"
-                aria-selected={tab === i}
-                aria-controls={`${inquiryId}-result-${i}`}
-                tabIndex={tab === i ? 0 : -1}
-                onKeyDown={(e) => {
-                  if (['ArrowLeft', 'ArrowRight'].includes(e.key)) {
-                    e.preventDefault();
-                    const next = (i + (e.key === 'ArrowRight' ? 1 : 3)) % 4;
-                    setTab(next);
-                    document.getElementById(`${inquiryId}-result-tab-${next}`)?.focus();
-                  }
-                }}
-                onClick={() => setTab(i)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="iw-result-content">
-            {!revision ? (
-              <EmptyState
-                title="还没有业务结果"
-                description="点击「开始处理」分析客户原文。只有成功保存的完整版本会出现在这里。"
-              />
-            ) : (
-              <>
-                <div
-                  hidden={tab !== 0}
-                  role="tabpanel"
-                  id={`${inquiryId}-result-0`}
-                  aria-labelledby={`${inquiryId}-result-tab-0`}
-                >
-                  <div className="iw-section-heading">
-                    <span className="iw-kicker">CUSTOMER REQUIREMENTS</span>
-                    <h3>客户要什么</h3>
-                  </div>
-                  <dl className="iw-facts">
-                    {[
-                      ['产品', revision.requirements.requestedProduct],
-                      [
-                        '需求数量',
-                        revision.requirements.quantity == null
-                          ? null
-                          : `${revision.requirements.quantity} 件`,
-                      ],
-                      ['规格', revision.requirements.specification],
-                      ['目的地', revision.requirements.destination],
-                      ['期望到货', revision.requirements.requestedArrival],
-                      ['定制要求', revision.requirements.customization],
-                    ].map(([label, value]) => (
-                      <div key={label}>
-                        <dt>{label}</dt>
-                        <dd className={!value ? 'unknown' : ''}>{value || '待确认'}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                  {revision.requirements.missingFields.length > 0 && (
-                    <div className="iw-note">
-                      待补信息：{revision.requirements.missingFields.join('、')}
-                    </div>
-                  )}
-                  <div className="iw-section-heading">
-                    <span className="iw-kicker">OPEN QUESTIONS</span>
-                    <h3>核对后，再向前一步</h3>
-                  </div>
-                  <div className="iw-risk-list">
-                    {revision.risks.length ? (
-                      revision.risks.map((r) => (
-                        <article key={r.id}>
-                          <TriangleAlert size={16} />
-                          <div>
-                            <div>
-                              <strong>{r.message}</strong>
-                              <span>
-                                {r.status === 'resolved'
-                                  ? '已解决'
-                                  : r.severity === 'error'
-                                    ? '阻断'
-                                    : '待确认'}
-                              </span>
-                            </div>
-                            <p>{r.suggestedAction}</p>
-                          </div>
-                        </article>
-                      ))
-                    ) : (
-                      <p className="iw-muted">此版本没有返回风险项。</p>
-                    )}
-                  </div>
-                  <div className="iw-inline-note">
-                    <BookOpen size={14} />
-                    客户要求与商家事实分开保留，备选方案需要客户确认。
-                  </div>
-                </div>
-                <div
-                  hidden={tab !== 1}
-                  role="tabpanel"
-                  id={`${inquiryId}-result-1`}
-                  aria-labelledby={`${inquiryId}-result-tab-1`}
-                >
-                  <div className="iw-section-heading">
-                    <span className="iw-kicker">PROPOSAL & QUOTATION</span>
-                    <h3>把方案的边界说清楚</h3>
-                  </div>
-                  <div className="iw-proposal">
-                    <div>
-                      <span>客户原要求</span>
-                      <strong>{revision.proposal.requestedSku || '尚未确定 SKU'}</strong>
-                    </div>
-                    <ArrowRight size={16} />
-                    <div>
-                      <span>当前方案</span>
-                      <strong>{revision.proposal.selectedSku || '等待选择方案'}</strong>
-                    </div>
-                    <span className="iw-proposal-state">
-                      {revision.proposal.status === 'accepted'
-                        ? '已记录客户接受'
-                        : revision.proposal.status === 'proposed'
-                          ? '备选 · 待客户确认'
-                          : '需求待准备'}
-                    </span>
-                  </div>
-                  {revision.proposal.differences.map((d) => (
-                    <p className="iw-note" key={d}>
-                      {d}
-                    </p>
-                  ))}
-                  {revision.quote ? (
-                    <>
-                      <div className="iw-quote-card">
-                        <div className="iw-quote-top">
-                          <span>商品小计 · USD</span>
-                          <span>草稿报价</span>
-                        </div>
-                        <strong className="iw-quote-amount">
-                          {money(revision.quote.goodsSubtotalMinor)}
-                        </strong>
-                        <p>
-                          {revision.quote.quantity.toLocaleString()} 件 ×{' '}
-                          {money(revision.quote.unitPriceMinor)} / 件
-                        </p>
-                        <dl className="iw-costs">
-                          <div>
-                            <dt>运费</dt>
-                            <dd>{money(revision.quote.freightMinor)}</dd>
-                          </div>
-                          <div>
-                            <dt>税费</dt>
-                            <dd>{money(revision.quote.taxMinor)}</dd>
-                          </div>
-                          <div>
-                            <dt>最终总额</dt>
-                            <dd>{money(revision.quote.totalMinor)}</dd>
-                          </div>
-                        </dl>
-                      </div>
-                      <dl className="iw-facts">
-                        <div>
-                          <dt>生产时间</dt>
-                          <dd>
-                            {revision.quote.timing.productionDays == null
-                              ? '待确认'
-                              : `${revision.quote.timing.productionDays} 天`}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>出库时间</dt>
-                          <dd>
-                            {revision.quote.timing.dispatchDays == null
-                              ? '待确认'
-                              : `${revision.quote.timing.dispatchDays} 天`}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>起算条件</dt>
-                          <dd>
-                            {revision.quote.timing.startsAfter === 'payment_conditions_met'
-                              ? '付款条件满足后'
-                              : revision.quote.timing.startsAfter}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>运输 / 到货</dt>
-                          <dd>
-                            {revision.quote.timing.transitDays == null
-                              ? '待确认，不承诺到货日期'
-                              : `${revision.quote.timing.transitDays} 天运输`}
-                          </dd>
-                        </div>
-                      </dl>
-                    </>
-                  ) : (
-                    <EmptyState
-                      title="本版本没有有效报价"
-                      description="需要有效商品、数量和价格依据后才能形成报价。"
-                    />
-                  )}
-                  {revision.proposal.status === 'proposed' && (
-                    <button
-                      className="button"
-                      disabled={!canWrite}
-                      onClick={() => setModal('accept')}
-                    >
-                      <Check size={14} />
-                      记录客户接受该方案
-                    </button>
-                  )}
-                </div>
-                <div
-                  hidden={tab !== 2}
-                  role="tabpanel"
-                  id={`${inquiryId}-result-2`}
-                  aria-labelledby={`${inquiryId}-result-tab-2`}
-                >
+            }
+            replyEditor={
+              revision ? (
+                <>
                   <ReplyEditor
                     key={`${scope}:${revision.number}`}
                     path={path}
@@ -917,70 +591,592 @@ export function InquiryWorkspace({
                       ))}
                     </div>
                   )}
+                </>
+              ) : null
+            }
+          />
+        </section>
+        <ResizeHandle
+          label="调整 AI 面板宽度"
+          controls={`results-${inquiryId}`}
+          paneRef={assistantRef}
+          containerRef={columnsRef}
+          min={280}
+          max={720}
+          remainingMin={380}
+          direction={-1}
+          onResize={setAssistantWidth}
+          onReset={() => setAssistantWidth(null)}
+          className="iw-panel-resizer"
+        />
+        <section
+          ref={assistantRef}
+          className="iw-results iw-assistant"
+          id={`results-${inquiryId}`}
+          aria-label="AI 助手与业务结果"
+        >
+          <div className="iw-side-tabs" role="tablist" aria-label="AI 面板">
+            {(['chat', 'results'] as const).map((pane, index) => (
+              <button
+                key={pane}
+                role="tab"
+                id={`${inquiryId}-side-${pane}`}
+                aria-controls={`${inquiryId}-side-panel-${pane}`}
+                aria-selected={rightPane === pane}
+                tabIndex={rightPane === pane ? 0 : -1}
+                onClick={() => setRightPane(pane)}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    const next = index ? 'chat' : 'results';
+                    setRightPane(next);
+                    document.getElementById(`${inquiryId}-side-${next}`)?.focus();
+                  }
+                }}
+              >
+                {pane === 'chat' ? <MessageSquare size={14} /> : <LayoutGrid size={14} />}
+                {pane === 'chat' ? 'AI 对话' : '业务结果'}
+              </button>
+            ))}
+            <span>仅当前询盘</span>
+          </div>
+          <div
+            className="iw-ai-chat"
+            role="tabpanel"
+            id={`${inquiryId}-side-panel-chat`}
+            aria-labelledby={`${inquiryId}-side-chat`}
+            hidden={rightPane !== 'chat'}
+          >
+            <div className="iw-messages" ref={messagesRef}>
+              <button className="iw-original" onClick={() => openDocument('original')}>
+                <FileText size={16} />
+                <div>
+                  <strong>客户原始询盘</strong>
+                  <p>
+                    {inquiry.originalText.slice(0, 110)}
+                    {inquiry.originalText.length > 110 ? '…' : ''}
+                  </p>
                 </div>
-                <div
-                  hidden={tab !== 3}
-                  role="tabpanel"
-                  id={`${inquiryId}-result-3`}
-                  aria-labelledby={`${inquiryId}-result-tab-3`}
-                >
-                  <div className="iw-section-heading">
-                    <span className="iw-kicker">EVIDENCE, NOT ASSUMPTIONS</span>
-                    <h3>每一项结论，都有出处</h3>
-                    <p>此版本使用的固定来源，更新资料不会改写历史依据。</p>
+                <ChevronRight size={14} />
+              </button>
+              {!detail.data?.messages.length && (
+                <div className="iw-assistant-intro">
+                  <span className="iw-ai-mark">
+                    <Sparkles size={16} />
+                  </span>
+                  <h3>先把需求读清楚。</h3>
+                  <p>
+                    从客户原文开始，梳理产品、数量、目的地与时间要求。资料不足的地方，会保留为待确认。
+                  </p>
+                </div>
+              )}
+              {detail.data?.messages.map((message) => (
+                <article className={`iw-message ${message.role}`} key={message.id}>
+                  <div className="iw-message-meta">
+                    <span>{message.role === 'user' ? '你' : 'Navowork'}</span>
+                    <time>{date(message.createdAt)}</time>
                   </div>
-                  <div className="iw-sources">
-                    {revision.sourceRefs.map((s) => (
-                      <button key={s.sourceVersionId} onClick={() => setSource(s)}>
-                        <span className="iw-source-icon">
-                          <FileText size={18} />
-                        </span>
-                        <div>
-                          <strong>{s.title}</strong>
-                          <p>
-                            V{s.version} ·{' '}
-                            {s.locator.row
-                              ? `第 ${s.locator.row} 行`
-                              : s.locator.section || s.locator.field || '原始资料'}
-                          </p>
-                        </div>
-                        <ChevronRight size={15} />
-                      </button>
+                  <p>{message.text}</p>
+                </article>
+              ))}
+              {run && (
+                <div className="iw-run">
+                  <div className="iw-run-title">
+                    <Sparkles size={14} />
+                    <strong>{running ? phaseNames[run.phase] : '本次运行'}</strong>
+                    <StatusBadge status={run.status} />
+                  </div>
+                  <div className="iw-run-steps">
+                    {Object.entries(phaseNames).map(([phase, title], index) => (
+                      <span
+                        key={phase}
+                        className={
+                          Object.keys(phaseNames).indexOf(run.phase) >= index ? 'reached' : ''
+                        }
+                        title={title}
+                      />
                     ))}
                   </div>
-                  {!revision.sourceRefs.length && (
-                    <EmptyState
-                      title="暂无引用来源"
-                      description="查阅已发布资料后，固定版本引用会展示在这里。"
-                    />
-                  )}
-                  <div className="iw-section-heading">
-                    <h3>本次审校记录</h3>
-                  </div>
-                  {revision.checks.map((c, index) => (
-                    <div className="iw-check" key={index}>
-                      {c.status === 'passed' ? <Check size={14} /> : <TriangleAlert size={14} />}
-                      <span>{c.label}</span>
-                      <small>
-                        {c.status === 'passed' ? '通过' : c.status === 'error' ? '错误' : '待确认'}
-                      </small>
-                    </div>
+                  <details className="iw-run-details">
+                    <summary>运行详情</summary>
+                    <small>runId: {run.id}</small>
+                  </details>
+                  {running && <p>可以切换其他询盘，结果会保存在这里。</p>}
+                  {run.error && <ErrorNotice error={run.error.message} />}{' '}
+                  {run.clarification?.questions.map((q) => (
+                    <p key={q.id}>
+                      <TriangleAlert size={13} /> {q.question}
+                    </p>
                   ))}
-                  <p className="iw-muted">规则版本：{revision.ruleSetVersion}</p>
-                  <MaterialsPanel
-                    base={base}
-                    path={path}
-                    scope={scope}
-                    revision={revision}
-                    readOnly={readOnly || busy}
-                    pending={draftsPending}
-                    draftVersions={draftState.versions}
-                    selectedAssets={history ? null : selectedAssets}
-                    onSelect={setSelectedAssets}
-                  />
+                  {run.status === 'failed' && (
+                    <button
+                      className="button"
+                      disabled={!canWrite}
+                      onClick={() => {
+                        setInput(run.instruction);
+                        setNotice('已恢复本次指令，确认后可重新处理。');
+                      }}
+                    >
+                      恢复指令并重试
+                    </button>
+                  )}
+                  {running && (
+                    <button
+                      className="button button-ghost"
+                      disabled={busy}
+                      onClick={() =>
+                        operate(async () => {
+                          await api.post(`${base}/runs/${run.id}/cancel`);
+                          await runQuery.refetch();
+                          await refresh();
+                        })
+                      }
+                    >
+                      <Square size={12} />
+                      取消本次运行
+                    </button>
+                  )}
                 </div>
-              </>
-            )}
+              )}
+              <ErrorNotice error={runQuery.error} onRetry={() => void runQuery.refetch()} />
+            </div>
+            <div className="iw-composer">
+              <label className="sr-only" htmlFor={`instruction-${inquiryId}`}>
+                补充要求或客户反馈
+              </label>
+              <textarea
+                id={`instruction-${inquiryId}`}
+                placeholder={
+                  readOnly
+                    ? '请回到当前版本、恢复处理或等待运行完成'
+                    : '例如：客户希望先试单 300 件，请准备现货方案…'
+                }
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                disabled={!canWrite}
+                onKeyDown={(e) => {
+                  if (
+                    (e.metaKey || e.ctrlKey) &&
+                    e.key === 'Enter' &&
+                    !e.nativeEvent.isComposing &&
+                    canSend
+                  ) {
+                    e.preventDefault();
+                    void startRun();
+                  }
+                }}
+              />
+              <div className="iw-composer-foot">
+                <button
+                  className="icon-button"
+                  aria-label="查看客户原始询盘"
+                  title="客户原始询盘"
+                  onClick={() => openDocument('original')}
+                >
+                  <Paperclip size={17} />
+                </button>
+                <span>
+                  {revision && draftsPending
+                    ? '正在载入回复草稿…'
+                    : input
+                      ? '草稿已暂存'
+                      : '仅当前询盘'}
+                  <span className="iw-send-shortcut"> · ⌘ / Ctrl + Enter</span>
+                </span>
+                <button
+                  className="button button-primary iw-send-button"
+                  aria-label={inquiry.currentRevision ? '处理反馈' : '开始处理'}
+                  aria-keyshortcuts="Meta+Enter Control+Enter"
+                  title={inquiry.currentRevision ? '处理反馈' : '开始处理'}
+                  disabled={!canSend}
+                  onClick={() => startRun()}
+                >
+                  <ArrowUp size={18} />
+                </button>
+              </div>
+            </div>
+            <div className="iw-case-actions">
+              {inquiry.businessStatus === 'active' && (
+                <button
+                  disabled={running || busy || (!!revision && draftsPending)}
+                  onClick={() => setModal('waiting')}
+                >
+                  标记待确认
+                </button>
+              )}
+              {inquiry.businessStatus !== 'done' && (
+                <button
+                  disabled={running || busy || (!!revision && draftsPending)}
+                  onClick={() => setModal('close')}
+                >
+                  结束询盘
+                </button>
+              )}
+              <button onClick={() => setModal('relations')}>
+                <GitBranch size={12} /> 业务关联
+              </button>
+            </div>
+          </div>
+          <div
+            className="iw-business-results"
+            role="tabpanel"
+            id={`${inquiryId}-side-panel-results`}
+            aria-labelledby={`${inquiryId}-side-results`}
+            hidden={rightPane !== 'results'}
+          >
+            <div className="iw-panel-head">
+              <h2>
+                业务结果{' '}
+                <span className="iw-version">{revision ? `V${revision.number}` : '等待分析'}</span>
+              </h2>
+              <span className="iw-small-label">
+                {revision ? date(revision.createdAt) : '成功运行后生成'}
+              </span>
+            </div>
+            <div className="iw-stage-bar" aria-label="工作阶段">
+              {stages.map((label, i) => (
+                <button
+                  key={label}
+                  className={stage === i ? 'selected' : ''}
+                  aria-pressed={stage === i}
+                  onClick={() => {
+                    setStage(i);
+                    setTab(i);
+                    if (i === 2 && revision) openDocument(`reply:${revision.number}`);
+                    setMobilePane(i === 2 && revision ? 'chat' : 'results');
+                  }}
+                >
+                  <span>0{i + 1}</span>
+                  <strong>{label}</strong>
+                  {i < 2 && <ChevronRight size={12} />}
+                </button>
+              ))}
+            </div>
+            {revision?.risks
+              .filter((r) => r.status !== 'resolved' && r.severity !== 'info')
+              .slice(0, 1)
+              .map((r) => (
+                <div className="iw-pinned-risk" key={r.id}>
+                  <TriangleAlert size={17} />
+                  <div>
+                    <strong>{r.message}</strong>
+                    <p>{r.suggestedAction}</p>
+                  </div>
+                  <button onClick={() => setTab(0)} aria-label="查看全部风险">
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              ))}
+            <div className="iw-result-tabs" role="tablist" aria-label="业务结果">
+              {resultTabs.map((label, i) => (
+                <button
+                  key={label}
+                  id={`${inquiryId}-result-tab-${i}`}
+                  role="tab"
+                  aria-selected={tab === i}
+                  aria-controls={`${inquiryId}-result-${i}`}
+                  tabIndex={tab === i ? 0 : -1}
+                  onKeyDown={(e) => {
+                    if (['ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                      e.preventDefault();
+                      const next = (i + (e.key === 'ArrowRight' ? 1 : 3)) % 4;
+                      setTab(next);
+                      if (next === 2 && revision) openDocument(`reply:${revision.number}`);
+                      document.getElementById(`${inquiryId}-result-tab-${next}`)?.focus();
+                    }
+                  }}
+                  onClick={() => {
+                    setTab(i);
+                    if (i === 2 && revision) {
+                      openDocument(`reply:${revision.number}`);
+                      setMobilePane('chat');
+                    }
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="iw-result-content">
+              {!revision ? (
+                <EmptyState
+                  title="还没有业务结果"
+                  description="点击「开始处理」分析客户原文。只有成功保存的完整版本会出现在这里。"
+                />
+              ) : (
+                <>
+                  <div
+                    hidden={tab !== 0}
+                    role="tabpanel"
+                    id={`${inquiryId}-result-0`}
+                    aria-labelledby={`${inquiryId}-result-tab-0`}
+                  >
+                    <div className="iw-section-heading">
+                      <span className="iw-kicker">CUSTOMER REQUIREMENTS</span>
+                      <h3>客户要什么</h3>
+                    </div>
+                    <dl className="iw-facts">
+                      {[
+                        ['产品', revision.requirements.requestedProduct],
+                        [
+                          '需求数量',
+                          revision.requirements.quantity == null
+                            ? null
+                            : `${revision.requirements.quantity} 件`,
+                        ],
+                        ['规格', revision.requirements.specification],
+                        ['目的地', revision.requirements.destination],
+                        ['期望到货', revision.requirements.requestedArrival],
+                        ['定制要求', revision.requirements.customization],
+                      ].map(([label, value]) => (
+                        <div key={label}>
+                          <dt>{label}</dt>
+                          <dd className={!value ? 'unknown' : ''}>{value || '待确认'}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                    {revision.requirements.missingFields.length > 0 && (
+                      <div className="iw-note">
+                        待补信息：{revision.requirements.missingFields.join('、')}
+                      </div>
+                    )}
+                    <div className="iw-section-heading">
+                      <span className="iw-kicker">OPEN QUESTIONS</span>
+                      <h3>核对后，再向前一步</h3>
+                    </div>
+                    <div className="iw-risk-list">
+                      {revision.risks.length ? (
+                        revision.risks.map((r) => (
+                          <article key={r.id}>
+                            <TriangleAlert size={16} />
+                            <div>
+                              <div>
+                                <strong>{r.message}</strong>
+                                <span>
+                                  {r.status === 'resolved'
+                                    ? '已解决'
+                                    : r.severity === 'error'
+                                      ? '阻断'
+                                      : '待确认'}
+                                </span>
+                              </div>
+                              <p>{r.suggestedAction}</p>
+                            </div>
+                          </article>
+                        ))
+                      ) : (
+                        <p className="iw-muted">此版本没有返回风险项。</p>
+                      )}
+                    </div>
+                    <div className="iw-inline-note">
+                      <BookOpen size={14} />
+                      客户要求与商家事实分开保留，备选方案需要客户确认。
+                    </div>
+                  </div>
+                  <div
+                    hidden={tab !== 1}
+                    role="tabpanel"
+                    id={`${inquiryId}-result-1`}
+                    aria-labelledby={`${inquiryId}-result-tab-1`}
+                  >
+                    <div className="iw-section-heading">
+                      <span className="iw-kicker">PROPOSAL & QUOTATION</span>
+                      <h3>把方案的边界说清楚</h3>
+                    </div>
+                    <div className="iw-proposal">
+                      <div>
+                        <span>客户原要求</span>
+                        <strong>{revision.proposal.requestedSku || '尚未确定 SKU'}</strong>
+                      </div>
+                      <ArrowRight size={16} />
+                      <div>
+                        <span>当前方案</span>
+                        <strong>{revision.proposal.selectedSku || '等待选择方案'}</strong>
+                      </div>
+                      <span className="iw-proposal-state">
+                        {revision.proposal.status === 'accepted'
+                          ? '已记录客户接受'
+                          : revision.proposal.status === 'proposed'
+                            ? '备选 · 待客户确认'
+                            : '需求待准备'}
+                      </span>
+                    </div>
+                    {revision.proposal.differences.map((d) => (
+                      <p className="iw-note" key={d}>
+                        {d}
+                      </p>
+                    ))}
+                    {revision.quote ? (
+                      <>
+                        <div className="iw-quote-card">
+                          <div className="iw-quote-top">
+                            <span>商品小计 · USD</span>
+                            <span>草稿报价</span>
+                          </div>
+                          <strong className="iw-quote-amount">
+                            {money(revision.quote.goodsSubtotalMinor)}
+                          </strong>
+                          <p>
+                            {revision.quote.quantity.toLocaleString()} 件 ×{' '}
+                            {money(revision.quote.unitPriceMinor)} / 件
+                          </p>
+                          <dl className="iw-costs">
+                            <div>
+                              <dt>运费</dt>
+                              <dd>{money(revision.quote.freightMinor)}</dd>
+                            </div>
+                            <div>
+                              <dt>税费</dt>
+                              <dd>{money(revision.quote.taxMinor)}</dd>
+                            </div>
+                            <div>
+                              <dt>最终总额</dt>
+                              <dd>{money(revision.quote.totalMinor)}</dd>
+                            </div>
+                          </dl>
+                        </div>
+                        <dl className="iw-facts">
+                          <div>
+                            <dt>生产时间</dt>
+                            <dd>
+                              {revision.quote.timing.productionDays == null
+                                ? '待确认'
+                                : `${revision.quote.timing.productionDays} 天`}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>出库时间</dt>
+                            <dd>
+                              {revision.quote.timing.dispatchDays == null
+                                ? '待确认'
+                                : `${revision.quote.timing.dispatchDays} 天`}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>起算条件</dt>
+                            <dd>
+                              {revision.quote.timing.startsAfter === 'payment_conditions_met'
+                                ? '付款条件满足后'
+                                : revision.quote.timing.startsAfter}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>运输 / 到货</dt>
+                            <dd>
+                              {revision.quote.timing.transitDays == null
+                                ? '待确认，不承诺到货日期'
+                                : `${revision.quote.timing.transitDays} 天运输`}
+                            </dd>
+                          </div>
+                        </dl>
+                      </>
+                    ) : (
+                      <EmptyState
+                        title="本版本没有有效报价"
+                        description="需要有效商品、数量和价格依据后才能形成报价。"
+                      />
+                    )}
+                    {revision.proposal.status === 'proposed' && (
+                      <button
+                        className="button"
+                        disabled={!canWrite}
+                        onClick={() => setModal('accept')}
+                      >
+                        <Check size={14} />
+                        记录客户接受该方案
+                      </button>
+                    )}
+                  </div>
+                  <div
+                    hidden={tab !== 2}
+                    role="tabpanel"
+                    id={`${inquiryId}-result-2`}
+                    aria-labelledby={`${inquiryId}-result-tab-2`}
+                  >
+                    <div className="iw-section-heading">
+                      <span className="iw-kicker">CUSTOMER REPLY</span>
+                      <h3>双语回复草稿</h3>
+                      <p>在画板标签页中打开并编辑，修改会同步到这里。</p>
+                    </div>
+                    <div className="iw-reply-preview">
+                      {draftState.texts?.['en-US'] ?? revision.replies['en-US']}
+                    </div>
+                    <button
+                      className="button"
+                      onClick={() => openDocument(`reply:${revision.number}`)}
+                    >
+                      <FileText size={14} />
+                      打开回复草稿编辑
+                    </button>
+                  </div>
+                  <div
+                    hidden={tab !== 3}
+                    role="tabpanel"
+                    id={`${inquiryId}-result-3`}
+                    aria-labelledby={`${inquiryId}-result-tab-3`}
+                  >
+                    <div className="iw-section-heading">
+                      <span className="iw-kicker">EVIDENCE, NOT ASSUMPTIONS</span>
+                      <h3>每一项结论，都有出处</h3>
+                      <p>此版本使用的固定来源，更新资料不会改写历史依据。</p>
+                    </div>
+                    <div className="iw-sources">
+                      {revision.sourceRefs.map((s) => (
+                        <button key={s.sourceVersionId} onClick={() => setSource(s)}>
+                          <span className="iw-source-icon">
+                            <FileText size={18} />
+                          </span>
+                          <div>
+                            <strong>{s.title}</strong>
+                            <p>
+                              V{s.version} ·{' '}
+                              {s.locator.row
+                                ? `第 ${s.locator.row} 行`
+                                : s.locator.section || s.locator.field || '原始资料'}
+                            </p>
+                          </div>
+                          <ChevronRight size={15} />
+                        </button>
+                      ))}
+                    </div>
+                    {!revision.sourceRefs.length && (
+                      <EmptyState
+                        title="暂无引用来源"
+                        description="查阅已发布资料后，固定版本引用会展示在这里。"
+                      />
+                    )}
+                    <div className="iw-section-heading">
+                      <h3>本次审校记录</h3>
+                    </div>
+                    {revision.checks.map((c, index) => (
+                      <div className="iw-check" key={index}>
+                        {c.status === 'passed' ? <Check size={14} /> : <TriangleAlert size={14} />}
+                        <span>{c.label}</span>
+                        <small>
+                          {c.status === 'passed'
+                            ? '通过'
+                            : c.status === 'error'
+                              ? '错误'
+                              : '待确认'}
+                        </small>
+                      </div>
+                    ))}
+                    <p className="iw-muted">规则版本：{revision.ruleSetVersion}</p>
+                    <MaterialsPanel
+                      base={base}
+                      path={path}
+                      scope={scope}
+                      revision={revision}
+                      readOnly={readOnly || busy}
+                      pending={draftsPending}
+                      draftVersions={draftState.versions}
+                      selectedAssets={history ? null : selectedAssets}
+                      onSelect={setSelectedAssets}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </section>
       </div>
