@@ -10,7 +10,7 @@ from langgraph.types import Command
 from sqlalchemy import select, text
 
 from .agent import build_graph
-from .core import create_item, decode, encode, items, uid
+from .core import create_item, decode, encode, item_view, items, uid
 from .db import SessionLocal, engine
 from .models import Case, Item, Job, Run, WorkItem, now
 
@@ -92,15 +92,26 @@ def finish_work(item_id: str, generation: int, state: dict):
         context = decode(job.payload)
         rev["sourceRefs"] = context.get("sourceRefs", [])
         rev["inputManifest"] = {"evidence": context.get("evidence", []), "assets": context.get("assetManifest", []), "sourceRefs": rev["sourceRefs"]}
+        from .revision_history import NODE_ARTIFACTS as GENERATION_ARTIFACTS, artifact_snapshot, merge_generation
+        target_node = context.get("generationTarget")
+        if target_node:
+            if previous and target_node != "reply":
+                for locale in ("en-US", "es-MX"):
+                    saved = items(db, "draft", case_id=case.id, parent_id=f"{case.id}:{case.current_revision}:{locale}")
+                    if saved:
+                        previous["replies"][locale] = item_view(max(saved, key=lambda d: d.version))["text"]
+            rev = merge_generation(previous, rev, target_node)
         if context.get("acceptedProposal"):
             rev["proposal"] = context["acceptedProposal"]
         if job.kind == "prepare_quote" and rev.get("quote"):
             if not decode(job.payload).get("selectedSupplierOfferId"):
                 raise ValueError("核价缺少供应商原件")
-        create_item(db, "revision", rev, case_id=case.id, parent_id=case.id, version=rev["number"])
+        revision_row = create_item(db, "revision", rev, case_id=case.id, parent_id=case.id, version=rev["number"])
         for locale, value in rev["replies"].items():
             create_item(db, "draft", {"inquiryId": case.id, "revision": rev["number"], "locale": locale, "draftVersion": 1, "text": value, "reviewStatus": "needs_review", "updatedAt": now()}, case_id=case.id, parent_id=f"{case.id}:{rev['number']}:{locale}")
         for artifact in ([] if job.kind == "apply_change" else state.get("artifacts", [])):
+            if target_node and artifact["kind"] not in GENERATION_ARTIFACTS[target_node]:
+                continue
             existing = [i for i in items(db, "artifact", case_id=case.id) if decode(i.payload).get("kind") == artifact["kind"]]
             version = max((i.version for i in existing), default=0) + 1
             create_item(db, "artifact", {"caseId": case.id, "kind": artifact["kind"], "title": artifact["title"], "version": version, "content": artifact["content"], "status": "draft", "jobId": job.id, "runId": run.id, "createdAt": now()}, case_id=case.id, parent_id=artifact["kind"], version=version, item_id=f"artifact_{case.id}_{artifact['kind']}_v{version}")
@@ -140,6 +151,9 @@ def finish_work(item_id: str, generation: int, state: dict):
             changed["baseRevision"] = rev["number"]
             changed["regeneratedByRunId"] = run.id
             change.payload = encode(changed)
+        db.flush()
+        rev["artifactVersionIds"] = artifact_snapshot(db, case)
+        revision_row.payload = encode(rev)
         case.current_revision = rev["number"]
         if job.kind == "apply_change":
             for approval in items(db, "approval", case_id=case.id):

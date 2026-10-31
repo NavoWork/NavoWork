@@ -16,6 +16,21 @@ python dev.py
 
 浏览器打开 <http://127.0.0.1:5173>。演示账号为 `demo@navowork.local`，密码为 `ChangeMe123!`；可在 `backend/.env` 修改。`dev.py` 自动运行迁移、启动 API、Worker 和 real 模式前端，按 Ctrl+C 关闭。数据写在 `backend/data/`，上传原件写在 `backend/storage/`，均不纳入 Git。
 
+## 比赛演示资料
+
+完整操作见 [演示操作手册](demo/competition_v1/演示操作手册.md)。包含5个待办场景、8篇Wiki和21份模拟原件，覆盖首次报价、彩盒变更、PO与生产资料放行、MOQ阻断和需求澄清。
+
+```powershell
+backend/.venv/Scripts/python.exe demo/seed.py
+backend/.venv/Scripts/python.exe demo/advance.py --case de_a --step quote
+```
+
+继续用 `--step change`、`order`，然后在界面逐项审核；`approve`、`release` 是需要操作者分别执行的模拟批准和放行命令。重复导入保留进度；重演用 `demo/seed.py --batch replay1`。导入不会提前批准或放行。所有资料仅用于演示，当前链路终点为生产资料包放行。
+
+画布的需求、风险、报价、回复节点及 SOP 阶段均可点击“依据现有资料生成”，选择原件和 Wiki 固定版本。对话成果在数据库留档，画布只有一个“对话成果汇总”入口。版本记录支持恢复单节点或从旧版继续编辑，恢复会创建新草稿并保留历史；业务资料面板也可恢复单份成果。
+
+演示客户已补充获客渠道、邮箱、模拟官网/LinkedIn 和待核验背景。模型配置支持 `MODEL_BASE_URL`；`APP_ENV=demo` 时模型调用失败会明确提示并降级为有限规则抽取，未知字段仍需补充。正式环境调用失败不会静默降级。
+
 ## 验证
 
 ```powershell

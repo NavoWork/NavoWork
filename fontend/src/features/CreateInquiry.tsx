@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { api } from '../api';
-import type { Inquiry, Session } from '../api/types';
+import type { CustomerContext, Inquiry, Session } from '../api/types';
+import { channelLabels } from './CustomerContextCard';
 import { ErrorNotice, Modal } from '../components/ui';
 export function CreateInquiry({
   session,
@@ -17,6 +18,9 @@ export function CreateInquiry({
   const [customer, setCustomer] = useState('');
   const [originalText, setOriginalText] = useState(initialText);
   const [destination, setDestination] = useState('');
+  const [channel, setChannel] = useState<CustomerContext['channel']>('unknown');
+  const [email, setEmail] = useState('');
+  const [website, setWebsite] = useState('');
   const [error, setError] = useState<unknown>();
   const [pending, setPending] = useState(false);
   const inFlight = useRef(false);
@@ -30,6 +34,7 @@ export function CreateInquiry({
       originalText: originalText.trim(),
       destination: destination.trim() || undefined,
       requestedLocales: ['en-US', 'es-MX'],
+      customerContext: { channel, email: email.trim(), website: website.trim() },
     };
     if (!body.title || !body.customer || !body.originalText) {
       setError('请先粘贴客户原文或描述工作目标');
@@ -101,6 +106,9 @@ export function CreateInquiry({
           />
           <small>{originalText.length.toLocaleString()} / 20,000 · 不会替换为演示案例</small>
         </label>
+        <label className="field">询盘来源<select value={channel} disabled={pending} onChange={e => setChannel(e.target.value as CustomerContext['channel'])}>{Object.entries(channelLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+        <label className="field">客户邮箱（选填）<input type="email" maxLength={254} disabled={pending} value={email} onChange={e => setEmail(e.target.value)} /></label>
+        <label className="field">客户官网（选填）<input type="url" placeholder="https://" maxLength={500} disabled={pending} value={website} onChange={e => setWebsite(e.target.value)} /></label>
         <label className="field">
           目标国家 / 地区（选填）
           <input

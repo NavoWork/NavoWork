@@ -1,0 +1,22 @@
+{
+  "product": "backpack",
+  "sku": "BP-DE-3000",
+  "quantity": 3000,
+  "material": "600D polyester shell; 210D polyester lining",
+  "dimensions": "45 x 30 x 15 cm; tolerance +/- 1 cm",
+  "color": "black",
+  "logo": "White embroidery, 50 x 20 mm, front pocket center; approved artwork required",
+  "construction": "Padded 15.6-inch laptop sleeve; 2 side mesh pockets; padded adjustable straps",
+  "packaging": "Plain kraft box per bag; 20 bags/carton",
+  "inspectionStandard": "General inspection level II; AQL major 2.5 / minor 4.0; critical 0; agreed functional checks",
+  "destination": "Hamburg",
+  "incoterm": "FOB",
+  "namedPlace": "Ningbo",
+  "incotermsVersion": "2020",
+  "missingFields": [
+    "sampleApproval",
+    "shippingSchedule"
+  ],
+  "status": "draft",
+  "simulation": true
+}

@@ -1,0 +1,23 @@
+SIMULATED / QUANTITY 600 ONLY AFTER CUSTOMER UPDATE
+{
+  "product": "canvas bag",
+  "sku": "CT-MX-0600",
+  "quantity": 600,
+  "material": "12 oz cotton canvas",
+  "dimensions": "38 x 42 cm; handles 65 cm",
+  "color": "natural",
+  "logo": "One-color black screen print 8 x 8 cm",
+  "construction": "Single compartment, reinforced handles",
+  "packaging": "Paper band per bag; 100 bags/carton",
+  "inspectionStandard": "General inspection level II; AQL major 2.5 / minor 4.0; critical 0; agreed functional checks",
+  "destination": "Mexico City",
+  "incoterm": "FOB",
+  "namedPlace": "Ningbo",
+  "incotermsVersion": "2020",
+  "missingFields": [
+    "sampleApproval",
+    "shippingSchedule"
+  ],
+  "status": "draft",
+  "simulation": true
+}

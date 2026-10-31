@@ -159,6 +159,9 @@ def case_routes(request: Request, db: Session, user: User, parts: list[str], bod
                 body_value(body, key, size)
             case = Case(id=uid("inq"), workspace_id=WORKSPACE_ID, owner_id=user.id, payload=encode({"title": body["title"].strip(), "customer": body["customer"].strip(), "originalText": body["originalText"].strip(), "requestedLocales": body.get("requestedLocales") or ["en-US", "es-MX"], "destination": body.get("destination"), "nextAction": "读懂客户原文，确认需求与缺项"}), status="todo")
             db.add(case)
+            if body.get("customerContext") is not None:
+                from .customer_context import validate_customer_context
+                case.payload = encode({**decode(case.payload), "customerContext": validate_customer_context(body["customerContext"])})
             db.flush()
             db.add(CaseAccess(case_id=case.id, user_id=user.id))
             create_item(db, "message", {"id": uid("msg"), "inquiryId": case.id, "role": "user", "text": body["originalText"].strip(), "createdAt": now()}, case_id=case.id)
@@ -184,6 +187,9 @@ def case_routes(request: Request, db: Session, user: User, parts: list[str], bod
             for key in ("title", "customer", "destination"):
                 if key in body:
                     payload[key] = body[key]
+            if "customerContext" in body:
+                from .customer_context import validate_customer_context
+                payload["customerContext"] = validate_customer_context(body["customerContext"])
             if "originalText" in body:
                 if case.current_revision:
                     fail("INVALID_INPUT", "首次处理后原文不能覆盖，请追加证据")
@@ -240,6 +246,9 @@ def case_routes(request: Request, db: Session, user: User, parts: list[str], bod
             fail("NOT_FOUND", "业务版本不存在", 404)
         if len(tail) == 2:
             return item_view(found)
+        if tail[2] == "restore" and method == "POST":
+            from .revision_history import restore_revision
+            return restore_revision(db, user, case, found, body)
         if tail[2] == "reply-drafts":
             locale = tail[3] if len(tail) > 3 else request.query_params.get("locale")
             if method == "GET":
@@ -367,7 +376,12 @@ def create_run(request: Request, db: Session, user: User, case: Case, body: dict
         if not source or source.case_id != case.id or source.kind != "evidence":
             fail("NOT_FOUND", "输入来源不存在或不属于当前项目", 404)
     context = prepare_context(db, user, case, body)
-    job = Job(id=uid("job"), case_id=case.id, kind=kind, goal=instruction, graph_version="sop-v2", payload=encode({**context, "inputRefs": body.get("inputRefs", []), "costInputs": cost_inputs, "selectedSupplierOfferId": selected_offer_id, "changeSetId": body.get("changeSetId"), "interactive": interactive}))
+    generation_target = body.get("generationTarget")
+    if generation_target:
+        from .revision_history import NODE_FIELDS
+        if generation_target not in NODE_FIELDS:
+            fail("INVALID_INPUT", "未知生成节点")
+    job = Job(id=uid("job"), case_id=case.id, kind=kind, goal=instruction, graph_version="sop-v2", payload=encode({**context, "inputRefs": body.get("inputRefs", []), "costInputs": cost_inputs, "selectedSupplierOfferId": selected_offer_id, "changeSetId": body.get("changeSetId"), "interactive": interactive, "generationTarget": generation_target}))
     run = Run(id=uid("run"), job_id=job.id, case_id=case.id, base_revision=base_revision, action=action, instruction=instruction, payload=encode({"assetVersionIds": body.get("assetVersionIds", [])}))
     db.add(job)
     db.flush()

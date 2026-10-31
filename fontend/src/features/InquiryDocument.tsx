@@ -4,6 +4,8 @@ import { api, mode } from '../api';
 import type { Inquiry } from '../api/types';
 import { ErrorNotice, Loading } from '../components/ui';
 import { getCanvasFile, type WorkspaceDocument, type WorkspaceFile } from './inquiry-canvas-model';
+import { CustomerContextCard } from './CustomerContextCard';
+import { RequirementsTable } from './RequirementsTable';
 
 export function FilePreview({
   file,
@@ -150,6 +152,7 @@ export function OriginalDocument({
       <div className="ic-document-eyebrow">CUSTOMER INQUIRY</div>
       <h2>客户原始询盘</h2>
       <p className="ic-document-subtitle">{inquiry.customer}</p>
+      <CustomerContextCard inquiry={inquiry} />
       <div className="ic-document-status">
         {locked ? (
           <>
@@ -204,12 +207,16 @@ export function WorkingDocument({
   onChange,
   readOnly,
   onInstruction,
+  onGenerate,
+  onRestore,
 }: {
   doc: WorkspaceDocument;
   value: string;
   onChange: (text?: string) => void;
   readOnly: boolean;
   onInstruction: (instruction: string) => void;
+  onGenerate?: (text?: string) => void;
+  onRestore?: () => void;
 }) {
   return (
     <div className="ic-document-sheet">
@@ -222,34 +229,40 @@ export function WorkingDocument({
       </div>
       <h2>{doc.title}</h2>
       <p className="ic-document-subtitle">
-        基于 V{doc.revision?.number} 整理，编辑后可交给助手更新业务版本。
+        {doc.revision ? `基于 V${doc.revision.number} 整理；编辑草稿后可生成新版本。` : '从现有询盘与原件生成节点内容。'}
       </p>
+      <div className="ic-document-actions">
+        {onGenerate && <button className="button button-primary" disabled={readOnly} onClick={() => onGenerate()}>依据现有资料生成</button>}
+        {onRestore && <button className="button" onClick={onRestore}>恢复此节点为新版本</button>}
+      </div>
       <div className="ic-document-status">
         <FileText size={13} />
         {value !== doc.text ? `${mode === 'real' ? '工作草稿' : '本机工作草稿'} · 尚未生成新业务版本` : '版本内容 · 可编辑为工作草稿'}
       </div>
-      <textarea
+      {doc.kind === 'requirements' ? (
+        <RequirementsTable value={value} onChange={onChange} readOnly={readOnly} />
+      ) : <textarea
         className="ic-document-text"
         aria-label={`编辑${doc.title}`}
         value={value}
         readOnly={readOnly}
         onChange={(e) => onChange(e.target.value)}
         spellCheck={false}
-      />
+      />}
       <div className="ic-document-actions">
         <button
           className="button button-ghost"
           disabled={readOnly || value === doc.text}
           onClick={() => onChange(undefined)}
         >
-          还原版本内容
+          撤销未提交编辑
         </button>
         <button
           className="button button-primary"
           disabled={readOnly || !value.trim()}
           onClick={() =>
-            onInstruction(
-              `请根据以下「${doc.title}」工作草稿重新核对需求、方案、报价和回复，保留未确认项：\n\n${value}`,
+            (onGenerate || onInstruction)(
+              `请根据以下「${doc.title}」工作草稿及原始依据更新此节点，保留未确认项：\n\n${value}`,
             )
           }
         >

@@ -45,6 +45,8 @@ import { ErrorNotice, Loading, Modal } from '../components/ui';
 import { CanvasPersistence } from './canvas-persistence';
 import { ResizeHandle } from '../components/ResizeHandle';
 import { FilePreview, OriginalDocument, WorkingDocument } from './InquiryDocument';
+import { ConversationResults } from './ConversationResults';
+import type { GenerationNode } from './GenerateNodeDialog';
 import {
   canvasKey,
   defaultFolders,
@@ -94,6 +96,8 @@ type PreviewNode = Node<
     scope: string;
     open: (id: string) => void;
     modified: boolean;
+    generate?: () => void;
+    generating: boolean;
   },
   'preview'
 >;
@@ -135,6 +139,7 @@ function PreviewCard({ data, selected }: NodeProps<PreviewNode>) {
         <span>{data.modified ? (mode === 'real' ? '工作草稿' : '本机工作草稿') : doc.caption}</span>
         <span>双击打开</span>
       </footer>
+      {data.generate && <button className="button ic-node-generate nodrag nopan" disabled={data.generating} onClick={e => { e.stopPropagation(); data.generate?.(); }}>依据现有资料生成</button>}
       <Handle type="source" position={Position.Right} isConnectable={false} />
     </article>
   );
@@ -167,6 +172,9 @@ interface Props {
   onInstruction: (text: string) => void;
   onOpenChat: () => void;
   onRevision: (number: number) => void;
+  onGenerate?: (node: GenerationNode, text?: string) => void;
+  onRestore?: (number: number, target: string) => Promise<number | undefined>;
+  canRestore?: boolean;
 }
 export function InquiryCanvas(props: Props) {
   return (
@@ -244,12 +252,16 @@ function CanvasWorkspace({
   onInstruction,
   onOpenChat,
   onRevision,
+  onGenerate,
+  onRestore,
+  canRestore,
 }: Props) {
   const [initial] = useState(() => {
     try {
       const saved = serverState || readCanvas(scope);
+      const alias = (id: string) => id.startsWith('result:') ? 'result:hub' : id;
       return {
-        state: { ...saved, initialRevision: saved.initialRevision ?? inquiry.currentRevision },
+        state: { ...saved, tabs: [...new Set(saved.tabs.map(alias))], active: alias(saved.active), initialRevision: saved.initialRevision ?? inquiry.currentRevision },
         error: '',
       };
     } catch {
@@ -313,27 +325,11 @@ function CanvasWorkspace({
     }
   }, [state, scope, initial.error]);
   const docs = revisionDocuments(inquiry, revision, messages, revisions, replyText);
-  const initialRevision = revisions.find((r) => r.number === state.initialRevision);
-  const initialDocuments = revisionDocuments(
-    inquiry,
-    initialRevision,
-    messages,
-    revisions.filter((r) => r.number <= (state.initialRevision || 0)),
-  );
-  for (const document of initialDocuments) {
-    if (!docs.some((doc) => doc.id === document.id)) docs.push(document);
-  }
-  docs.push(
-    ...(state.results || []).map((result) => ({
-      id: `result:${result.revision}`,
-      title: result.title,
-      kind: 'result' as const,
-      folder: 'notes',
-      text: result.text,
-      caption: `V${result.revision} · 已确认保留`,
-      revision: revisions.find((r) => r.number === result.revision),
-    })),
-  );
+  docs.push({ id: 'result:hub', title: '对话成果汇总', kind: 'result', folder: 'analysis', text: `已保存 ${revisions.length} 个业务版本。统一查看每轮需求、报价、回复与来源；历史恢复请到版本记录。`, caption: mode === 'real' ? '数据库留档 · 统一入口' : '统一成果入口' });
+  useEffect(() => {
+    const remap = (id: string) => /^(requirements|risks|quote|reply):\d+$/.test(id) ? `${id.split(':')[0]}:${revision?.number || 0}` : id;
+    setState(s => ({ ...s, tabs: [...new Set(s.tabs.map(remap))], active: remap(s.active) }));
+  }, [revision?.number]);
   sourceRefs.forEach((ref, index) => {
     const doc = docs.find((d) => d.id === `source:${ref.sourceVersionId}`);
     if (doc && sources[index]?.data) {
@@ -396,10 +392,25 @@ function CanvasWorkspace({
   const active = state.active === 'canvas' || tabs.includes(state.active) ? state.active : 'canvas';
   const activeDoc = docs.find((d) => d.id === active);
   function open(id: string) {
+    if (id.startsWith('result:')) id = 'result:hub';
     const doc = docs.find((document) => document.id === id);
     if (doc?.kind === 'reply' && doc.revision?.number !== revision?.number)
       onRevision(doc.revision!.number);
     setState((s) => ({ ...s, active: id, tabs: s.tabs.includes(id) ? s.tabs : [...s.tabs, id] }));
+  }
+  async function restore(number: number, target: string) {
+    const nextNumber = await onRestore?.(number, target);
+    if (!nextNumber) return;
+    setState(s => {
+      const drafts = { ...s.drafts };
+      const kinds = target === 'all' ? ['requirements', 'risks', 'quote'] : [target];
+      for (const kind of kinds) {
+        const oldId = `${kind}:${number}`;
+        if (drafts[oldId] !== undefined) drafts[`${kind}:${nextNumber}`] = drafts[oldId];
+      }
+      const id = target === 'all' ? 'canvas' : `${target}:${nextNumber}`;
+      return { ...s, drafts, active: id, tabs: id === 'canvas' ? s.tabs : [...new Set([...s.tabs, id])] };
+    });
   }
   useEffect(() => {
     if (openRequest) open(openRequest.id);
@@ -473,15 +484,8 @@ function CanvasWorkspace({
     }
   }
   // Put the main working documents first; supporting files continue below them.
-  const initialIds = new Set(initialDocuments.map((doc) => doc.id));
   const ordered = docs
-    .filter(
-      (doc) =>
-        initialIds.has(doc.id) ||
-        ['file', 'note', 'result'].includes(doc.kind) ||
-        doc.id.startsWith('bundle:') ||
-        state.positions[doc.id] !== undefined,
-    )
+    .filter((doc, index) => doc.kind !== 'revision' && docs.findIndex(d => d.id === doc.id) === index)
     .sort((a, b) => {
       const rank = (kind: DocumentKind) =>
         ({
@@ -499,18 +503,26 @@ function CanvasWorkspace({
         })[kind];
       return rank(a.kind) - rank(b.kind);
     });
-  const nodes: PreviewNode[] = ordered.map((doc, index) => ({
+  const occupied = ordered.flatMap(doc => state.positions[doc.id] ? [state.positions[doc.id]] : []);
+  function defaultPosition() {
+    let index = 0;
+    let position = { x: 0, y: 68 };
+    while (occupied.some(p => Math.abs(p.x - position.x) < 320 && Math.abs(p.y - position.y) < 290)) {
+      index += 1; position = { x: (index % 3) * 350, y: Math.floor(index / 3) * 320 + 68 };
+    }
+    occupied.push(position);
+    return position;
+  }
+  const nodes: PreviewNode[] = ordered.map((doc) => ({
     id: doc.id,
     type: 'preview',
     initialWidth: 300,
-    initialHeight: 235,
+    initialHeight: 275,
     measured: measurements.current[doc.id],
-    position: state.positions[doc.id] || {
-      x: (index % 3) * 350,
-      y: Math.floor(index / 3) * 285 + 68,
-    },
+    position: state.positions[doc.id] || defaultPosition(),
     selected: selected === doc.id,
-    data: { doc, base, scope, open, modified: state.drafts[doc.id] !== undefined },
+    data: { doc, base, scope, open, modified: state.drafts[doc.id] !== undefined, generating: readOnly,
+      generate: onGenerate && ['requirements', 'risks', 'quote', 'reply'].includes(doc.kind) ? () => onGenerate(doc.kind as GenerationNode) : undefined },
     ariaLabel: `${doc.title}，预览节点，双击打开`,
   }));
   const edges: Edge[] = [];
@@ -531,14 +543,15 @@ function CanvasWorkspace({
     try {
       if (initial.error) throw new Error(initial.error);
       const result = saveResultRequest.result;
-      const id = `result:${result.revision}`;
+      const id = 'result:hub';
       const position = state.positions[id] || {
         x: Math.max(0, ...nodes.map((node) => node.position.x)) + 350,
         y: 68,
       };
       const next: CanvasState = {
         ...state,
-        active: 'canvas',
+        active: id,
+        tabs: [...new Set([...state.tabs, id])],
         results: state.results?.some((saved) => saved.revision === result.revision)
           ? state.results
           : [...(state.results || []), result],
@@ -877,7 +890,7 @@ function CanvasWorkspace({
               />
               <Panel position="top-left" className="ic-board-label">
                 <span>INQUIRY CANVAS</span>
-                <small>单击预览 · 双击打开 · 对话成果确认后添加</small>
+                <small>双击打开文档 · 节点可直接生成 · 历史统一留档</small>
               </Panel>
               <Panel position="top-right">
                 <button
@@ -917,10 +930,14 @@ function CanvasWorkspace({
           <div
             className="ic-document-panel ic-reply-panel"
             role="tabpanel"
-            id={`ic-panel-${scope}-reply:${revision?.number}`}
-            aria-labelledby={`ic-tab-${scope}-reply:${revision?.number}`}
-            hidden={active !== `reply:${revision?.number}`}
+            id={`ic-panel-${scope}-reply:${revision?.number || 0}`}
+            aria-labelledby={`ic-tab-${scope}-reply:${revision?.number || 0}`}
+            hidden={active !== `reply:${revision?.number || 0}`}
           >
+            <div className="ic-document-actions">
+              {onGenerate && <button className="button button-primary" disabled={readOnly} onClick={() => onGenerate('reply')}>依据现有资料生成</button>}
+              {canRestore && revision && revision.number !== inquiry.currentRevision && <button className="button" onClick={() => void restore(revision.number, 'reply')}>恢复此节点为新版本</button>}
+            </div>
             {replyEditor}
           </div>
           {tabs
@@ -959,6 +976,8 @@ function CanvasWorkspace({
                       readOnly={readOnly}
                       onChange={(value) => draft(id, value)}
                       onInstruction={onInstruction}
+                      onGenerate={onGenerate ? text => onGenerate(doc.kind as GenerationNode, text) : undefined}
+                      onRestore={canRestore && doc.revision && doc.revision.number !== inquiry.currentRevision ? () => void restore(doc.revision!.number, doc.kind) : undefined}
                     />
                   ) : doc.kind === 'note' ? (
                     <div className="ic-document-sheet">
@@ -1044,10 +1063,12 @@ function CanvasWorkspace({
                       </label>
                       <FilePreview file={doc.file} base={base} scope={scope} />
                     </div>
-                  ) : doc.kind === 'revision' || doc.kind === 'result' ? (
+                  ) : doc.kind === 'result' ? (
+                    <ConversationResults path={path} revisions={revisions} saved={state.results || []} onRevision={onRevision} />
+                  ) : doc.kind === 'revision' ? (
                     <div className="ic-document-sheet">
                       <div className="ic-document-eyebrow">
-                        {doc.kind === 'result' ? 'SAVED CONVERSATION RESULT' : 'VERSION SNAPSHOT'}
+                        VERSION HISTORY
                       </div>
                       <h2>{doc.title}</h2>
                       <p className="ic-document-subtitle">{doc.caption} · 版本快照只读</p>
@@ -1058,6 +1079,11 @@ function CanvasWorkspace({
                           在对话中查看此版本
                         </button>
                       )}
+                      {canRestore && doc.revision && <div className="ic-history-restore">
+                        <p>复制旧内容为新的当前草稿，保留全部历史。恢复的业务成果需要重新审核。</p>
+                        <button className="button button-primary" onClick={() => void restore(doc.revision!.number, 'all')}>从此版本继续编辑</button>
+                        <div className="ic-document-actions">{(['requirements', 'risks', 'quote', 'reply'] as const).map(kind => <button className="button" key={kind} onClick={() => void restore(doc.revision!.number, kind)}>仅恢复{({ requirements: '需求', risks: '风险', quote: '报价', reply: '回复' })[kind]}节点</button>)}</div>
+                      </div>}
                     </div>
                   ) : (
                     <div className="ic-document-sheet">
@@ -1091,7 +1117,7 @@ function CanvasWorkspace({
               {active === 'canvas' ? (
                 <>
                   <span className="ic-scope-dot" />
-                  {docs.length} 个节点 · 仅预览
+                  {nodes.length} 个画布节点 · {revisions.length} 个历史版本
                 </>
               ) : (
                 <>

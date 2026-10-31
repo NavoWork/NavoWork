@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="680" viewBox="0 0 1000 680">
+<rect width="1000" height="680" fill="#f3f5f8"/><g font-family="Arial" fill="#172b4d">
+<text x="55" y="65" font-size="30">BP-DE-3000 / simulated product drawing</text>
+<text x="55" y="102" font-size="17">Requested dimensions. Not a photograph or measurement certificate.</text>
+<path d="M390 195 C390 145 610 145 610 195" fill="none" stroke="#56647b" stroke-width="20"/>
+<rect x="320" y="190" width="360" height="370" rx="65" fill="#263449"/>
+<rect x="355" y="380" width="290" height="140" rx="22" fill="#40516a"/>
+<path d="M350 285 L650 285 M375 405 L625 405" stroke="#92a4ba" stroke-width="5"/>
+<rect x="447" y="420" width="106" height="42" fill="none" stroke="white" stroke-width="2"/>
+<text x="460" y="448" fill="white" font-size="20">LOGO</text>
+<path d="M260 190 V560 M250 190 H270 M250 560 H270 M320 600 H680 M320 590 V610 M680 590 V610" stroke="#314867" stroke-width="2"/>
+<text x="170" y="380" font-size="24">45 cm</text><text x="455" y="638" font-size="24">30 cm</text>
+<text x="725" y="290" font-size="20">Depth: 15 cm</text><text x="725" y="330" font-size="18">600D shell / 210D lining</text>
+<text x="725" y="365" font-size="18">15.6-inch laptop sleeve</text><text x="725" y="400" font-size="18">White embroidery</text>
+<text x="725" y="435" font-size="18">50 x 20 mm</text></g></svg>

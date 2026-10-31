@@ -1,0 +1,14 @@
+SIMULATED FINANCE ADVICE - NOT A BANK DOCUMENT
+Reference: DEMO-PAY-DE-001
+Order: PO-DE-001-V2
+Payer: Nordlicht Outdoor GmbH (fictional)
+Beneficiary: NavoWork Demo Trading (fictional)
+Currency: USD
+Goods total: 27630.00
+Deposit rate: 30%
+Amount to reconcile: 8289.00
+Remaining amount: 19341.00
+Simulation date: 2026-10-31
+No real bank, account, SWIFT code or payment transaction is represented.
+During the exercise the operator may record a simulated reconciliation, explicitly citing this reference.
+Uploading this file alone must not create a verified payment or production release.

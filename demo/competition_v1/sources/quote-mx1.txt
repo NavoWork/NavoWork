@@ -1,0 +1,10 @@
+SIMULATED / SUPPLIER QUOTATION MX1
+Supplier: 工厂 M｜嘉兴帆布制品（模拟）
+Product: canvas bag CT-MX-0600
+Base factory cost: CNY 15 per piece. Packaging: CNY 1 per piece, charged separately.
+MOQ: 500 pieces. Estimated production lead time: 18 days after final sample/artwork and payment conditions.
+Supplier currency: CNY. Valid until: 2026-11-14. No international freight or import tax included.
+Packing: paper band.
+The workbook Supplier_Quotes.xlsx / Factory M V1 contains the same simulated original quote.
+Domestic charges CNY 2.5/piece are an internal allocation, not part of the supplier's factory quote.
+No actual production has started; this document is a training fixture.

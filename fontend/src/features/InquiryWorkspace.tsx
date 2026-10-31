@@ -42,6 +42,8 @@ import { InquiryResult } from './InquiryResult';
 import { InquiryRunActivity } from './InquiryRunActivity';
 import { resultSnapshot, type SavedResult } from './inquiry-canvas-model';
 import { InquiryCanvas } from './InquiryCanvas';
+import { GenerateNodeDialog, type GenerationNode } from './GenerateNodeDialog';
+import { CustomerContextCard, channelLabels } from './CustomerContextCard';
 import { ResizeHandle } from '../components/ResizeHandle';
 import './inquiry.css';
 
@@ -146,6 +148,7 @@ export function InquiryWorkspace({
   const [error, setError] = useState<unknown>();
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
+  const [generation, setGeneration] = useState<{ node: GenerationNode; instruction?: string } | null>(null);
   const [draftState, setDraftState] = useState<DraftState>({
     revision: null,
     versions: {},
@@ -295,6 +298,21 @@ export function InquiryWorkspace({
       await refresh();
     });
   }
+  async function restoreRevision(number: number, target: string): Promise<number | undefined> {
+    if (!inquiry || running || busy) return;
+    let created: number | undefined;
+    await operate(async () => {
+      const result = await api.post<Revision>(`${path}/revisions/${number}/restore`, { baseRevision: inquiry.currentRevision, target });
+      created = result.number;
+      setRevisionNumber(null);
+      setLastRunId('');
+      setDraftRefresh(v => v + 1);
+      setReview(null);
+      await refresh();
+      setNotice(`已从 V${number} 恢复${target === 'all' ? '全部节点' : '所选节点'}到 V${result.number}，可以继续编辑。历史仍保留。`);
+    });
+    return created;
+  }
   async function transition(to: BusinessStatus, extra: Record<string, unknown> = {}) {
     if (!inquiry) return;
     await operate(async () => {
@@ -402,10 +420,7 @@ export function InquiryWorkspace({
       deferred={deferredResults.includes(revision.number)}
       onDefer={() => setDeferredResults((values) => [...values, revision.number])}
       onSave={() => {
-        if (!canWrite || draftsPending) return;
-        const result = resultSnapshot(revision, draftState.texts);
-        setSaveResultRequest((old) => ({ result, seq: (old?.seq || 0) + 1 }));
-        setMobilePane('chat');
+        openDocument('result:hub');
       }}
     />
   ) : null;
@@ -459,6 +474,7 @@ export function InquiryWorkspace({
           <History size={16} />
           正在查看 V{revisionNumber} 历史快照，内容只读。
           <button onClick={() => setRevisionNumber(null)}>回到当前版本</button>
+          {mode === 'real' && <button disabled={busy || running || inquiry.businessStatus === 'done' || inquiry.businessStatus === 'waiting'} onClick={() => void restoreRevision(selectedNumber!, 'all')}>从此版本继续编辑</button>}
         </div>
       )}
       {inquiry.businessStatus === 'done' && (
@@ -528,6 +544,9 @@ export function InquiryWorkspace({
             base={base}
             path={path}
             readOnly={readOnly}
+            onGenerate={mode === 'real' ? (node, instruction) => setGeneration({ node, instruction }) : undefined}
+            onRestore={mode === 'real' ? restoreRevision : undefined}
+            canRestore={mode === 'real' && !busy && !running && inquiry.businessStatus !== 'done' && inquiry.businessStatus !== 'waiting'}
             openRequest={documentRequest}
             saveResultRequest={saveResultRequest}
             onSavedResultsChange={setSavedResults}
@@ -640,6 +659,7 @@ export function InquiryWorkspace({
                 <FileText size={16} />
                 <div>
                   <strong>客户原始询盘</strong>
+                  <small>{channelLabels[inquiry.customerContext?.channel || 'unknown']}{inquiry.customerContext?.email ? ` · ${inquiry.customerContext.email}` : ''}{inquiry.customerContext?.simulation ? ' · 模拟客户' : ''}</small>
                   <p>
                     {inquiry.originalText.slice(0, 110)}
                     {inquiry.originalText.length > 110 ? '…' : ''}
@@ -838,9 +858,14 @@ export function InquiryWorkspace({
       {modal === 'original' && (
         <Modal title="客户原始询盘" onClose={() => setModal(null)}>
           <p className="iw-muted">客户：{inquiry.customer} · 原文留档</p>
+          <CustomerContextCard inquiry={inquiry} />
           <pre className="iw-original-full">{inquiry.originalText}</pre>
         </Modal>
       )}
+      {generation && <GenerateNodeDialog inquiry={inquiry} base={base} path={path} node={generation.node} instruction={generation.instruction} onClose={() => setGeneration(null)} onStarted={r => {
+        setGeneration(null); setLastRunId(r.id); setRevisionNumber(null); showAIChat();
+        queryClient.setQueryData(['run', scope, r.id], r); void refresh();
+      }} />}
       {modal === 'waiting' && (
         <Modal title="标记为待确认" onClose={() => setModal(null)}>
           <form

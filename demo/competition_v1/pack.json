@@ -1,0 +1,424 @@
+{
+  "version": "competition-v1",
+  "simulation": true,
+  "asOf": "2026-10-31",
+  "wiki": [
+    {
+      "key": "01-demo-route",
+      "title": "比赛演示｜三条主链路与资料使用",
+      "folder": "业务流程",
+      "file": "wiki/01-demo-route.md"
+    },
+    {
+      "key": "02-bag-spec",
+      "title": "包袋产品｜背包与帆布袋规格确认清单",
+      "folder": "产品资料",
+      "file": "wiki/02-bag-spec.md"
+    },
+    {
+      "key": "03-cost",
+      "title": "核价规则｜汇率、毛利率、费用与舍入",
+      "folder": "业务流程",
+      "file": "wiki/03-cost.md"
+    },
+    {
+      "key": "04-trade",
+      "title": "报价条款｜FOB 宁波与交期表达",
+      "folder": "客户沟通",
+      "file": "wiki/04-trade.md"
+    },
+    {
+      "key": "05-change",
+      "title": "变更 SOP｜包装变更影响与版本维护",
+      "folder": "业务流程",
+      "file": "wiki/05-change.md"
+    },
+    {
+      "key": "06-sample",
+      "title": "打样与验货｜封样、规格和检查标准",
+      "folder": "产品资料",
+      "file": "wiki/06-sample.md"
+    },
+    {
+      "key": "07-order",
+      "title": "订单与生产｜PO、PI、付款及六项放行门禁",
+      "folder": "业务流程",
+      "file": "wiki/07-order.md"
+    },
+    {
+      "key": "08-assets",
+      "title": "资料规范｜知识、原件、历史订单与权限",
+      "folder": "团队协作",
+      "file": "wiki/08-assets.md"
+    }
+  ],
+  "files": [
+    {
+      "key": "inquiry",
+      "file": "sources/de-inquiry.eml",
+      "role": "customer_request",
+      "cases": [
+        "de_a",
+        "de_b",
+        "de_c"
+      ],
+      "future": false
+    },
+    {
+      "key": "spec1",
+      "file": "sources/spec-DE-v1.txt",
+      "role": "customer_request",
+      "cases": [
+        "de_a",
+        "de_b",
+        "de_c"
+      ],
+      "future": false
+    },
+    {
+      "key": "spec2",
+      "file": "sources/spec-DE-v2.txt",
+      "role": "customer_request",
+      "cases": [
+        "de_b",
+        "de_c"
+      ],
+      "future": true
+    },
+    {
+      "key": "offer_a1",
+      "file": "sources/quote-a1.txt",
+      "role": "supplier_quote",
+      "cases": [
+        "de_a",
+        "de_b",
+        "de_c"
+      ],
+      "future": false
+    },
+    {
+      "key": "offer_b1",
+      "file": "sources/quote-b1.txt",
+      "role": "supplier_quote",
+      "cases": [
+        "de_a",
+        "de_b",
+        "de_c"
+      ],
+      "future": false
+    },
+    {
+      "key": "offer_a2",
+      "file": "sources/quote-a2.txt",
+      "role": "supplier_quote",
+      "cases": [
+        "de_b",
+        "de_c"
+      ],
+      "future": true
+    },
+    {
+      "key": "offer_mx1",
+      "file": "sources/quote-mx1.txt",
+      "role": "supplier_quote",
+      "cases": [
+        "mx"
+      ],
+      "future": false
+    },
+    {
+      "key": "change",
+      "file": "sources/customer-packaging-change.eml",
+      "role": "customer_change",
+      "cases": [
+        "de_b",
+        "de_c"
+      ],
+      "future": true
+    },
+    {
+      "key": "customer_ok",
+      "file": "sources/customer-final-approval.eml",
+      "role": "customer_approval",
+      "cases": [
+        "de_c"
+      ],
+      "future": true
+    },
+    {
+      "key": "seller_ok",
+      "file": "sources/seller-order-acceptance.eml",
+      "role": "internal_note",
+      "cases": [
+        "de_c"
+      ],
+      "future": true
+    },
+    {
+      "key": "supplier_ok",
+      "file": "sources/supplier-production-confirmation.eml",
+      "role": "supplier_confirmation",
+      "cases": [
+        "de_c"
+      ],
+      "future": true
+    },
+    {
+      "key": "payment",
+      "file": "sources/payment-advice.txt",
+      "role": "payment_receipt",
+      "cases": [
+        "de_c"
+      ],
+      "future": true
+    },
+    {
+      "key": "sample_check",
+      "file": "sources/sample-inspection.txt",
+      "role": "sample_inspection",
+      "cases": [
+        "de_c"
+      ],
+      "future": true
+    },
+    {
+      "key": "mx_inquiry",
+      "file": "sources/mx-inquiry.eml",
+      "role": "customer_request",
+      "cases": [
+        "mx"
+      ],
+      "future": false
+    },
+    {
+      "key": "mx_quantity",
+      "file": "sources/mx-quantity-confirmation.eml",
+      "role": "customer_request",
+      "cases": [],
+      "future": true
+    },
+    {
+      "key": "mx_spec",
+      "file": "sources/spec-MX-v1.txt",
+      "role": "customer_request",
+      "cases": [],
+      "future": true
+    },
+    {
+      "key": "uk_inquiry",
+      "file": "sources/uk-incomplete-inquiry.eml",
+      "role": "customer_request",
+      "cases": [
+        "uk"
+      ],
+      "future": false
+    },
+    {
+      "key": "uk_reply",
+      "file": "sources/uk-clarification-reply.eml",
+      "role": "customer_request",
+      "cases": [],
+      "future": true
+    },
+    {
+      "key": "drawing",
+      "file": "sources/product-reference.svg",
+      "role": "customer_request",
+      "cases": [],
+      "future": false
+    },
+    {
+      "key": "po",
+      "file": "sources/PO-DE-001-V2.pdf",
+      "role": "customer_po",
+      "cases": [
+        "de_c"
+      ],
+      "future": true
+    },
+    {
+      "key": "workbook",
+      "file": "sources/Supplier_Quotes.xlsx",
+      "role": "supplier_quote",
+      "cases": [],
+      "future": false
+    }
+  ],
+  "offers": [
+    {
+      "key": "a1",
+      "supplier": "工厂 A｜宁波远行箱包（模拟）",
+      "baseCny": "44",
+      "packagingCny": "2",
+      "localCny": "4",
+      "moq": 1000,
+      "leadDays": 28,
+      "sheet": "Factory A V1",
+      "cases": [
+        "de_a",
+        "de_b",
+        "de_c"
+      ]
+    },
+    {
+      "key": "b1",
+      "supplier": "工厂 B｜绍兴行旅箱包（模拟）",
+      "baseCny": "46",
+      "packagingCny": "2",
+      "localCny": "4",
+      "moq": 1000,
+      "leadDays": 23,
+      "sheet": "Factory B V1",
+      "cases": [
+        "de_a",
+        "de_b",
+        "de_c"
+      ]
+    },
+    {
+      "key": "a2",
+      "supplier": "工厂 A｜彩盒新版（模拟）",
+      "baseCny": "44",
+      "packagingCny": "5",
+      "localCny": "4",
+      "moq": 1000,
+      "leadDays": 31,
+      "sheet": "Factory A V2",
+      "cases": [
+        "de_b",
+        "de_c"
+      ]
+    },
+    {
+      "key": "mx1",
+      "supplier": "工厂 M｜嘉兴帆布制品（模拟）",
+      "baseCny": "15",
+      "packagingCny": "1",
+      "localCny": "2.5",
+      "moq": 500,
+      "leadDays": 18,
+      "sheet": "Factory M V1",
+      "cases": [
+        "mx"
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "key": "de_a",
+      "title": "01｜德国背包首次报价【模拟】",
+      "customer": "Michael Weber / Nordlicht Outdoor",
+      "originalText": "Dear Alex,\nWe are Nordlicht Outdoor GmbH (fictional), Germany. Please quote 3,000 custom backpacks,\nstyle BP-DE-3000, for our outdoor retail stores. Target price: USD 9.50 per piece.\nPlease use black 600D polyester, 210D lining, a padded 15.6-inch laptop sleeve,\n45 x 30 x 15 cm dimensions, and our white embroidered logo, 50 x 20 mm.\nOne plain kraft box per bag, 20 bags per export carton. FOB Ningbo, Incoterms 2020.\nWe would like them in Hamburg within 45 days if possible; please assess feasibility.\nPlease quote sample cost, production lead time and 30% deposit / 70% before shipment.\nProduct drawing and requested specifications are attached. No sample is approved yet.\nBest regards, Michael Weber / procurement@nordlicht.example",
+      "destination": "Hamburg",
+      "baseline": 0,
+      "nextAction": "核对需求并选择工厂 A，生成 USD 8.69 报价草稿",
+      "prompt": "请分析3000件背包需求，列出缺失信息；参考核价规则，先不承诺45天到港。"
+    },
+    {
+      "key": "de_b",
+      "title": "02｜德国彩盒变更续办【模拟】",
+      "customer": "Michael Weber / Nordlicht Outdoor",
+      "originalText": "Dear Alex,\nWe are Nordlicht Outdoor GmbH (fictional), Germany. Please quote 3,000 custom backpacks,\nstyle BP-DE-3000, for our outdoor retail stores. Target price: USD 9.50 per piece.\nPlease use black 600D polyester, 210D lining, a padded 15.6-inch laptop sleeve,\n45 x 30 x 15 cm dimensions, and our white embroidered logo, 50 x 20 mm.\nOne plain kraft box per bag, 20 bags per export carton. FOB Ningbo, Incoterms 2020.\nWe would like them in Hamburg within 45 days if possible; please assess feasibility.\nPlease quote sample cost, production lead time and 30% deposit / 70% before shipment.\nProduct drawing and requested specifications are attached. No sample is approved yet.\nBest regards, Michael Weber / procurement@nordlicht.example",
+      "destination": "Hamburg",
+      "baseline": 1,
+      "nextAction": "处理彩盒变更：包装2→5元，报价8.69→9.21美元",
+      "prompt": "包装从普通纸盒改为定制彩盒，请分析受影响节点；以工厂A新版报价为依据。"
+    },
+    {
+      "key": "de_c",
+      "title": "03｜德国PO与生产放行【模拟】",
+      "customer": "Michael Weber / Nordlicht Outdoor",
+      "originalText": "Dear Alex,\nWe are Nordlicht Outdoor GmbH (fictional), Germany. Please quote 3,000 custom backpacks,\nstyle BP-DE-3000, for our outdoor retail stores. Target price: USD 9.50 per piece.\nPlease use black 600D polyester, 210D lining, a padded 15.6-inch laptop sleeve,\n45 x 30 x 15 cm dimensions, and our white embroidered logo, 50 x 20 mm.\nOne plain kraft box per bag, 20 bags per export carton. FOB Ningbo, Incoterms 2020.\nWe would like them in Hamburg within 45 days if possible; please assess feasibility.\nPlease quote sample cost, production lead time and 30% deposit / 70% before shipment.\nProduct drawing and requested specifications are attached. No sample is approved yet.\nBest regards, Michael Weber / procurement@nordlicht.example",
+      "destination": "Hamburg",
+      "baseline": 2,
+      "nextAction": "核对PO/样品/双方确认/付款保障；逐项解除六项门禁",
+      "prompt": "请核对PO-DE-001-V2与彩盒最终规格及报价，准备生产资料草稿；不要自动批准或宣称开工。"
+    },
+    {
+      "key": "mx",
+      "title": "04｜墨西哥帆布袋试单【模拟】",
+      "customer": "Sofia Hernandez / Luna Comercio",
+      "originalText": "Hola Alex,\nSomos Luna Comercio S.A. de C.V. (fictional), Mexico City. We would like a trial order\nof 300 canvas bags (帆布袋), style CT-MX-0600, natural cotton canvas 12 oz,\n38 x 42 cm, handles 65 cm, single-color black screen-printed logo 8 x 8 cm.\nPlease quote FOB Ningbo, Incoterms 2020. We hope to receive the order in 30 days.\nPlease confirm MOQ and sample terms before a firm quote. Our target is USD 4.00 per bag.\nSaludos, Sofia Hernandez / compras@luna.example",
+      "destination": "Mexico City",
+      "baseline": 0,
+      "nextAction": "先澄清300件低于MOQ500，再按客户600件回复核价",
+      "prompt": "请分析300件帆布袋询盘，MOQ为500件，先生成澄清问题，不要承诺30天到货。"
+    },
+    {
+      "key": "uk",
+      "title": "05｜英国信息不足询盘【模拟】",
+      "customer": "Emma Brown / Harbor Promotions",
+      "originalText": "Hello,\nWe are preparing a promotional project for next month and need a product carrying our logo.\nPlease suggest what information you need before providing a quotation.\nThe item type, purchase quantity, material, size, delivery destination and budget are not yet specified.\nEmma Brown / hello@harbor.example (fictional company)",
+      "destination": "London",
+      "baseline": 0,
+      "nextAction": "通过Agent澄清产品和数量；刷新后继续同一个任务",
+      "prompt": "请分析这封询盘，缺少哪些关键需求需要先问客户？"
+    }
+  ],
+  "spec1": {
+    "product": "backpack",
+    "sku": "BP-DE-3000",
+    "quantity": 3000,
+    "material": "600D polyester shell; 210D polyester lining",
+    "dimensions": "45 x 30 x 15 cm; tolerance +/- 1 cm",
+    "color": "black",
+    "logo": "White embroidery, 50 x 20 mm, front pocket center; approved artwork required",
+    "construction": "Padded 15.6-inch laptop sleeve; 2 side mesh pockets; padded adjustable straps",
+    "packaging": "Plain kraft box per bag; 20 bags/carton",
+    "inspectionStandard": "General inspection level II; AQL major 2.5 / minor 4.0; critical 0; agreed functional checks",
+    "destination": "Hamburg",
+    "incoterm": "FOB",
+    "namedPlace": "Ningbo",
+    "incotermsVersion": "2020",
+    "missingFields": [
+      "sampleApproval",
+      "shippingSchedule"
+    ],
+    "status": "draft",
+    "simulation": true
+  },
+  "spec2": {
+    "product": "backpack",
+    "sku": "BP-DE-3000",
+    "quantity": 3000,
+    "material": "600D polyester shell; 210D polyester lining",
+    "dimensions": "45 x 30 x 15 cm; tolerance +/- 1 cm",
+    "color": "black",
+    "logo": "White embroidery, 50 x 20 mm, front pocket center; approved artwork required",
+    "construction": "Padded 15.6-inch laptop sleeve; 2 side mesh pockets; padded adjustable straps",
+    "packaging": "Custom CMYK color box 48 x 33 x 18 cm; 20 bags/carton; customer artwork CB-02",
+    "inspectionStandard": "General inspection level II; AQL major 2.5 / minor 4.0; critical 0; agreed functional checks",
+    "destination": "Hamburg",
+    "incoterm": "FOB",
+    "namedPlace": "Ningbo",
+    "incotermsVersion": "2020",
+    "missingFields": [
+      "shippingSchedule"
+    ],
+    "status": "draft",
+    "simulation": true,
+    "pendingReconfirmation": false
+  },
+  "mxSpec": {
+    "product": "canvas bag",
+    "sku": "CT-MX-0600",
+    "quantity": 600,
+    "material": "12 oz cotton canvas",
+    "dimensions": "38 x 42 cm; handles 65 cm",
+    "color": "natural",
+    "logo": "One-color black screen print 8 x 8 cm",
+    "construction": "Single compartment, reinforced handles",
+    "packaging": "Paper band per bag; 100 bags/carton",
+    "inspectionStandard": "General inspection level II; AQL major 2.5 / minor 4.0; critical 0; agreed functional checks",
+    "destination": "Mexico City",
+    "incoterm": "FOB",
+    "namedPlace": "Ningbo",
+    "incotermsVersion": "2020",
+    "missingFields": [
+      "sampleApproval",
+      "shippingSchedule"
+    ],
+    "status": "draft",
+    "simulation": true
+  }
+}

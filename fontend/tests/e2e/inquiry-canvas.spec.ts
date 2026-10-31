@@ -34,9 +34,15 @@ test('画板只预览，双击打开唯一标签，编辑草稿同步预览并�
     .locator('.ic-directory')
     .getByRole('button', { name: '客户需求与规格', exact: true });
   await directoryItem.dblclick();
-  const field = work.getByLabel('编辑客户需求与规格');
-  const text = `${await field.inputValue()}\n客户确认杯口尺寸需复核。`;
+  await expect(work.getByRole('table', { name: '客户需求与规格' })).toBeVisible();
+  const field = work.getByLabel('需求规格', { exact: true });
+  const original = await field.inputValue();
+  const product = work.getByLabel('需求产品', { exact: true });
+  expect((await product.boundingBox())!.height).toBeLessThan(50);
+  const initialHeight = (await field.boundingBox())!.height;
+  const text = `${original}\n客户确认杯口尺寸需复核。`;
   await field.fill(text);
+  expect((await field.boundingBox())!.height).toBeGreaterThan(initialHeight);
   await work.getByRole('tab', { name: '询盘画板', exact: true }).click();
   await expect(work.locator('.ic-card-requirements')).toContainText('客户确认杯口尺寸需复核');
   await directoryItem.dblclick();
@@ -44,6 +50,11 @@ test('画板只预览，双击打开唯一标签，编辑草稿同步预览并�
   await work.getByRole('button', { name: '关闭资料标签 客户需求与规格', exact: true }).click();
   await directoryItem.press('Enter');
   await expect(field).toHaveValue(text);
+  await page.reload();
+  await expect(field).toHaveValue(text);
+  await work.getByRole('button', { name: '撤销未提交编辑', exact: true }).click();
+  await expect(field).toHaveValue(original);
+  expect((await field.boundingBox())!.height).toBe(initialHeight);
   await field.fill('请重新核对定制规格和最终数量。');
   await work.getByRole('button', { name: '交给助手更新版本', exact: true }).click();
   await expect(work.getByRole('heading', { name: 'AI 对话', exact: true })).toBeVisible();

@@ -343,26 +343,17 @@ export function InquiryResult({
       </details>
       <div className="iw-answer-save">
         <p>
-          {saved
-            ? '已添加到当前询盘画板。'
-            : deferred
-              ? '已留在对话中，之后也可以添加到画板。'
-              : '这个答案可以吗？需要把本轮成果添加到画板吗？'}
+          本轮内容已随业务版本保存。画布的“对话成果汇总”统一展示各轮成果；恢复和继续编辑请进入版本记录。
         </p>
         <div className="iw-answer-actions">
           <button
             className={`button ${saved ? '' : 'button-primary'}`}
-            disabled={saved || !canWrite || draftsPending || errors > 0}
+            disabled={busy || draftsPending}
             onClick={onSave}
           >
             {saved ? <Check size={14} /> : <LayoutGrid size={14} />}
-            {saved ? '已添加到画板' : '添加到画板'}
+            查看成果汇总
           </button>
-          {!saved && !deferred && (
-            <button className="button button-ghost" onClick={onDefer}>
-              暂不添加
-            </button>
-          )}
         </div>
       </div>
     </section>

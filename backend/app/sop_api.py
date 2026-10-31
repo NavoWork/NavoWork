@@ -131,6 +131,15 @@ def sop_case_routes(request: Request, db: Session, user: User, case: Case, tail:
     if not tail:
         fail("NOT_FOUND", "接口不存在", 404)
     method, group = request.method, tail[0]
+    if group == "node-generations" and method == "POST" and len(tail) == 1:
+        from .main import create_run
+        kinds = {"customer": "qualify_inquiry", "requirements": "confirm_requirements", "risks": "confirm_requirements", "quote": "prepare_quote", "reply": "confirm_requirements", "sample": "manage_sample", "order": "confirm_order", "production": "prepare_production"}
+        target = body.get("node")
+        if target not in kinds:
+            fail("INVALID_INPUT", "该节点尚不支持生成")
+        if any(item_view(c).get("status") not in ("applied", "rejected", "cancelled") for c in items(db, "change_set", case_id=case.id)):
+            fail("CHANGE_ACTIVATION_BLOCKED", "请先完成开放变更的节点维护，避免生成任务改变变更基线", 409)
+        return create_run(request, db, user, case, {**body, "generationTarget": target, "action": "generate_node", "instruction": body.get("instruction") or f"从已选择的询盘和来源生成 {target} 节点草稿，未知信息保持待确认"}, kind=kinds[target])
     if group == "supplier-offers":
         if len(tail) == 1 and method == "GET":
             return _list(db, case, "supplier_offer")
@@ -265,6 +274,23 @@ def sop_case_routes(request: Request, db: Session, user: User, case: Case, tail:
         if tail[2] == "exports" and method == "POST":
             from .exports import export_artifact
             return export_artifact(db, case, row, str(body.get("format") or "pdf"))
+        if tail[2] == "restore" and method == "POST":
+            from sqlalchemy import text
+            db.execute(text("BEGIN IMMEDIATE"))
+            db.refresh(case)
+            if case.active_run_id or decode(case.payload).get("pendingRunId") or case.status in ("waiting", "done"):
+                fail("INVALID_STATUS_TRANSITION", "请先恢复处理并完成当前任务", 409)
+            if any(item_view(c).get("status") not in ("applied", "rejected", "cancelled") for c in items(db, "change_set", case_id=case.id)):
+                fail("CHANGE_ACTIVATION_BLOCKED", "请先完成当前变更的节点修订", 409)
+            same_kind = [i for i in items(db, "artifact", case_id=case.id) if decode(i.payload).get("kind") == value["kind"]]
+            latest = max(same_kind, key=lambda i: i.version)
+            if body.get("baseVersion") != latest.version:
+                fail("ARTIFACT_CONFLICT", "成果版本已有更新，请刷新", 409)
+            content = {**value["content"], "status": "draft"}
+            for key in ("released", "customerApproved"):
+                if key in content:
+                    content[key] = False
+            return _create(db, case, "artifact", {"kind": value["kind"], "title": value["title"], "version": latest.version + 1, "content": content, "basedOnId": latest.id, "restoredFromId": row.id, "createdBy": user.id}, parent=value["kind"])
         if tail[2] == "versions":
             group_rows = [i for i in items(db, "artifact", case_id=case.id) if decode(i.payload).get("kind") == value["kind"]]
             if len(tail) == 3 and method == "GET":

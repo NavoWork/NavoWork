@@ -5,6 +5,7 @@ export interface Session {
   workspace: { id: string; name: string };
 }
 export interface Inquiry {
+  customerContext?: CustomerContext;
   id: string;
   workspaceId: string;
   title: string;
@@ -21,6 +22,19 @@ export interface Inquiry {
   pendingRunId?: string;
   updatedAt: string;
   nextAction: string;
+}
+export interface CustomerContext {
+  channel: 'unknown' | 'email' | 'website' | 'alibaba' | 'amazon' | 'linkedin' | 'referral';
+  sourceRef?: string;
+  email?: string;
+  website?: string;
+  linkedin?: string;
+  company?: string;
+  country?: string;
+  business?: string;
+  summary?: string;
+  simulation?: boolean;
+  checks?: { label: string; status: 'pending' | 'matched' | 'review'; detail: string }[];
 }
 export interface Message {
   id: string;
@@ -68,6 +82,11 @@ export interface Risk {
   evidenceRefs: string[];
 }
 export interface Revision {
+  parentRevision?: number;
+  restoredFromRevision?: number;
+  restoredNode?: string;
+  generatedNode?: string;
+  artifactVersionIds?: Record<string, string>;
   inquiryId: string;
   number: number;
   runId: string;
