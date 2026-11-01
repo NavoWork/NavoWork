@@ -7,6 +7,7 @@ export interface DraftState {
   revision: number | null;
   versions: Partial<Record<Locale, number>>;
   pending: boolean;
+  unsaved?: boolean;
   texts?: Partial<Record<Locale, string>>;
 }
 type Entry = {
@@ -127,6 +128,7 @@ export function ReplyEditor({
       ),
       pending:
         loading || !!error || locales.some((l) => !entries[l] || entries[l]?.status !== 'saved'),
+      unsaved: locales.some((l) => entries[l] && entries[l]?.status !== 'saved'),
     });
   }, [entries, loading, error, onState]);
   async function save(language: Locale, explicit = false) {

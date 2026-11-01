@@ -440,6 +440,8 @@ class WorkbenchToolbox:
                     artifacts[kind] = {"id": value["itemId"], "version": value["version"], "release": content.get("release")}
                 elif kind in ("ta", "qc"):
                     artifacts[kind] = {"id": value["itemId"], "version": value["version"]}
+                elif kind in ("concept_image", "design_brief", "competitor_analysis"):
+                    artifacts[kind] = {"id": value["itemId"], "version": value["version"], "content": content}
             offers = [item_view(row) for row in items(db, "supplier_offer", case_id=case.id)]
             knowledge = []
             project_knowledge = []
@@ -469,7 +471,9 @@ class WorkbenchToolbox:
                 if current is None or row.version > current["version"]:
                     assets_by_id[value.get("id")] = {"id": value.get("id"), "versionId": f"{value.get('id')}:v{row.version}", "title": value.get("title"), "version": row.version, "mediaType": value.get("mediaType"), "name": value.get("name")}
             assets = list(assets_by_id.values())
+            from .concept_images import image_capability
             data = {
+                "imageCapability": image_capability(case),
                 "case": {"id": case.id, "title": decode(case.payload).get("title"), "customer": decode(case.payload).get("customer"), "originalText": (decode(case.payload).get("originalText") or "")[:6000], "destination": decode(case.payload).get("destination"), "currentRevision": case.current_revision, "nextAction": decode(case.payload).get("nextAction")},
                 "customerProfile": (profile or {}).get("profile"),
                 "customerContext": decode(case.payload).get("customerContext"),

@@ -1,0 +1,31 @@
+{
+  "tool": "Codex built-in imagegen",
+  "usage": "Prepared demo assets. Application playback reads local files and never calls an image API.",
+  "prompts": [
+    {
+      "id": "de-backpack",
+      "file": "de-backpack.png",
+      "prompt": "Use case: product-mockup. Prepare one polished product concept image for an offline software demonstration. Subject: navy blue urban commuter backpack made from subtly textured recycled polyester; rounded rectangular body, a zipped front pocket, padded shoulder straps, top carry handle, small plain rectangular embroidered patch on upper front. Approximate proportions 30cm wide 45cm high 15cm deep. Composition: one product only, centered three-quarter front view, entire bag visible with comfortable margin, square canvas. Style: high-end realistic industrial-design visualization, tactile textile and seam detail, convincing zippers, soft studio daylight and soft contact shadow, warm light grey seamless background. Consistent quiet catalog aesthetic. No people, no scenery, no brand names, no text, no watermark, no measurement annotations, no collage. This is a visual concept, not an engineering drawing."
+    },
+    {
+      "id": "us-tote",
+      "file": "us-tote.png",
+      "prompt": "Use case: product-mockup. Prepare one polished product concept image for an offline software demonstration. Subject: natural undyed cotton canvas tote bag, strong woven fabric, two wide long carry handles, structured rectangular gusseted body, small minimal blank dark rectangular screen print area on front. Approximate proportions 38cm wide 42cm high 10cm deep. Composition: one product only, centered three-quarter front view, entire bag visible with comfortable margin, square canvas. Style: high-end realistic industrial-design visualization, tactile textile and seam detail, convincing zippers, soft studio daylight and soft contact shadow, warm light grey seamless background. Consistent quiet catalog aesthetic. No people, no scenery, no brand names, no text, no watermark, no measurement annotations, no collage. This is a visual concept, not an engineering drawing."
+    },
+    {
+      "id": "uk-duffel",
+      "file": "uk-duffel.png",
+      "prompt": "Use case: product-mockup. Prepare one polished product concept image for an offline software demonstration. Subject: black sports gym duffel bag made from textured heavy polyester, rounded rectangular horizontal body, twin carry handles with wrap, removable shoulder strap resting naturally to side, zipped end shoe compartment, small blank woven patch. Approximate proportions 50cm long 28cm high 25cm deep. Composition: one product only, centered three-quarter front view, entire bag visible with comfortable margin, square canvas. Style: high-end realistic industrial-design visualization, tactile textile and seam detail, convincing zippers, soft studio daylight and soft contact shadow, warm light grey seamless background. Consistent quiet catalog aesthetic. No people, no scenery, no brand names, no text, no watermark, no measurement annotations, no collage. This is a visual concept, not an engineering drawing."
+    },
+    {
+      "id": "jp-cooler",
+      "file": "jp-cooler.png",
+      "prompt": "Use case: product-mockup. Prepare one polished product concept image for an offline software demonstration. Subject: light grey insulated lunch bag, compact rounded rectangular soft cooler, textured polyester outer, subtle silver insulated lining visible inside the slightly open lid, zip around top and short carry handles, small plain blank front patch. Approximate proportions 24cm wide 20cm high 18cm deep. Composition: one product only, centered three-quarter front view, entire bag visible with comfortable margin, square canvas. Style: high-end realistic industrial-design visualization, tactile textile and seam detail, convincing zippers, soft studio daylight and soft contact shadow, warm light grey seamless background. Consistent quiet catalog aesthetic. No people, no scenery, no brand names, no text, no watermark, no measurement annotations, no collage. This is a visual concept, not an engineering drawing."
+    },
+    {
+      "id": "au-laptop",
+      "file": "au-laptop.png",
+      "prompt": "Use case: product-mockup. Prepare one polished product concept image for an offline software demonstration. Subject: charcoal grey 15.6 inch laptop shoulder bag in woven nylon, slim horizontal rectangular shape, padded twin carry handles, detachable shoulder strap resting neatly to side, front zip pocket and small plain woven label. Approximate proportions 40cm wide 30cm high 8cm deep. Composition: one product only, centered three-quarter front view, entire bag visible with comfortable margin, square canvas. Style: high-end realistic industrial-design visualization, tactile textile and seam detail, convincing zippers, soft studio daylight and soft contact shadow, warm light grey seamless background. Consistent quiet catalog aesthetic. No people, no scenery, no brand names, no text, no watermark, no measurement annotations, no collage. This is a visual concept, not an engineering drawing."
+    }
+  ]
+}

@@ -5,6 +5,8 @@ export interface Session {
   workspace: { id: string; name: string };
 }
 export interface Inquiry {
+  demoScenarioId?: string;
+  demoDataScope?: 'reference' | 'full';
   customerContext?: CustomerContext;
   id: string;
   workspaceId: string;
@@ -20,6 +22,7 @@ export interface Inquiry {
   currentRevision: number;
   activeRunId: string | null;
   pendingRunId?: string;
+  latestRunId?: string | null;
   updatedAt: string;
   nextAction: string;
 }
@@ -37,6 +40,7 @@ export interface CustomerContext {
   checks?: { label: string; status: 'pending' | 'matched' | 'review'; detail: string }[];
 }
 export interface Message {
+  images?: { artifactId: string; version: number; title: string; url: string; proposalUrl?: string; generationMode?: 'preset' | 'provider' }[];
   id: string;
   inquiryId: string;
   role: 'user' | 'assistant';

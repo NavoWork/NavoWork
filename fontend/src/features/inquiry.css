@@ -286,26 +286,6 @@
   font-size: 9px;
   color: var(--navo-color-text-muted);
 }
-.iw-case-actions {
-  display: flex;
-  align-items: center;
-  gap: 17px;
-  border-top: 1px solid var(--navo-color-border-subtle);
-  background: var(--navo-color-surface);
-  padding: 13px 20px;
-}
-.iw-case-actions button {
-  font-size: 10px;
-  border: 0;
-  background: transparent;
-  color: var(--navo-color-text-secondary);
-  padding: 0;
-}
-.iw-case-actions > span {
-  margin-left: auto;
-  font-size: 9px;
-  color: var(--navo-color-text-muted);
-}
 .iw-pinned-risk {
   display: flex;
   gap: 11px;

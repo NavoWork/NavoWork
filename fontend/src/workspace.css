@@ -157,10 +157,7 @@
   border-color: transparent;
   background: transparent;
 }
-.topbar-actions .mode-label {
-  font-size: 10px;
-  color: var(--navo-color-text-muted);
-}
+
 .app-shell.sidebar-collapsed {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -622,9 +619,7 @@
   .topbar-actions {
     gap: 4px;
   }
-  .topbar-actions .mode-label {
-    display: none;
-  }
+
   .theme-switch {
     padding-left: 4px;
     gap: 1px;
@@ -707,9 +702,6 @@
   }
   .iw-composer textarea {
     min-height: 54px;
-  }
-  .iw-case-actions {
-    padding-bottom: 12px;
   }
   .iw-readonly,
   .iw-notice,

@@ -298,12 +298,22 @@ def workbench_routes(request: Request, db: Session, user: User, case: Case, tail
         return workbench_view(db, case, user)
     if tail == ["stages"] and method == "GET":
         return {"stages": stage_state(db, case), "gate": release_gate(db, case)}
+    if tail == ["capabilities"] and method == "GET":
+        import os
+        from .concept_images import image_capability
+        image = image_capability(case)
+        return {"chat": {"configured": bool(os.getenv("MODEL_API_KEY") and os.getenv("MODEL_NAME"))}, "image": image}
     if tail == ["agent"] and method == "POST":
         from .main import create_run
         instruction = str(body.get("instruction") or body.get("goal") or "").strip()
         if not instruction:
             fail("INVALID_INPUT", "请描述本次要完成的工作", 400)
         node = body.get("node")
+        if node is None and decode(case.payload).get("demoScenarioId"):
+            from .demo_scenarios import PROMPTS
+            # Explicit workflow suggestions keep their stage. Free conversation
+            # can choose any relevant capability, including image generation.
+            node = next((key for key, prompt in PROMPTS.items() if instruction.startswith(prompt)), None)
         if node is not None and node not in NODE_KINDS:
             fail("INVALID_INPUT", "未知的业务节点", 400)
         kind = NODE_KINDS.get(node or "", "confirm_requirements")

@@ -226,7 +226,7 @@ interface Props {
 }
 export function InquiryCanvas(props: Props) {
   return (
-    <ReactFlowProvider>
+    <ReactFlowProvider key={props.scope}>
       {mode === 'real' ? (
         <ServerCanvas key={props.scope} {...props} />
       ) : (
@@ -958,6 +958,8 @@ function CanvasWorkspace({
               nodes={nodes}
               edges={edges}
               nodeTypes={nodeTypes}
+              fitView={!state.viewport}
+              fitViewOptions={{ padding: 0.12, maxZoom: 1 }}
               defaultViewport={state.viewport || { x: 30, y: 16, zoom: 0.78 }}
               minZoom={0.15}
               maxZoom={1.75}

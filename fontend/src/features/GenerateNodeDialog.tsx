@@ -12,6 +12,7 @@ export function GenerateNodeDialog({ inquiry, base, path, node, instruction, onC
   inquiry: Inquiry; base: string; path: string; node: GenerationNode; instruction?: string;
   onClose: () => void; onStarted: (run: Run) => void;
 }) {
+  const agentNode = inquiry.demoScenarioId ? ({ customer: 'inquiry', requirements: 'requirements', quote: 'costing', sample: 'sample', order: 'order', production: 'production' } as Partial<Record<GenerationNode, string>>)[node] : undefined;
   const [selected, setSelected] = useState<string[] | null>(null);
   const [knowledge, setKnowledge] = useState<string[]>([]);
   const [offer, setOffer] = useState('');
@@ -34,10 +35,10 @@ export function GenerateNodeDialog({ inquiry, base, path, node, instruction, onC
   async function submit() {
     if (busy) return;
     setError(undefined);
-    if (node === 'quote' && (!offer || !cost.exchangeRate || !cost.margin || !cost.quantity)) { setError('请明确选择供应商原件，并填写汇率、毛利率和数量。'); return; }
+    if (node === 'quote' && !agentNode && (!offer || !cost.exchangeRate || !cost.margin || !cost.quantity)) { setError('请明确选择供应商原件，并填写汇率、毛利率和数量。'); return; }
     setBusy(true);
     try {
-      const run = await api.post<Run>(`${path}/node-generations`, { node, baseRevision: inquiry.currentRevision, instruction: goal, inputRefs: evidenceIds, sourceVersionIds: knowledge, ...(node === 'quote' ? { selectedSupplierOfferId: offer, costInputs: cost } : {}) });
+      const run = await api.post<Run>(`${path}/${agentNode ? 'workbench/agent' : 'node-generations'}`, { node: agentNode || node, baseRevision: inquiry.currentRevision, instruction: goal, inputRefs: evidenceIds, sourceVersionIds: knowledge, ...(node === 'quote' && !agentNode ? { selectedSupplierOfferId: offer, costInputs: cost } : {}) });
       onStarted(run);
     } catch (e) { setError(e); setBusy(false); }
   }
@@ -52,7 +53,7 @@ export function GenerateNodeDialog({ inquiry, base, path, node, instruction, onC
         <fieldset className="ic-generation-sources"><legend>知识库参考（固定版本）</legend>
           {sources.data?.wiki.filter(w => w.status !== 'revoked').map(w => { const id = `${w.sourceId}:v${w.version}`; return <label key={id}><input type="checkbox" disabled={busy} checked={knowledge.includes(id)} onChange={e => setKnowledge(e.target.checked ? [...knowledge, id] : knowledge.filter(value => value !== id))} />{w.title} · V{w.version}</label>; })}
         </fieldset>
-        {node === 'quote' && <><label className="field">供应商报价<select aria-label="生成报价的供应商" disabled={busy} value={offer} onChange={e => setOffer(e.target.value)}><option value="">请选择已绑定原件的报价</option>{sources.data?.offers.map(o => <option key={o.id} value={o.id}>{o.supplier} · CNY {o.baseCny} + {o.packagingCny} · MOQ {o.moq}</option>)}</select></label>
+        {node === 'quote' && !agentNode && <><label className="field">供应商报价<select aria-label="生成报价的供应商" disabled={busy} value={offer} onChange={e => setOffer(e.target.value)}><option value="">请选择已绑定原件的报价</option>{sources.data?.offers.map(o => <option key={o.id} value={o.id}>{o.supplier} · CNY {o.baseCny} + {o.packagingCny} · MOQ {o.moq}</option>)}</select></label>
           <div className="ic-generation-cost">{(['exchangeRate', 'margin', 'quantity'] as const).map(key => <label className="field" key={key}>{({ exchangeRate: '汇率 CNY/USD', margin: '毛利率 %', quantity: '数量' })[key]}<input type="number" disabled={busy} value={cost[key]} onChange={e => setCost({ ...cost, [key]: e.target.value })} /></label>)}</div>
         </>}
         <label className="field">本次生成要求<textarea rows={3} disabled={busy} value={goal} onChange={e => setGoal(e.target.value)} /></label>

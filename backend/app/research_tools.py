@@ -52,7 +52,7 @@ MODELS = {"create_competitor_analysis": CompareArgs, "generate_concept_image": C
           "recognize_bom_image": BomArgs}
 DESCRIPTIONS = {
     "create_competitor_analysis": "Compare curated Case competitor sources. Every observation requires a verbatim excerpt, exact locator, observation date and scope. Suggestions are explicitly unverified design ideas, never supplier cost, confirmation, or source facts.",
-    "generate_concept_image": "Generate a PNG/JPEG product concept draft bound to the current exact specification version. Requires configured image provider; never constitutes engineering or physical sample approval.",
+    "generate_concept_image": "Prepare a PNG/JPEG product concept draft bound to the current specification. For demo cases with imageCapability.mode=preset, load bundled demo artwork without an image API; cannot redraw or revise its pixels. Other cases require an image provider. Never constitutes engineering or physical sample approval.",
     "recognize_bom_image": "Read a Case supplier/internal PNG/JPEG BOM as candidate rows with uncertainty and totals checks. Human review is required; this does not approve price or set verified business costs.",
 }
 TOOL_SCHEMAS = [{"type": "function", "function": {"name": name, "description": DESCRIPTIONS[name],

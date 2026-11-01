@@ -31,6 +31,7 @@ import { ErrorNotice, Loading, Modal, StatusBadge } from '../../components/ui';
 import { runContext, type ComposerContext } from '../inquiry-context';
 import { useAvailableSkills } from '../skill-catalog';
 import { AgentPanel } from './AgentPanel';
+import { useInquiryChat } from '../inquiry-chat';
 import { ResearchPanel, PropagationPanel } from './ResearchPanel';
 import { OfficeFiles } from './OfficeFiles';
 import {
@@ -89,9 +90,12 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
   const [stage, setStage] = useState(() => {
     try { return localStorage.getItem(stagePrefKey) || 'inquiry'; } catch { return 'inquiry'; }
   });
-  const [runId, setRunId] = useState('');
+  const chat = useInquiryChat(session, inquiryId, active);
+  const runId = chat.latestRunId || '';
+  const setRunId = chat.recordRun;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>();
+  useEffect(() => { setError(undefined); }, [inquiryId]);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [selectedEvidence, setSelectedEvidence] = useState<string[]>([]);
@@ -388,15 +392,16 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
 
         <AgentPanel
           key={scope}
+          chat={chat}
           inquiry={data.case}
           session={session}
           messages={messages.data?.items || []}
           run={run.data || null}
           events={events.data?.items || []}
-          running={!!run.data && ['queued', 'running'].includes(run.data.status)}
+          running={!!data.case.activeRunId || (!!run.data && ['queued', 'running'].includes(run.data.status))}
           busy={busy}
           selectedRefs={selectedRefCount}
-          onSend={(text, selection) => sendAgent(text, stage, selection)}
+          onSend={(text, selection) => sendAgent(text, undefined, selection)}
           onAnswer={answerAgent}
           onOpenSources={() => setSourcesOpen(true)}
           onCancel={cancelAgent}

@@ -360,6 +360,7 @@ export function ResearchPanel({
           <figure>
             <img src={image.content.downloadUrl} alt={`概念图 V${image.version}，仅供视觉沟通`} />
             <figcaption>
+              {image.content.generationMode === 'preset' && '预置演示图 · '}
               V{image.version} · 规格 {image.content.specVersionId} ·{' '}
               {['stale', 'needs_review', 'superseded'].includes(image.freshness?.status)
                 ? '设计输入已变化，待更新或复核'

@@ -29,6 +29,21 @@ beforeEach(async () => {
 });
 afterEach(() => vi.useRealTimers());
 describe('Mock contract boundaries', () => {
+  it('keeps one inquiry history and removes conversation management without cancelling a run', async () => {
+    const before = (await get<{ items: Message[] }>(`${i}/messages`)).items;
+    const run = await post<Run>(`${i}/runs`, {
+      baseRevision: 2,
+      action: 'revise',
+      instruction: '请核对报价',
+    });
+    await expect(post(`${i}/conversations`, { cancelRunId: run.id })).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect((await get<Run>(`${w}/runs/${run.id}`)).status).toBe('running');
+    expect((await get<Inquiry>(i)).latestRunId).toBe(run.id);
+    const messages = (await get<{ items: Message[] }>(`${i}/messages`)).items;
+    expect(messages).toEqual(expect.arrayContaining(before));
+    expect(messages).toEqual(expect.arrayContaining([expect.objectContaining({ runId: run.id, text: '请核对报价' })]));
+    expect((await get<{ items: Message[] }>(`${w}/inquiries/inq_de014/messages`)).items.some(message => message.runId === run.id)).toBe(false);
+  });
   it('freezes invocation context on its run, user message and output revision', async () => {
     const context: RunContext = {
       skills: [{ id: 'reply-review', name: '回复质量检查', instructions: ['检查报价和交期表述'] }],

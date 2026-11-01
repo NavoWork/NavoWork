@@ -880,7 +880,12 @@ def finalize_agent_run(
     create_item(
         db,
         "message",
-        {"inquiryId": case.id, "role": "assistant", "text": summary, "runId": run.id, "createdAt": now()},
+        {"inquiryId": case.id, "role": "assistant", "text": summary, "runId": run.id, "createdAt": now(),
+         "images": [{"artifactId": row.id, "version": row.version, "title": value.get("title") or "产品概念图",
+                     "url": value["content"]["downloadUrl"], "proposalUrl": value["content"].get("proposalDownloadUrl"),
+                     "generationMode": value["content"].get("generationMode", "provider")}
+                    for row in items(db, "artifact", case_id=case.id) for value in [decode(row.payload)]
+                    if value.get("runId") == run.id and value.get("kind") == "concept_image" and value.get("content", {}).get("downloadUrl")]},
         case_id=case.id,
     )
     return revision

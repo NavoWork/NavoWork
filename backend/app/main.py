@@ -155,6 +155,13 @@ def case_routes(request: Request, db: Session, user: User, parts: list[str], bod
             result, marker = idem_lookup(db, request, body)
             if result:
                 return result
+            demo_id = body.get("demoScenarioId")
+            demo_scope = body.get("demoDataScope", "reference")
+            if demo_id:
+                if demo_scope not in ("reference", "full"):
+                    fail("INVALID_INPUT", "未知的演示资料范围", 400)
+                from .demo_scenarios import creation_body
+                body = creation_body(demo_id)
             for key, size in (("title", 80), ("customer", 120), ("originalText", 20000)):
                 body_value(body, key, size)
             case = Case(id=uid("inq"), workspace_id=WORKSPACE_ID, owner_id=user.id, payload=encode({"title": body["title"].strip(), "customer": body["customer"].strip(), "originalText": body["originalText"].strip(), "requestedLocales": body.get("requestedLocales") or ["en-US", "es-MX"], "destination": body.get("destination"), "nextAction": "读懂客户原文，确认需求与缺项"}), status="todo")
@@ -165,15 +172,24 @@ def case_routes(request: Request, db: Session, user: User, parts: list[str], bod
             db.flush()
             db.add(CaseAccess(case_id=case.id, user_id=user.id))
             create_item(db, "message", {"id": uid("msg"), "inquiryId": case.id, "role": "user", "text": body["originalText"].strip(), "createdAt": now()}, case_id=case.id)
+            if demo_id:
+                from .demo_scenarios import seed_demo
+                seed_demo(db, case, demo_id, full=demo_scope == "full")
             result = case_view(case)
             idem_store(db, marker, result)
             db.commit()
             return result
+    if parts == ["demo-scenarios"] and method == "GET":
+        from .demo_scenarios import catalog
+        return catalog()
     if parts == ["summary"]:
         values = [c.status for c in db.scalars(select(Case).join(CaseAccess, CaseAccess.case_id == Case.id).where(CaseAccess.user_id == user.id))]
         return {key: values.count(key) for key in ("todo", "active", "waiting", "done")}
     case = require_case(db, user, parts[0])
     tail = parts[1:]
+    if tail == ["demo-guide"] and method == "GET":
+        from .demo_scenarios import demo_guide
+        return demo_guide(db, case)
     if tail and tail[0] == "workbench":
         from .workbench_api import workbench_routes
         return workbench_routes(request, db, user, case, tail[1:], body, form)
@@ -182,7 +198,8 @@ def case_routes(request: Request, db: Session, user: User, parts: list[str], bod
         return canvas_routes(request, db, user, case, tail, body, form)
     if not tail:
         if method == "GET":
-            return case_view(case)
+            latest = db.scalar(select(Run).where(Run.case_id == case.id).order_by(Run.created_at.desc(), Run.id.desc()).limit(1))
+            return {**case_view(case), "latestRunId": decode(case.payload).get("latestRunId") or (latest.id if latest else None)}
         if method == "PATCH":
             if body.get("metadataVersion") != case.metadata_version:
                 fail("METADATA_CONFLICT", "询盘信息已更新", 409, {"current": case_view(case)})
@@ -391,7 +408,11 @@ def create_run(request: Request, db: Session, user: User, case: Case, body: dict
         evidence_rows = items(db, "evidence", case_id=case.id) if not body.get("inputRefs") else [db.get(Item, ref) for ref in body["inputRefs"]]
         context["evidence"] = [{"id": row.id, **item_view(row)} for row in evidence_rows if row]
         facts = {**decode(case.payload).get("agentFacts", {}), **confirmed_facts(instruction)}
-        context.update(agentMode=True, agentNode=body.get("agentNode"), agentFacts=facts, agentMessages=[instruction])
+        history = [item_view(row) for row in items(db, "message", case_id=case.id)]
+        history.sort(key=lambda message: message.get("createdAt", ""))
+        context.update(agentMode=True, agentNode=body.get("agentNode"), agentFacts=facts, agentMessages=[instruction],
+                       chatHistory=[{"role": message["role"], "text": str(message.get("text") or "")[:4000]}
+                                    for message in history[-20:] if message.get("role") in ("user", "assistant")])
         case.payload = encode({**decode(case.payload), "agentFacts": facts})
     if file_tools:
         # Freeze actual case attachments at dispatch, including explicitly selected user-owned canvas files.
@@ -416,6 +437,9 @@ def create_run(request: Request, db: Session, user: User, case: Case, body: dict
     db.add(run)
     db.flush()
     db.add(WorkItem(id=uid("work"), run_id=run.id))
+    case_data = decode(case.payload)
+    case_data["latestRunId"] = run.id
+    case.payload = encode(case_data)
     case.active_run_id = run.id
     case.status = "active"
     touch(case)

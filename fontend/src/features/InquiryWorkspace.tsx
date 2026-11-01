@@ -46,6 +46,8 @@ import {
 import { InquiryCanvas } from './InquiryCanvas';
 import { InquiryChatHeading, InquiryChatTranscript } from './InquiryChatTranscript';
 import { InquiryComposer } from './InquiryComposer';
+import { DemoGuide } from './DemoGuide';
+import { useInquiryChat } from './inquiry-chat';
 import { useAvailableSkills } from './skill-catalog';
 import { InvocationContext } from './InvocationContext';
 import {
@@ -114,11 +116,12 @@ export function InquiryWorkspace({
       assistantWidth: null as number | null,
     }),
   );
-  const [input, setInput] = useState(initial.current.input);
+  const chat = useInquiryChat(session, inquiryId, active, { text: initial.current.input, selection: initial.current.composerContext || emptyComposerContext() });
+  const input = chat.draft.text;
+  const setInput = (text: string) => chat.setDraft(old => ({ ...old, text }));
   const catalog = useAvailableSkills(session);
-  const [composerContext, setComposerContext] = useState<ComposerContext>(
-    initial.current.composerContext || emptyComposerContext(),
-  );
+  const composerContext = chat.draft.selection;
+  const setComposerContext = (selection: ComposerContext) => chat.setDraft(old => ({ ...old, selection }));
   const [draftStored, setDraftStored] = useState(true);
   const [deferredResults, setDeferredResults] = useState<number[]>(
     initial.current.deferredResults || [],
@@ -129,7 +132,8 @@ export function InquiryWorkspace({
     seq: number;
   } | null>(null);
   const [revisionNumber, setRevisionNumber] = useState<number | null>(initial.current.revision);
-  const [lastRunId, setLastRunId] = useState(initial.current.lastRunId);
+  const lastRunId = chat.latestRunId || '';
+  const setLastRunId = chat.recordRun;
   const [selectedAssets, setSelectedAssets] = useState<string[] | null>(
     initial.current.selectedAssets ?? null,
   );
@@ -158,6 +162,7 @@ export function InquiryWorkspace({
   >(null);
   const [source, setSource] = useState<SourceRef | null>(null);
   const [error, setError] = useState<unknown>();
+  useEffect(() => { setError(undefined); setRevisionNumber(null); }, [inquiryId]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [generation, setGeneration] = useState<{
@@ -195,8 +200,9 @@ export function InquiryWorkspace({
   const selectedNumber = revisionNumber ?? inquiry?.currentRevision;
   const revision = detail.data?.revisions.find((r) => r.number === selectedNumber);
   const draftsPending = draftState.pending || draftState.revision !== revision?.number;
+  const replyEditsPending = draftState.revision === revision?.number && !!draftState.unsaved;
   const history = !!inquiry && selectedNumber !== inquiry.currentRevision;
-  const activeRunId = inquiry?.activeRunId || inquiry?.pendingRunId || lastRunId;
+  const activeRunId = lastRunId || inquiry?.activeRunId || inquiry?.pendingRunId;
   const runQuery = useQuery({
     queryKey: ['run', scope, activeRunId],
     enabled: active && !!activeRunId,
@@ -206,15 +212,17 @@ export function InquiryWorkspace({
     retry: false,
   });
   const run = runQuery.data;
+  const chatMessages = detail.data?.messages || [];
   useEffect(() => {
     const messages = messagesRef.current;
     if (messages) messages.scrollTop = messages.scrollHeight;
-  }, [detail.data?.messages.length, run?.id, selectedNumber, mobilePane, resultsOpen]);
+  }, [inquiryId, chatMessages.length, run?.id, selectedNumber, mobilePane, resultsOpen]);
   const running = !!inquiry?.activeRunId || (!!run && ['queued', 'running'].includes(run.status));
   const readOnly =
     history ||
     inquiry?.businessStatus === 'done' ||
     inquiry?.businessStatus === 'waiting' ||
+    (!!inquiry?.pendingRunId && run?.id !== inquiry.pendingRunId) ||
     running;
   const handledRun = useRef('');
   const refresh = useCallback(async () => {
@@ -224,11 +232,8 @@ export function InquiryWorkspace({
   useEffect(() => {
     setDraftStored(
       writePref(prefKey, {
-        input,
-        composerContext,
         deferredResults,
         revision: revisionNumber,
-        lastRunId,
         selectedAssets,
         assistantWidth,
       }),
@@ -287,7 +292,7 @@ export function InquiryWorkspace({
     action = inquiry?.currentRevision ? 'revise' : 'analyze',
     evidence?: string,
   ) {
-    if (!inquiry || running || (draftsPending && !!revision)) return;
+    if (!inquiry || running || replyEditsPending) return;
     await operate(async () => {
       const canvas =
         mode === 'real'
@@ -315,7 +320,7 @@ export function InquiryWorkspace({
           ),
         ]),
       ];
-      const r = await api.post<Run>(`${path}/runs`, {
+      const r = await api.post<Run>(`${path}/${mode === 'real' && !evidence ? 'workbench/agent' : 'runs'}`, {
         ...(mode === 'real' ? { canvasFileIds } : {}),
         baseRevision: inquiry.currentRevision,
         action,
@@ -454,14 +459,14 @@ export function InquiryWorkspace({
     return (
       <ErrorNotice error={detail.error || '未找到该询盘'} onRetry={() => void detail.refetch()} />
     );
-  const canWrite = !readOnly && !busy;
-  const canSend = canWrite && (!revision || !draftsPending);
+  const canWrite = !readOnly && !busy && !chat.loading && !chat.error;
+  const canSend = canWrite && !replyEditsPending;
   const resultMessage =
     revision &&
-    [...(detail.data?.messages || [])]
+    [...chatMessages]
       .reverse()
       .find((message) => message.role === 'assistant' && message.runId === revision.runId);
-  const resultPreview = revision ? (
+  const resultPreview = revision && resultMessage ? (
     <InquiryResult
       key={revision.number}
       revision={revision}
@@ -731,12 +736,20 @@ export function InquiryWorkspace({
           id={`results-${inquiryId}`}
           aria-label="AI 助手"
         >
-          <InquiryChatHeading />
+          <InquiryChatHeading
+            chat={chat}
+            actions={<>
+              {mode === 'real' && <Link to={`/workbench?case=${encodeURIComponent(inquiryId)}`}>业务资料与审批</Link>}
+              {inquiry.businessStatus === 'active' && <button disabled={running || busy || (!!revision && draftsPending)} onClick={() => setModal('waiting')}>标记待确认</button>}
+              {inquiry.businessStatus !== 'done' && <button disabled={running || busy || (!!revision && draftsPending)} onClick={() => setModal('close')}>结束询盘</button>}
+              <button onClick={() => setModal('relations')}><GitBranch size={14} />业务关联</button>
+            </>}
+          />
           <div className="iw-ai-chat">
             <div className="iw-messages" ref={messagesRef}>
               <InquiryChatTranscript
                 inquiry={inquiry}
-                messages={detail.data?.messages || []}
+                messages={chatMessages}
                 onOriginal={() => openDocument('original')}
                 resultMessageId={resultMessage?.id}
                 resultPreview={resultPreview}
@@ -823,6 +836,7 @@ export function InquiryWorkspace({
               )}
               <ErrorNotice error={runQuery.error} onRetry={() => void runQuery.refetch()} />
             </div>
+            <DemoGuide inquiry={inquiry} session={session} disabled={!canWrite || !!inquiry.pendingRunId} onPrompt={setInput} />
             <InquiryComposer
               session={session}
               inquiryId={inquiryId}
@@ -833,36 +847,12 @@ export function InquiryWorkspace({
               canWrite={canWrite}
               canSend={canSend}
               readOnly={readOnly}
-              draftsPending={!!revision && draftsPending}
-              draftStored={draftStored}
+              draftsPending={replyEditsPending}
+              draftStored={draftStored && chat.draftStored}
               sendLabel={inquiry.currentRevision ? '处理反馈' : '开始处理'}
               onSend={() => void startRun()}
               onOriginal={() => openDocument('original')}
             />
-            <div className="iw-case-actions">
-              {mode === 'real' && (
-                <Link to={`/workbench?case=${encodeURIComponent(inquiryId)}`}>业务资料与审批</Link>
-              )}
-              {inquiry.businessStatus === 'active' && (
-                <button
-                  disabled={running || busy || (!!revision && draftsPending)}
-                  onClick={() => setModal('waiting')}
-                >
-                  标记待确认
-                </button>
-              )}
-              {inquiry.businessStatus !== 'done' && (
-                <button
-                  disabled={running || busy || (!!revision && draftsPending)}
-                  onClick={() => setModal('close')}
-                >
-                  结束询盘
-                </button>
-              )}
-              <button onClick={() => setModal('relations')}>
-                <GitBranch size={12} /> 业务关联
-              </button>
-            </div>
           </div>
         </section>
       </div>

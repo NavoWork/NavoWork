@@ -426,7 +426,7 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
         </div>
         <button
           className="button button-ghost new-inquiry"
-          aria-label="新建工作"
+          aria-label="新建询盘"
           aria-keyshortcuts="Meta+K Control+K"
           onClick={() => {
             setCreate(true);
@@ -434,7 +434,7 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
           }}
         >
           <Plus size={17} />
-          新建工作
+          新建询盘
           <kbd aria-hidden="true">⌘ K</kbd>
         </button>
         <nav aria-label="主导航">
@@ -562,10 +562,6 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
               </div>
             )}
             <ThemeSwitch />
-            <span className="mode-label">
-              <span className="connection-dot" />
-              {mode === 'mock' ? '演示工作空间 · 本地保存' : '真实服务 · 服务端保存'}
-            </span>
             <IconButton label="工作空间设置" onClick={() => setSettings(true)}>
               <Settings2 size={15} />
             </IconButton>

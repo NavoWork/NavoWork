@@ -22,4 +22,4 @@ pythonpath = ["."]
 include = ["app*"]
 
 [tool.setuptools.package-data]
-app = ["skills/*/SKILL.md"]
+app = ["skills/*/SKILL.md", "assets/demo-images/*.png", "assets/demo-images/prompts.json"]

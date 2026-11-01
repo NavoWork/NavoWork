@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from typing import Annotated, Any, TypedDict
 
-from langchain_core.messages import AnyMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, SystemMessage, ToolMessage
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
@@ -56,14 +56,14 @@ SYSTEM = """你是 NavoWork 的包袋出口跟单 Agent，服务一个真实业�
 4. get_case_context 返回的 projectKnowledge 是本项目匹配的客户/负责人确认文档；其中的规格、包装、样品、订单和核价假设可直接作为已确认输入使用，不要重复询问。若 projectKnowledge 与原件冲突，以原件为准并说明。只有关键必填字段（产品、数量、尺寸、面料、Logo、包装、验货、目的地、贸易术语/地点）缺失时才 request_info；肩带、图稿编号、抽样细则等非阻断细节可留空或在成果中说明，不要因此暂停。
 5. 未知字段保持 null，不编造材料、克重、尺寸、价格、交期或客户确认。
 6. 金额只能来自 calculate_cost 的确定性结果；不能自己算单价或总价。
-7. 下游节点未完成时，不生成它的成果；只推进本次目标节点。
+7. 用户明确指定业务节点时，只推进该节点。自由对话时按当前请求选用能力，可以完成必要的前置资料整理；不要擅自执行整套流程。普通问答、改写和客户回复可以直接答复，无需为此创建业务成果。
 8. 多家供应商报价可比且用户未指定时，优先选择总成本更优且条件可接受的一家，并在回复中说明选择依据；不要只凭交期或直觉切换供应商。
 9. 用户已在任务描述中给出的汇率、毛利、数量、贸易术语、付款方式、有效期等条件直接使用，不重复询问；projectKnowledge 中的核价假设也视为已确认；供应商报价已含包装/本地费用时不得再问“补价”。
 10. 核价至少需要基础价、包装、本地费用；其他费用类别缺失时在结果中标注，不阻断。缺关键信息时，调用 request_info 提 1-5 个具体问题；fields 必须是简短字段名（如“背包尺寸”“面料克重”“验货标准”），不要写成长句。提问后暂停本轮。
 11. 目标是产出可保存的草稿成果，不是停在分析。发现条款冲突时先写草稿并在 diff/notes 中标注，然后列出待人工确认项；不要用“将登记/将生成”代替工具调用。
-12. 回复用中文，简洁专业：不超过 6 行，先说明本轮结果，再列 1-3 个待确认项/下一步。不要输出 JSON、不要复述工具参数、不要长篇解释。
+12. 默认用中文简洁答复，先说明本轮结果，再列必要的待确认项。邮件、翻译和方案按用户要求的语言和长度输出。不要输出 JSON 或复述工具参数。
 13. 编辑真实 Office 文件时先 file_list_context、file_read_document，再 file_create_working_copy，使用返回的当前版本调用 file_edit_file 并 file_validate_artifact。原件只读，工作副本未知业务映射须待复核。file_ 工具不替代 update_requirements、calculate_cost、record_order 等业务工具。
-14. 按需用 create_competitor_analysis 比较带定位、日期与适用范围的原始竞品资料，候选建议不等于采用；有当前规格后可 generate_concept_image。recognize_bom_image 只生成待人工逐行复核的候选，不能据此直接批准成本。只能宣称工具实际成功的成果。
+14. 按需用 create_competitor_analysis 比较带定位、日期与适用范围的原始竞品资料，候选建议不等于采用；有当前规格后可 generate_concept_image。imageCapability.mode=preset 时该工具载入预置演示图，可以说明设计要点，但不能声称现场调用了生图 API 或按用户修改重新绘制。recognize_bom_image 只生成待人工逐行复核的候选，不能据此直接批准成本。只能宣称工具实际成功的成果。
 
 当前项目：{title} · {customer}
 当前任务：{goal}
@@ -309,6 +309,8 @@ def execute_agent_work(item_id: str, generation: int, *, model=None) -> None:
         title = decode(case.payload).get("title") or case.id
         customer = decode(case.payload).get("customer") or ""
         goal = run.instruction
+        chat_history = [AIMessage(content=message["text"]) if message["role"] == "assistant" else HumanMessage(content=message["text"])
+                        for message in payload.get("chatHistory", []) if message.get("text") and message.get("role") in ("user", "assistant")]
         skill_name = NODE_SKILL.get(node or "")
         skill_hint = ""
         if skill_name:
@@ -324,6 +326,8 @@ def execute_agent_work(item_id: str, generation: int, *, model=None) -> None:
             skill_hint=skill_hint,
             skills=", ".join(SKILLS),
         )
+        if decode(case.payload).get("demoScenarioId"):
+            system += "\n本项目为路演模拟询盘。内置资料均为文本，原件与 projectKnowledge 已提供业务依据。按本节点业务工具保存真实成果；业务工具已执行字段校验，不要对普通 JSON 业务成果调用 Office 文件校验。仅实际编辑 Office 工作副本时才调用 file_validate_artifact。客户、付款和生产确认只用于模拟业务，回复须保留这一语境。"
 
     live_model = model is None
     model = model or configured_model()
@@ -349,7 +353,7 @@ def execute_agent_work(item_id: str, generation: int, *, model=None) -> None:
             else:
                 graph_input = {"messages": [HumanMessage(content=goal)], "tool_steps": 0, "results": [], "pending_questions": [], "status": "success"}
         else:
-            graph_input = {"messages": [HumanMessage(content=goal)], "tool_steps": 0, "results": [], "pending_questions": [], "status": "success", "binding": _thread(run.case_id, job.id)}
+            graph_input = {"messages": [*chat_history, HumanMessage(content=goal)], "tool_steps": 0, "results": [], "pending_questions": [], "status": "success", "binding": _thread(run.case_id, job.id)}
         try:
             for update in graph.stream(graph_input, config=config, stream_mode="updates"):
                 if update.get("__interrupt__"):

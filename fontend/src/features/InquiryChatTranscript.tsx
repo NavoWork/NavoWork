@@ -1,9 +1,17 @@
-import type { ReactNode } from 'react';
-import { ChevronRight, FileText, MessageSquare, Sparkles } from 'lucide-react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import {
+  ChevronRight,
+  FileText,
+  MessageSquare,
+  MoreHorizontal,
+  Sparkles,
+} from 'lucide-react';
 import type { Inquiry, Message } from '../api/types';
 import { channelLabels } from './CustomerContextCard';
 import { InvocationContext } from './InvocationContext';
 import './inquiry-chat.css';
+import { ErrorNotice } from '../components/ui';
+import type { InquiryChat } from './inquiry-chat';
 
 const messageDate = (value: string) =>
   new Intl.DateTimeFormat('zh-CN', {
@@ -14,15 +22,80 @@ const messageDate = (value: string) =>
     timeZone: 'Asia/Shanghai',
   }).format(new Date(value));
 
-export function InquiryChatHeading() {
+export function InquiryChatHeading({
+  chat,
+  actions,
+}: {
+  chat: InquiryChat;
+  actions?: ReactNode;
+}) {
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const actionsRef = useRef<HTMLDivElement>(null);
+  const actionsButton = useRef<HTMLButtonElement>(null);
+  const actionsId = useId();
+  useEffect(() => {
+    if (!actionsOpen) return;
+    const outside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !actionsRef.current?.contains(event.target))
+        setActionsOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setActionsOpen(false);
+        actionsButton.current?.focus();
+      }
+    };
+    document.addEventListener('pointerdown', outside);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('pointerdown', outside);
+      document.removeEventListener('keydown', escape);
+    };
+  }, [actionsOpen]);
   return (
-    <div className="iw-assistant-heading">
-      <h2>
-        <MessageSquare size={14} />
-        AI 对话
-      </h2>
-      <span>仅当前询盘</span>
-    </div>
+    <>
+      <div className="iw-assistant-heading">
+        <h2>
+          <MessageSquare size={14} />
+          AI 对话
+        </h2>
+        <span>仅当前询盘</span>
+        <div className="iw-chat-heading-actions">
+          {actions && (
+            <div className="iw-chat-more" ref={actionsRef}>
+              <button
+                ref={actionsButton}
+                className="icon-button"
+                aria-label="更多询盘操作"
+                title="更多询盘操作"
+                aria-expanded={actionsOpen}
+                aria-controls={actionsOpen ? actionsId : undefined}
+                onClick={() => setActionsOpen((open) => !open)}
+              >
+                <MoreHorizontal size={16} />
+              </button>
+              {actionsOpen && (
+                <div
+                  className="iw-chat-actions-popover"
+                  id={actionsId}
+                  role="group"
+                  aria-label="询盘操作"
+                  onClick={(event) => {
+                    if (event.target instanceof Element && event.target.closest('button, a')) {
+                      actionsButton.current?.focus();
+                      setActionsOpen(false);
+                    }
+                  }}
+                >
+                  {actions}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+      <ErrorNotice error={chat.error} onRetry={() => void chat.refresh()} />
+    </>
   );
 }
 
@@ -73,6 +146,13 @@ export function InquiryChatTranscript({
               <time>{messageDate(message.createdAt)}</time>
             </div>
             <p>{message.text}</p>
+            {message.images?.map((image) => (
+              <figure className="iw-chat-image" key={image.artifactId}>
+                <a href={image.url} target="_blank" rel="noreferrer" aria-label={`查看${image.title}`}><img src={image.url} alt={image.title} loading="lazy" /></a>
+                <figcaption>{image.title} · V{image.version}<span>{image.generationMode === 'preset' ? '演示图' : 'AI 生成'}</span></figcaption>
+                <div><a href={image.url} download>下载图片</a>{image.proposalUrl && <a href={image.proposalUrl} download>下载设计方案</a>}</div>
+              </figure>
+            ))}
             <InvocationContext context={message.context} />
           </article>
           {message.id === resultMessageId && resultPreview}

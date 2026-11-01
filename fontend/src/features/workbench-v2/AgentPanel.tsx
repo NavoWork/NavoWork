@@ -6,13 +6,16 @@ import { InquiryRunActivity } from '../InquiryRunActivity';
 import { ErrorNotice, Modal } from '../../components/ui';
 import { CustomerContextCard } from '../CustomerContextCard';
 import { InquiryComposer } from '../InquiryComposer';
+import { DemoGuide } from '../DemoGuide';
 import { InquiryChatHeading, InquiryChatTranscript } from '../InquiryChatTranscript';
 import { emptyComposerContext, restoreContext, type ComposerContext } from '../inquiry-context';
+import type { InquiryChat } from '../inquiry-chat';
 import '../inquiry.css';
 
 type RecordItem = Record<string, any>;
 
 export function AgentPanel({
+  chat,
   inquiry,
   session,
   messages,
@@ -27,6 +30,7 @@ export function AgentPanel({
   onCancel,
   error,
 }: {
+  chat: InquiryChat;
   inquiry: Inquiry;
   session: Session;
   messages: Message[];
@@ -41,34 +45,11 @@ export function AgentPanel({
   onCancel: () => void;
   error: unknown;
 }) {
-  const draftKey = `easywork:business-chat:${session.user.id}:${session.workspace.id}:${inquiry.id}`;
-  const [draft, setDraft] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(draftKey) || 'null');
-      if (
-        typeof saved?.text === 'string' &&
-        Array.isArray(saved?.selection?.skillIds) &&
-        Array.isArray(saved?.selection?.knowledge)
-      )
-        return saved as { text: string; selection: ComposerContext };
-    } catch {
-      /* Use an empty draft when storage is unavailable. */
-    }
-    return { text: '', selection: emptyComposerContext() };
-  });
+  const { draft, setDraft, draftStored } = chat;
   const { text, selection } = draft;
-  const [draftStored, setDraftStored] = useState(true);
   const [originalOpen, setOriginalOpen] = useState(false);
   const setText = (text: string) => setDraft((old) => ({ ...old, text }));
   const setSelection = (selection: ComposerContext) => setDraft((old) => ({ ...old, selection }));
-  useEffect(() => {
-    try {
-      localStorage.setItem(draftKey, JSON.stringify(draft));
-      setDraftStored(true);
-    } catch {
-      setDraftStored(false);
-    }
-  }, [draftKey, draft]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [showTools, setShowTools] = useState(false);
   const sendingRef = useRef(false);
@@ -114,7 +95,8 @@ export function AgentPanel({
 
   return (
     <aside className="wbv2-agent iw-assistant" aria-label="AI 助手">
-      <InquiryChatHeading />
+      <InquiryChatHeading chat={chat}
+        actions={<button onClick={onOpenSources}>资料与依据{selectedRefs ? ` · ${selectedRefs}` : ''}</button>} />
       <div className="iw-ai-chat">
         <div className="iw-messages" ref={messagesRef}>
           <InquiryChatTranscript
@@ -227,6 +209,7 @@ export function AgentPanel({
           <ErrorNotice error={error} />
         </div>
 
+        <DemoGuide inquiry={inquiry} session={session} disabled={busy || running || waiting || !!inquiry.pendingRunId} onPrompt={setText} />
         <InquiryComposer
           session={session}
           inquiryId={inquiry.id}
@@ -234,8 +217,8 @@ export function AgentPanel({
           selection={selection}
           onInput={setText}
           onSelection={setSelection}
-          canWrite={!busy && !running && !waiting}
-          canSend={!!text.trim() && !busy && !running && !waiting}
+          canWrite={!busy && !running && !waiting && !chat.loading && !chat.error}
+          canSend={!!text.trim() && !busy && !running && !waiting && !chat.loading && !chat.error}
           readOnly={running || waiting}
           draftsPending={false}
           draftStored={draftStored}
@@ -243,11 +226,6 @@ export function AgentPanel({
           onSend={() => void submit()}
           onOriginal={() => setOriginalOpen(true)}
         />
-        <div className="iw-case-actions">
-          <button onClick={onOpenSources}>
-            资料与依据{selectedRefs ? ` · ${selectedRefs}` : ''}
-          </button>
-        </div>
       </div>
       {originalOpen && (
         <Modal title="客户原始询盘" onClose={() => setOriginalOpen(false)}>

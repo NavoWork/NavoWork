@@ -1300,9 +1300,7 @@ textarea {
     z-index: 35;
     background: var(--navo-color-overlay);
   }
-  .topbar .mode-label {
-    font-size: 9px;
-  }
+
   .table-footer {
     gap: 10px;
   }

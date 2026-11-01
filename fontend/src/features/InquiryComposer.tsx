@@ -409,7 +409,7 @@ export function InquiryComposer({
         </div>
         <span className="iw-composer-status">
           {draftsPending
-            ? '正在载入草稿…'
+            ? '回复草稿尚未保存'
             : !draftStored
               ? '草稿未保存'
               : input || selection.skillIds.length || selection.knowledge.length

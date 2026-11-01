@@ -498,7 +498,7 @@ function route(
     }
     const i = s.inquiries.find((v) => v.id === id);
     if (!i) fail('NOT_FOUND', '询盘不存在或无权查看', 404);
-    if (!action && method === 'GET') return i;
+    if (!action && method === 'GET') return { ...i!, latestRunId: i!.latestRunId || Object.values(s.runs).filter(run => run.inquiryId === id).at(-1)?.id || null };
     if (!action && method === 'PATCH') {
       readOnly(i!);
       if (b.metadataVersion !== i!.metadataVersion)
@@ -548,7 +548,9 @@ function route(
       return i;
     }
     if (action === 'messages') {
-      if (method === 'GET') return { items: s.messages[id] || [] };
+      if (method === 'GET') {
+        return { items: s.messages[id] || [] };
+      }
       readOnly(i!);
       if (!b.text?.trim()) fail('INVALID_INPUT', '消息不能为空', 400);
       const message = {
@@ -618,6 +620,7 @@ function route(
       if (run.fail) fault = 'none';
       s.runs[run.id] = run;
       i!.activeRunId = run.id;
+      i!.latestRunId = run.id;
       i!.businessStatus = 'active';
       change(i!);
       s.messages[id].push({

@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from .core import create_item, decode, item_view, items, require_case, store_blob, uid
 from .db import SessionLocal
 from .models import Case, Item, Run, User, WorkItem, now
+from .demo_images import preset_id, preset_path
 
 
 MAX_PROMPT_CHARS = 8000
@@ -35,9 +36,8 @@ class _NoRedirect(HTTPRedirectHandler):
 
 
 def image_settings() -> dict:
-    key = os.getenv("IMAGE_API_KEY") or os.getenv("IMAGE_MODEL_API_KEY") or os.getenv("MODEL_API_KEY")
-    base = (os.getenv("IMAGE_BASE_URL") or os.getenv("MODEL_BASE_URL") or
-            os.getenv("OPENAI_BASE_URL") or "https://api.openai.com/v1").rstrip("/")
+    key = os.getenv("IMAGE_API_KEY") or os.getenv("IMAGE_MODEL_API_KEY")
+    base = (os.getenv("IMAGE_BASE_URL") or "https://api.openai.com/v1").rstrip("/")
     if not key:
         raise ConceptImageError("IMAGE_MODEL_NOT_CONFIGURED", "概念图生成未配置模型密钥。", "blocked")
     if not os.getenv("IMAGE_MODEL"):
@@ -48,6 +48,19 @@ def image_settings() -> dict:
         raise ConceptImageError("IMAGE_ENDPOINT_INVALID", "图像服务端点必须使用 HTTPS。", "blocked")
     return {"api_key": key, "base_url": base,
             "model": os.environ["IMAGE_MODEL"]}
+
+
+def image_capability(case) -> dict:
+    preset = preset_id(case)
+    if preset:
+        ready = preset_path(preset).is_file()
+        return {"configured": ready, "mode": "preset", "presetId": preset,
+                "message": "预置演示图；不调用生图 API，不随提示词重新绘制。" if ready else "演示图片文件缺失"}
+    try:
+        config = image_settings()
+        return {"configured": True, "mode": "provider", "model": config["model"]}
+    except ConceptImageError:
+        return {"configured": False, "mode": "provider", "message": "生图服务待接入"}
 
 
 def generate_image(prompt: str, *, provider=None) -> tuple[bytes, str, str]:
@@ -138,8 +151,11 @@ def create_concept(*, case_id, user_id, expected_revision, spec_version_id, prom
                    spec_version_id=spec_version_id, base_version=base_version, run_id=run_id,
                    work_item_id=work_item_id, generation=generation)
     prompt = str(prompt).strip()
+    if not prompt or len(prompt) > MAX_PROMPT_CHARS:
+        raise ConceptImageError("IMAGE_PROMPT_INVALID", "设计说明不能为空且不能超过 8000 个字符。")
     with SessionLocal() as db:
         case, spec = _binding(db, **binding)
+        preset = preset_id(case)
         spec_hash = hashlib.sha256(json.dumps(decode(spec.payload).get("content", {}), sort_keys=True).encode()).hexdigest()
         # Freeze the exact input; the image service sees the controlled specification too.
         description = json.dumps(decode(spec.payload).get("content", {}), ensure_ascii=False, sort_keys=True)
@@ -147,7 +163,14 @@ def create_concept(*, case_id, user_id, expected_revision, spec_version_id, prom
         request_hash = hashlib.sha256(json.dumps([spec.id, spec_hash, prompt], ensure_ascii=False).encode()).hexdigest()
     attempt_id = uid("image_attempt")
     try:
-        image, mime, model = generate_image(provider_prompt, provider=provider)
+        if preset:
+            try:
+                image = preset_path(preset).read_bytes()
+            except OSError:
+                raise ConceptImageError("DEMO_IMAGE_UNAVAILABLE", "演示图片文件缺失，请恢复本地素材后重试。", "blocked") from None
+            mime, model = "image/png", f"demo-preset:{preset}"
+        else:
+            image, mime, model = generate_image(provider_prompt, provider=provider)
         from PIL import Image
         with Image.open(BytesIO(image)) as parsed:
             if parsed.width * parsed.height > 25_000_000 or parsed.format not in ("PNG", "JPEG"):
@@ -179,6 +202,8 @@ def create_concept(*, case_id, user_id, expected_revision, spec_version_id, prom
         export_id = uid("export")
         proposal_id = uid("export")
         content = {"prompt": prompt, "model": model, "specVersionId": spec.id, "specHash": spec_hash,
+            "generationMode": "preset" if preset else "provider", "presetId": preset,
+            "simulation": bool(preset), "imageApiCalled": not bool(preset),
             "inputHash": request_hash, "imageFileId": blob.id, "sha256": blob.sha256,
             "conceptOnly": True, "accepted": False, "sampleApproved": False, "productionReleased": False,
             "visualAlignment": "needs_human_review", "logoHandling": "neutral_placeholder; replace with original artwork in the document editor",
@@ -195,7 +220,7 @@ def create_concept(*, case_id, user_id, expected_revision, spec_version_id, prom
         from docx.shared import Inches
         document = Document()
         document.add_heading("Product concept proposal", 0)
-        document.add_paragraph("AI product concept illustration: visual communication only. Not an engineering drawing, real photograph, or approved physical sample.")
+        document.add_paragraph("Prepared demo concept image: loaded from a local preset; no image API was called and the image was not redrawn from this request." if preset else "AI product concept illustration: visual communication only. Not an engineering drawing, real photograph, or approved physical sample.")
         document.add_paragraph(f"Specification: {spec.id}; input snapshot: {request_hash}")
         document.add_paragraph(prompt)
         document.add_picture(BytesIO(image), width=Inches(4.5))
@@ -217,7 +242,7 @@ def create_concept(*, case_id, user_id, expected_revision, spec_version_id, prom
         create_item(db, "image_attempt", {"id": attempt_id, "status": "succeeded", "retryOf": retry_of,
             "inputHash": request_hash, "artifactVersionId": artifact["itemId"], "createdAt": now()}, case_id=case.id, item_id=attempt_id)
         if not run_id:
-            commit_revision(db, case, "生成规格绑定的概念图草稿", node="requirements")
+            commit_revision(db, case, "载入产品演示图" if preset else "生成规格绑定的概念图草稿", node="requirements")
         db.commit()
-        return {"status": "needs_review", "summary": "已生成概念图草稿；不代表工程可行性或实物样品批准。",
+        return {"status": "needs_review", "summary": "已载入本询盘的预置产品演示图并保存设计方案；未调用生图 API，图片不会随提示词重新绘制。" if preset else "已生成概念图草稿；不代表工程可行性或实物样品批准。",
                 "artifact": artifact, "export": export, "proposalExport": proposal_export, "attemptId": attempt_id}
