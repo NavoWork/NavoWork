@@ -1,0 +1,16 @@
+From: finance@navowork.example.invalid
+To: sales@navowork.example.invalid
+Date: Sun, 01 Nov 2026 09:00:00 +0800
+Message-ID: <finance-assumptions-20261101@demo.example.invalid>
+Subject: SIMULATED Demo costing assumptions NL-FIN-V1
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+MIME-Version: 1.0
+
+SIMULATED / fictional business source
+
+SIMULATED internal assumptions: exchange rate 7.20 CNY per USD, target gross =
+margin 20%, quantity 3000. Round unit USD price upward to cents before multip=
+lying quantity. CNY 4 domestic handling allocation does not include export cu=
+stoms or inspection; these costs are unknown. Quotes remain conditional. No i=
+nternal price approval is created.

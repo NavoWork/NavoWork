@@ -1,0 +1,445 @@
+{
+  "columns": [
+    "category",
+    "item",
+    "spec",
+    "quantityPerPiece",
+    "unit",
+    "supplier",
+    "unitPriceCny",
+    "wastage",
+    "sourceId"
+  ],
+  "sheets": [
+    {
+      "key": "bom_V1",
+      "type": "bom",
+      "rows": [
+        [
+          "material",
+          "Shell fabric",
+          "600D polyester / 300 gsm",
+          0.6,
+          "m",
+          "Factory A demo",
+          20,
+          0.05,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "material",
+          "Lining",
+          "210D polyester",
+          0.45,
+          "m",
+          "Factory A demo",
+          8,
+          0,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "material",
+          "EVA padding",
+          "8 mm",
+          0.2,
+          "m2",
+          "Factory A demo",
+          12,
+          0,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "accessory",
+          "Zipper",
+          "YKK #5 supplier claim",
+          0.75,
+          "m",
+          "Factory A demo",
+          8,
+          0,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "accessory",
+          "Buckles",
+          "black acetal",
+          2,
+          "pc",
+          "Factory A demo",
+          1,
+          0,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "accessory",
+          "Webbing",
+          "25 mm PP",
+          1,
+          "m",
+          "Factory A demo",
+          2,
+          0,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "accessory",
+          "Embroidery",
+          "60 x 25 mm",
+          1,
+          "pc",
+          "Factory A demo",
+          2,
+          0,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "labor",
+          "Sewing and assembly",
+          "per finished bag",
+          1,
+          "pc",
+          "Factory A demo",
+          10,
+          0,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "overhead",
+          "Factory allocation",
+          "per finished bag",
+          1,
+          "pc",
+          "Factory A demo",
+          3.4,
+          0,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "packaging",
+          "Standard packaging",
+          "polybag + hangtag",
+          1,
+          "set",
+          "Factory A demo",
+          2,
+          0,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "domesticFreight",
+          "Local allocation",
+          "domestic handling only",
+          1,
+          "pc",
+          "Seller demo",
+          4,
+          0,
+          "NL-FIN-V1"
+        ]
+      ],
+      "title": "NL BOM V1"
+    },
+    {
+      "key": "bom_V2",
+      "type": "bom",
+      "rows": [
+        [
+          "material",
+          "Shell fabric",
+          "600D polyester / 300 gsm",
+          0.6,
+          "m",
+          "Factory A demo",
+          20,
+          0.05,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "material",
+          "Lining",
+          "210D polyester",
+          0.45,
+          "m",
+          "Factory A demo",
+          8,
+          0,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "material",
+          "EVA padding",
+          "8 mm",
+          0.2,
+          "m2",
+          "Factory A demo",
+          12,
+          0,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "accessory",
+          "Zipper",
+          "YKK #5 supplier claim",
+          0.75,
+          "m",
+          "Factory A demo",
+          8,
+          0,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "accessory",
+          "Buckles",
+          "black acetal",
+          2,
+          "pc",
+          "Factory A demo",
+          1,
+          0,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "accessory",
+          "Webbing",
+          "25 mm PP",
+          1,
+          "m",
+          "Factory A demo",
+          2,
+          0,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "accessory",
+          "Embroidery",
+          "60 x 25 mm",
+          1,
+          "pc",
+          "Factory A demo",
+          2,
+          0,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "labor",
+          "Sewing and assembly",
+          "per finished bag",
+          1,
+          "pc",
+          "Factory A demo",
+          10,
+          0,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "overhead",
+          "Factory allocation",
+          "per finished bag",
+          1,
+          "pc",
+          "Factory A demo",
+          3.4,
+          0,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "packaging",
+          "Color box CB-02-DEMO",
+          "47 x 32 x 17 cm; 2/carton",
+          1,
+          "set",
+          "Factory A demo",
+          5,
+          0,
+          "FA-NL-V2"
+        ],
+        [
+          "domesticFreight",
+          "Local allocation",
+          "domestic handling only",
+          1,
+          "pc",
+          "Seller demo",
+          4,
+          0,
+          "NL-FIN-V1"
+        ]
+      ],
+      "title": "NL BOM V2"
+    },
+    {
+      "key": "bom_missing_price",
+      "type": "bom",
+      "rows": [
+        [
+          "material",
+          "Shell fabric",
+          "600D polyester / 300 gsm",
+          0.6,
+          "m",
+          "Factory A demo",
+          20,
+          0.05,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "material",
+          "Lining",
+          "210D polyester",
+          0.45,
+          "m",
+          "Factory A demo",
+          8,
+          0,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "material",
+          "EVA padding",
+          "8 mm",
+          0.2,
+          "m2",
+          "Factory A demo",
+          12,
+          0,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "accessory",
+          "Zipper",
+          "YKK #5 supplier claim",
+          0.75,
+          "m",
+          "Factory A demo",
+          8,
+          0,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "accessory",
+          "Buckles",
+          "black acetal",
+          2,
+          "pc",
+          "Factory A demo",
+          1,
+          0,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "accessory",
+          "Webbing",
+          "25 mm PP",
+          1,
+          "m",
+          "Factory A demo",
+          2,
+          0,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "accessory",
+          "Embroidery",
+          "60 x 25 mm",
+          1,
+          "pc",
+          "Factory A demo",
+          null,
+          0,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "labor",
+          "Sewing and assembly",
+          "per finished bag",
+          1,
+          "pc",
+          "Factory A demo",
+          10,
+          0,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "overhead",
+          "Factory allocation",
+          "per finished bag",
+          1,
+          "pc",
+          "Factory A demo",
+          3.4,
+          0,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "packaging",
+          "Standard packaging",
+          "polybag + hangtag",
+          1,
+          "set",
+          "Factory A demo",
+          2,
+          0,
+          "NL-ALLOC-V1"
+        ],
+        [
+          "domesticFreight",
+          "Local allocation",
+          "domestic handling only",
+          1,
+          "pc",
+          "Seller demo",
+          4,
+          0,
+          "NL-FIN-V1"
+        ]
+      ],
+      "title": "BOM missing logo price"
+    },
+    {
+      "key": "supplier_A_V1",
+      "type": "supplier",
+      "title": "Factory A standard quote",
+      "values": [
+        44,
+        2,
+        4,
+        1000,
+        28
+      ]
+    },
+    {
+      "key": "supplier_A_V2",
+      "type": "supplier",
+      "title": "Factory A color box quote",
+      "values": [
+        44,
+        5,
+        4,
+        1000,
+        31
+      ]
+    },
+    {
+      "key": "supplier_B_V1",
+      "type": "supplier",
+      "title": "Factory B standard quote",
+      "values": [
+        46,
+        2,
+        4,
+        1000,
+        23
+      ]
+    },
+    {
+      "key": "09_costing",
+      "type": "costing",
+      "title": "NL conditional costing"
+    },
+    {
+      "key": "09_costing_editable",
+      "type": "costing_simple",
+      "title": "NL basic editable costing"
+    }
+  ]
+}

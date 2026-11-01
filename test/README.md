@@ -1,6 +1,12 @@
 # TradeWorkbench Hackathon Demo Fixtures
 
-本目录只提供可上传的模拟输入、结构化期望结果和确定性校验器，不包含应用实现。全部姓名、公司、报价、订单和审批均为虚构演示数据。邮件地址使用 `.invalid` 域名。资料上的 `SIMULATED` 标记不可移除或表述为真实商业记录。
+本目录提供可上传的模拟输入、结构化期望结果、确定性校验器，以及对接当前应用的资产与 Case 导入脚本。全部姓名、公司、报价、订单和审批均为虚构演示数据。邮件地址使用 `.invalid` 域名。资料上的 `SIMULATED` 标记不可移除或表述为真实商业记录。
+
+## 当前前后端演示包（2026-11-01）
+
+请优先使用 [workbench_demo/README.md](workbench_demo/README.md)：对照 Hackathon PRD v0.5 和 `guilimao` 当前代码，补齐 15 类文件、逐行 BOM、研究快照、异常输入及 7 条独立演示路线；默认登记 65 个真实 PDF/XLSX/EML/PNG 等资产和 Case 原件。下载包为 `NavoWork_demo_assets.zip`。资产库登记、Case 证据与实际业务成果分别处理，导入不会冒充审批或生成结果。
+
+旧包仍用于历史快照和回归。原 `core15/09_costing.xlsx` 可下载和读取，但其保护公式超出当前网页编辑器支持范围；网页演示使用新包的 `09_costing_editable.xlsx`。具体适配结论、实际 API 检查与尚未执行的在线模型检查见新包说明。
 
 ## 15 类核心业务文件补充包
 
