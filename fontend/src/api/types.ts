@@ -5,6 +5,7 @@ export interface Session {
   workspace: { id: string; name: string };
 }
 export interface Inquiry {
+  customerContext?: CustomerContext;
   id: string;
   workspaceId: string;
   title: string;
@@ -18,8 +19,22 @@ export interface Inquiry {
   metadataVersion: number;
   currentRevision: number;
   activeRunId: string | null;
+  pendingRunId?: string;
   updatedAt: string;
   nextAction: string;
+}
+export interface CustomerContext {
+  channel: 'unknown' | 'email' | 'website' | 'alibaba' | 'amazon' | 'linkedin' | 'referral';
+  sourceRef?: string;
+  email?: string;
+  website?: string;
+  linkedin?: string;
+  company?: string;
+  country?: string;
+  business?: string;
+  summary?: string;
+  simulation?: boolean;
+  checks?: { label: string; status: 'pending' | 'matched' | 'review'; detail: string }[];
 }
 export interface Message {
   id: string;
@@ -31,6 +46,7 @@ export interface Message {
   context?: RunContext;
 }
 export interface KnowledgeContext {
+  sourceVersionId?: string;
   id: string;
   title: string;
   folder: string;
@@ -79,6 +95,11 @@ export interface Risk {
   evidenceRefs: string[];
 }
 export interface Revision {
+  parentRevision?: number;
+  restoredFromRevision?: number;
+  restoredNode?: string;
+  generatedNode?: string;
+  artifactVersionIds?: Record<string, string>;
   inquiryId: string;
   number: number;
   runId: string;
@@ -114,6 +135,12 @@ export interface Revision {
   context?: RunContext;
 }
 export interface Run {
+  executionOutcome?: 'partial' | 'failed' | null;
+  failedTools?: { tool: string; status: string; code?: string; summary?: string }[];
+  node?: string | null;
+  fileOutputs?: { file_id: string; name: string; sha256: string; downloadUrl: string }[];
+  agentVerification?: { liveExecuted: boolean; mode: string } | null;
+  completedPhases?: string[];
   id: string;
   runId: string;
   inquiryId: string;
@@ -151,6 +178,7 @@ export interface Source {
   locator?: string;
 }
 export interface Asset {
+  space?: 'company' | 'personal';
   id: string;
   title: string;
   name: string;
@@ -209,4 +237,120 @@ export interface MaterialBundle {
   sourceVersionIds: string[];
   status: 'draft';
   createdAt: string;
+}
+
+export type WorkbenchStageStatus = 'empty' | 'draft' | 'ready' | 'confirmed' | 'blocked' | 'locked';
+export interface WorkbenchGateGap {
+  code: string;
+  message: string;
+  stage: string;
+}
+export interface WorkbenchGate {
+  status: 'passed' | 'blocked';
+  missing: WorkbenchGateGap[];
+}
+export interface WorkbenchStage {
+  key: string;
+  title: string;
+  short: string;
+  status: WorkbenchStageStatus;
+  summary: string;
+  missing: string[];
+  nextAction: string;
+  artifactVersionIds: string[];
+  available: boolean;
+  gate?: WorkbenchGate;
+}
+export interface WorkbenchArtifact {
+  itemId: string;
+  kind: string;
+  title: string;
+  version: number;
+  status: string;
+  content: Record<string, any>;
+}
+export interface WorkbenchEvidence {
+  id: string;
+  title: string;
+  sourceRole: string;
+  parseStatus: string;
+  blobId?: string | null;
+  text: string;
+  createdAt: string;
+}
+export interface WorkbenchKnowledge {
+  id: string;
+  sourceId: string;
+  title: string;
+  version: number;
+  folder?: string;
+}
+export interface WorkbenchAsset {
+  id: string;
+  title: string;
+  name: string;
+  version: number;
+  mediaType: string;
+  size: number;
+  folder?: string;
+}
+export interface SupplierOffer {
+  id: string;
+  supplier: string;
+  baseCny: string;
+  packagingCny: string;
+  localCny: string;
+  costLines?: { category: string; label: string; amountCny: string; scope: string }[];
+  moq: number;
+  leadDays: number;
+  currency: string;
+  includesPackaging: boolean;
+  validUntil?: string | null;
+  incoterm?: string | null;
+  namedPlace?: string | null;
+  paymentTerms?: string | null;
+  notes?: string;
+  evidenceSourceId: string;
+}
+export interface WorkbenchApproval {
+  id: string;
+  scope: string;
+  targetVersionId: string;
+  decision: string;
+  evidenceRefs: string[];
+  note?: string;
+  actorId: string;
+  createdAt: string;
+}
+export interface WorkbenchSpecField {
+  key: string;
+  label: string;
+  required?: boolean;
+  group: string;
+}
+export interface WorkbenchSpecGroup {
+  key: string;
+  title: string;
+  fields: { key: string; label: string; required?: boolean }[];
+}
+export interface WorkbenchData {
+  case: Inquiry;
+  customerContext: CustomerContext;
+  customerProfile: { profile?: Record<string, any>; version?: number } | null;
+  stages: WorkbenchStage[];
+  artifacts: Record<string, WorkbenchArtifact>;
+  evidence: WorkbenchEvidence[];
+  knowledge: WorkbenchKnowledge[];
+  assets: WorkbenchAsset[];
+  supplierOffers: SupplierOffer[];
+  approvals: WorkbenchApproval[];
+  gate: WorkbenchGate;
+  schema: {
+    specGroups: WorkbenchSpecGroup[];
+    specFields: WorkbenchSpecField[];
+    costCategories: { key: string; label: string }[];
+    sampleChecks: string[];
+    sampleTypes: string[];
+  };
+  nextAction: string;
 }

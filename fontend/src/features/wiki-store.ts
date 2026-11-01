@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Session } from '../api';
+import { mode, type Session } from '../api';
 import { wikiDocuments, type WikiDocument } from './library-data';
+import { useLibraryCollection } from './library-api';
 
 const changedEvent = 'navowork:wiki-changed';
 export const wikiStorageKey = (session: Session) =>
@@ -27,12 +28,14 @@ function readDocuments(key: string): WikiDocument[] {
 }
 
 export function useWikiDocuments(session: Session) {
+  const remote = useLibraryCollection(session, 'documents', wikiDocuments);
   const client = useQueryClient();
   const key = wikiStorageKey(session);
   const queryKey = ['wiki-documents', session.user.id, session.workspace.id];
   const [writeError, setWriteError] = useState<unknown>();
   const query = useQuery({
     queryKey,
+    enabled: mode === 'mock',
     queryFn: () => readDocuments(key),
     staleTime: 0,
   });
@@ -55,6 +58,10 @@ export function useWikiDocuments(session: Session) {
     };
   }, [client, key, session.user.id, session.workspace.id]);
   function update(change: (docs: WikiDocument[]) => WikiDocument[]) {
+    if (mode === 'real') {
+      remote.setValues(change);
+      return true;
+    }
     try {
       const docs = change(readDocuments(key));
       localStorage.setItem(key, JSON.stringify(docs));
@@ -68,10 +75,11 @@ export function useWikiDocuments(session: Session) {
     }
   }
   return {
-    docs: query.data || [],
+    path: remote.path,
+    docs: mode === 'real' ? remote.values : query.data || [],
     update,
-    loading: query.isPending,
-    error: writeError || query.error,
-    retry: query.refetch,
+    loading: mode === 'real' ? remote.query.isPending : query.isPending,
+    error: mode === 'real' ? remote.query.error : writeError || query.error,
+    retry: mode === 'real' ? remote.query.refetch : query.refetch,
   };
 }

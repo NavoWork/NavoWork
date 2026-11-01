@@ -1,0 +1,196 @@
+{
+  "schema_version": "tradeworkbench-fixture/v1",
+  "case": {
+    "id": "BAG-2026-DE-002",
+    "title": "Lea Fischer / incomplete daypack inquiry",
+    "all_values_simulated": true
+  },
+  "sources": [
+    {
+      "id": "src-bag-2026-de-002-inquiry",
+      "case_id": "BAG-2026-DE-002",
+      "name": "inquiry.eml",
+      "mime_type": "message/rfc822",
+      "sha256": "80ab5325df342616e1b21f4676bc3c669568c8fffe9111cc6198ac873b707c5f",
+      "simulated": true,
+      "storage_uri": "test/inputs/BAG-2026-DE-002/inquiry.eml",
+      "source_role": "customer_inquiry",
+      "locators": [
+        {
+          "type": "eml",
+          "body_quote": "1,200 daypacks"
+        },
+        {
+          "type": "eml",
+          "body_quote": "FCA Shenzhen"
+        },
+        {
+          "type": "eml",
+          "body_quote": "Target arrival date is not specified"
+        }
+      ]
+    },
+    {
+      "id": "src-bag-2026-de-002-supplier-incomplete",
+      "case_id": "BAG-2026-DE-002",
+      "name": "supplier-incomplete.pdf",
+      "mime_type": "application/pdf",
+      "sha256": "6e1c305ec000a0c45b09fa369becc0ae02a4e4abb6c594af5e2bcbdc2d2d37ef",
+      "simulated": true,
+      "storage_uri": "test/inputs/BAG-2026-DE-002/supplier-incomplete.pdf",
+      "source_role": "supplier_quote",
+      "locators": [
+        {
+          "type": "pdf",
+          "page": 1,
+          "body_quote": "CNY 39.00 / piece"
+        },
+        {
+          "type": "pdf",
+          "page": 1,
+          "field": "MOQ"
+        },
+        {
+          "type": "pdf",
+          "page": 1,
+          "field": "Lead time"
+        }
+      ]
+    }
+  ],
+  "assertions": [
+    {
+      "id": "c2-f1",
+      "case_id": "BAG-2026-DE-002",
+      "field_path": "quantity.value",
+      "value": {
+        "kind": "known",
+        "value": {
+          "amount": "1200",
+          "unit": "piece"
+        }
+      },
+      "status": "observed",
+      "source_id": "src-bag-2026-de-002-inquiry",
+      "source_locator": {
+        "type": "eml",
+        "body_quote": "1,200 daypacks"
+      },
+      "evidence_quote": "1,200 daypacks",
+      "asserted_by": "SIMULATED_SOURCE"
+    },
+    {
+      "id": "c2-f2",
+      "case_id": "BAG-2026-DE-002",
+      "field_path": "trade.incoterm",
+      "value": {
+        "kind": "known",
+        "value": {
+          "rule": "FCA",
+          "place": "Shenzhen"
+        }
+      },
+      "status": "observed",
+      "source_id": "src-bag-2026-de-002-inquiry",
+      "source_locator": {
+        "type": "eml",
+        "body_quote": "FCA Shenzhen"
+      },
+      "evidence_quote": "FCA Shenzhen",
+      "asserted_by": "SIMULATED_SOURCE"
+    },
+    {
+      "id": "c2-f3",
+      "case_id": "BAG-2026-DE-002",
+      "field_path": "supplier.cost.base",
+      "value": {
+        "kind": "known",
+        "value": {
+          "amount": "39.00",
+          "currency": "CNY",
+          "unit": "piece",
+          "packaging_included": {
+            "kind": "unknown",
+            "reason": "not_stated"
+          }
+        }
+      },
+      "status": "observed",
+      "source_id": "src-bag-2026-de-002-supplier-incomplete",
+      "source_locator": {
+        "type": "pdf",
+        "page": 1,
+        "body_quote": "CNY 39.00 / piece"
+      },
+      "evidence_quote": "CNY 39.00 / piece",
+      "asserted_by": "SIMULATED_SOURCE"
+    },
+    {
+      "id": "c2-f4",
+      "case_id": "BAG-2026-DE-002",
+      "field_path": "supplier.moq",
+      "value": {
+        "kind": "unknown",
+        "reason": "not_stated"
+      },
+      "status": "unknown",
+      "source_id": "src-bag-2026-de-002-supplier-incomplete",
+      "source_locator": {
+        "type": "pdf",
+        "page": 1,
+        "field": "MOQ"
+      },
+      "evidence_quote": null,
+      "asserted_by": "SIMULATED_SOURCE"
+    },
+    {
+      "id": "c2-f5",
+      "case_id": "BAG-2026-DE-002",
+      "field_path": "supplier.lead_time_days",
+      "value": {
+        "kind": "unknown",
+        "reason": "not_stated"
+      },
+      "status": "unknown",
+      "source_id": "src-bag-2026-de-002-supplier-incomplete",
+      "source_locator": {
+        "type": "pdf",
+        "page": 1,
+        "field": "Lead time"
+      },
+      "evidence_quote": null,
+      "asserted_by": "SIMULATED_SOURCE"
+    },
+    {
+      "id": "c2-f6",
+      "case_id": "BAG-2026-DE-002",
+      "field_path": "customer.arrival_target",
+      "value": {
+        "kind": "unknown",
+        "reason": "not_stated"
+      },
+      "status": "unknown",
+      "source_id": "src-bag-2026-de-002-inquiry",
+      "source_locator": {
+        "type": "eml",
+        "body_quote": "Target arrival date is not specified"
+      },
+      "evidence_quote": null,
+      "asserted_by": "SIMULATED_SOURCE"
+    }
+  ],
+  "resolutions": [],
+  "expected": {
+    "quote_release": {
+      "decision": "deny",
+      "blocking_reasons": [
+        "required supplier price or scope details are unknown"
+      ]
+    },
+    "unknown_policy": "typed unknown, never zero or empty string",
+    "case_isolation": {
+      "cross_case_access": false,
+      "expected_status": "403_or_404"
+    }
+  }
+}

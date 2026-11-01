@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '../api';
+import { api, mode } from '../api';
 import type {
   Asset,
   Draft,
@@ -16,10 +16,12 @@ import {
   canvasKey,
   defaultFolders,
   getCanvasFile,
+  initialCanvas,
   inquiryAssetsChangedEvent,
   readCanvas,
   resultSnapshot,
   workspaceDocuments,
+  type CanvasState,
 } from './inquiry-canvas-model';
 import type { AssetKind, LibraryAsset } from './library-data';
 
@@ -57,12 +59,15 @@ export async function loadInquiryAssetGroup(
   const scope = `${session.user.id}:${session.workspace.id}:${inquiry.id}`;
   const base = `/workspaces/${encodeURIComponent(session.workspace.id)}`;
   const path = `${base}/inquiries/${encodeURIComponent(inquiry.id)}`;
-  const state = readCanvas(scope);
-  const [messages, revisions, bundles] = await Promise.all([
+  const [messages, revisions, bundles, canvas] = await Promise.all([
     api.get<{ items: Message[] }>(`${path}/messages`, signal),
     api.get<{ items: Revision[] }>(`${path}/revisions`, signal),
     api.get<{ items: MaterialBundle[] }>(`${path}/material-bundles`, signal),
+    mode === 'real'
+      ? api.get<{ state: CanvasState | null }>(`${path}/canvas`, signal)
+      : Promise.resolve({ state: readCanvas(scope) }),
   ]);
+  const state = canvas.state || initialCanvas();
   const revision = revisions.items.find((item) => item.number === inquiry.currentRevision);
   const includedRevisions = revisions.items.filter(
     (item) => item.number === inquiry.currentRevision || item.number === state.initialRevision,
@@ -135,7 +140,10 @@ export async function loadInquiryAssetGroup(
         inquiry: origin,
       };
       if (doc.file) {
-        const file = doc.file.assetId ? undefined : await getCanvasFile(scope, doc.file.id);
+        const file =
+          doc.file.assetId || doc.file.serverFileId
+            ? undefined
+            : await getCanvasFile(scope, doc.file.id);
         const asset = assetResponse.items.find(
           (item) => item.id === doc.file!.assetId && item.version === doc.file!.version,
         );
@@ -153,11 +161,15 @@ export async function loadInquiryAssetGroup(
               ? await file.text()
               : undefined,
           url: asset?.url,
-          downloadPath: doc.file.assetId
-            ? `${base}/assets/${encodeURIComponent(doc.file.assetId)}/versions/${doc.file.version}/download`
-            : undefined,
+          downloadPath: doc.file.serverFileId
+            ? `${path}/canvas/files/${encodeURIComponent(doc.file.serverFileId)}/download`
+            : doc.file.assetId
+              ? `${base}/assets/${encodeURIComponent(doc.file.assetId)}/versions/${doc.file.version}/download`
+              : undefined,
           unavailable:
-            !doc.file.assetId && !file ? '本机附件无法读取，请返回原询盘重新添加。' : undefined,
+            !doc.file.assetId && !doc.file.serverFileId && !file
+              ? '本机附件无法读取，请返回原询盘重新添加。'
+              : undefined,
         };
       }
       let text = doc.text;

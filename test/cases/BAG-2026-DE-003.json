@@ -1,0 +1,170 @@
+{
+  "schema_version": "tradeworkbench-fixture/v1",
+  "case": {
+    "id": "BAG-2026-DE-003",
+    "title": "Jonas Keller / independent travel bag inquiry",
+    "all_values_simulated": true
+  },
+  "sources": [
+    {
+      "id": "src-bag-2026-de-003-inquiry",
+      "case_id": "BAG-2026-DE-003",
+      "name": "inquiry.eml",
+      "mime_type": "message/rfc822",
+      "sha256": "0683edaac53a938a0d43f84a0a621adf738e3c7f7f06125b9645207279aae710",
+      "simulated": true,
+      "storage_uri": "test/inputs/BAG-2026-DE-003/inquiry.eml",
+      "source_role": "customer_inquiry",
+      "locators": [
+        {
+          "type": "eml",
+          "body_quote": "800 travel bags"
+        },
+        {
+          "type": "eml",
+          "body_quote": "FCA Hamburg"
+        }
+      ]
+    },
+    {
+      "id": "src-bag-2026-de-003-supplier-reply",
+      "case_id": "BAG-2026-DE-003",
+      "name": "supplier-reply.pdf",
+      "mime_type": "application/pdf",
+      "sha256": "13ec42211e7111f63f895795ce95a3c9ebf8b4746ddd6b39709d535a87b0fccf",
+      "simulated": true,
+      "storage_uri": "test/inputs/BAG-2026-DE-003/supplier-reply.pdf",
+      "source_role": "supplier_quote",
+      "locators": [
+        {
+          "type": "pdf",
+          "page": 1,
+          "body_quote": "1,000 pieces per style"
+        },
+        {
+          "type": "pdf",
+          "page": 1,
+          "field": "Unit price"
+        },
+        {
+          "type": "pdf",
+          "page": 1,
+          "field": "Lead time"
+        }
+      ]
+    }
+  ],
+  "assertions": [
+    {
+      "id": "c3-f1",
+      "case_id": "BAG-2026-DE-003",
+      "field_path": "quantity.value",
+      "value": {
+        "kind": "known",
+        "value": {
+          "amount": "800",
+          "unit": "piece"
+        }
+      },
+      "status": "observed",
+      "source_id": "src-bag-2026-de-003-inquiry",
+      "source_locator": {
+        "type": "eml",
+        "body_quote": "800 travel bags"
+      },
+      "evidence_quote": "800 travel bags",
+      "asserted_by": "SIMULATED_SOURCE"
+    },
+    {
+      "id": "c3-f2",
+      "case_id": "BAG-2026-DE-003",
+      "field_path": "trade.incoterm",
+      "value": {
+        "kind": "known",
+        "value": {
+          "rule": "FCA",
+          "place": "Hamburg"
+        }
+      },
+      "status": "observed",
+      "source_id": "src-bag-2026-de-003-inquiry",
+      "source_locator": {
+        "type": "eml",
+        "body_quote": "FCA Hamburg"
+      },
+      "evidence_quote": "FCA Hamburg",
+      "asserted_by": "SIMULATED_SOURCE"
+    },
+    {
+      "id": "c3-f3",
+      "case_id": "BAG-2026-DE-003",
+      "field_path": "supplier.moq",
+      "value": {
+        "kind": "known",
+        "value": {
+          "amount": "1000",
+          "unit": "piece"
+        }
+      },
+      "status": "observed",
+      "source_id": "src-bag-2026-de-003-supplier-reply",
+      "source_locator": {
+        "type": "pdf",
+        "page": 1,
+        "body_quote": "1,000 pieces per style"
+      },
+      "evidence_quote": "1,000 pieces per style",
+      "asserted_by": "SIMULATED_SOURCE"
+    },
+    {
+      "id": "c3-f4",
+      "case_id": "BAG-2026-DE-003",
+      "field_path": "supplier.cost.unit_price",
+      "value": {
+        "kind": "unknown",
+        "reason": "not_quoted"
+      },
+      "status": "unknown",
+      "source_id": "src-bag-2026-de-003-supplier-reply",
+      "source_locator": {
+        "type": "pdf",
+        "page": 1,
+        "field": "Unit price"
+      },
+      "evidence_quote": null,
+      "asserted_by": "SIMULATED_SOURCE"
+    },
+    {
+      "id": "c3-f5",
+      "case_id": "BAG-2026-DE-003",
+      "field_path": "supplier.lead_time_days",
+      "value": {
+        "kind": "unknown",
+        "reason": "not_quoted"
+      },
+      "status": "unknown",
+      "source_id": "src-bag-2026-de-003-supplier-reply",
+      "source_locator": {
+        "type": "pdf",
+        "page": 1,
+        "field": "Lead time"
+      },
+      "evidence_quote": null,
+      "asserted_by": "SIMULATED_SOURCE"
+    }
+  ],
+  "resolutions": [],
+  "expected": {
+    "quote_release": {
+      "decision": "deny",
+      "blocking_reasons": [
+        "required supplier price or scope details are unknown"
+      ]
+    },
+    "unknown_policy": "typed unknown, never zero or empty string",
+    "case_isolation": {
+      "cross_case_access": false,
+      "expected_status": "403_or_404"
+    }
+  }
+}

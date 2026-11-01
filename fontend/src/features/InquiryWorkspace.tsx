@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link, useLocation } from 'react-router-dom';
 import {
   ArrowRight,
   BookOpen,
@@ -44,6 +45,7 @@ import {
 } from './inquiry-canvas-model';
 import { InquiryCanvas } from './InquiryCanvas';
 import { InquiryComposer } from './InquiryComposer';
+import { useAvailableSkills } from './skill-catalog';
 import { InvocationContext } from './InvocationContext';
 import {
   emptyComposerContext,
@@ -51,6 +53,8 @@ import {
   runContext,
   type ComposerContext,
 } from './inquiry-context';
+import { GenerateNodeDialog, type GenerationNode } from './GenerateNodeDialog';
+import { CustomerContextCard, channelLabels } from './CustomerContextCard';
 import { ResizeHandle } from '../components/ResizeHandle';
 import './inquiry.css';
 
@@ -95,6 +99,8 @@ export function InquiryWorkspace({
   const base = `/workspaces/${session.workspace.id}`;
   const path = `${base}/inquiries/${encodeURIComponent(inquiryId)}`;
   const scope = `${session.user.id}:${session.workspace.id}:${inquiryId}`;
+  const location = useLocation();
+  const active = location.pathname === `/inquiries/${encodeURIComponent(inquiryId)}`;
   const prefKey = `easywork:view:${scope}`;
   const initial = useRef(
     readPref(prefKey, {
@@ -108,10 +114,29 @@ export function InquiryWorkspace({
     }),
   );
   const [input, setInput] = useState(initial.current.input);
+  const catalog = useAvailableSkills(session);
   const [composerContext, setComposerContext] = useState<ComposerContext>(
     initial.current.composerContext || emptyComposerContext(),
   );
   const [draftStored, setDraftStored] = useState(true);
+  const [selectedSources, setSelectedSources] = useState<string[] | null>(null);
+  const [offerId, setOfferId] = useState('');
+  const [costInputs, setCostInputs] = useState({ exchangeRate: '', margin: '', quantity: '' });
+  const references = useQuery({
+    queryKey: ['inquiry-reference-library', scope],
+    enabled: mode === 'real' && active,
+    queryFn: ({ signal }) =>
+      api.get<{ items: (Source & { sourceVersionId?: string })[] }>(`${base}/sources`, signal),
+  });
+  const supplierOffers = useQuery({
+    queryKey: ['inquiry-offers', scope],
+    enabled: mode === 'real' && active,
+    queryFn: ({ signal }) =>
+      api.get<{ items: { id: string; supplier: string; moq: number }[] }>(
+        `${path}/supplier-offers`,
+        signal,
+      ),
+  });
   const [deferredResults, setDeferredResults] = useState<number[]>(
     initial.current.deferredResults || [],
   );
@@ -152,6 +177,10 @@ export function InquiryWorkspace({
   const [error, setError] = useState<unknown>();
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
+  const [generation, setGeneration] = useState<{
+    node: GenerationNode;
+    instruction?: string;
+  } | null>(null);
   const [draftState, setDraftState] = useState<DraftState>({
     revision: null,
     versions: {},
@@ -169,6 +198,7 @@ export function InquiryWorkspace({
   const queryKey = ['inquiry', scope];
   const detail = useQuery({
     queryKey,
+    enabled: active,
     queryFn: async ({ signal }) => {
       const [inquiry, messages, revisions] = await Promise.all([
         api.get<Inquiry>(path, signal),
@@ -183,10 +213,10 @@ export function InquiryWorkspace({
   const revision = detail.data?.revisions.find((r) => r.number === selectedNumber);
   const draftsPending = draftState.pending || draftState.revision !== revision?.number;
   const history = !!inquiry && selectedNumber !== inquiry.currentRevision;
-  const activeRunId = inquiry?.activeRunId || lastRunId;
+  const activeRunId = inquiry?.activeRunId || inquiry?.pendingRunId || lastRunId;
   const runQuery = useQuery({
     queryKey: ['run', scope, activeRunId],
-    enabled: !!activeRunId,
+    enabled: active && !!activeRunId,
     queryFn: ({ signal }) => api.get<Run>(`${base}/runs/${activeRunId}`, signal),
     refetchInterval: (q) =>
       !q.state.data || ['queued', 'running'].includes(q.state.data.status) ? 900 : false,
@@ -276,17 +306,48 @@ export function InquiryWorkspace({
   ) {
     if (!inquiry || running || (draftsPending && !!revision)) return;
     await operate(async () => {
+      const canvas =
+        mode === 'real'
+          ? await api.get<{ state: { files?: { serverFileId?: string }[] } | null }>(
+              `${path}/canvas`,
+            )
+          : null;
+      const canvasFileIds =
+        canvas?.state?.files?.flatMap((file) => (file.serverFileId ? [file.serverFileId] : [])) ??
+        [];
+      const context = runContext(composerContext, catalog.skills);
+      const instruction =
+        evidence ||
+        input.trim() ||
+        (action === 'analyze'
+          ? '分析客户原始询盘，提取需求与待确认项'
+          : '根据当前事实更新方案与回复');
+      if (mode === 'real' && composerContext.knowledge.some((doc) => !doc.sourceVersionId))
+        throw new Error('引用中包含本机旧资料，请移除后从团队知识库重新选择。');
+      const sourceVersionIds = [
+        ...new Set([
+          ...(selectedSources ?? revision?.sourceRefs.map((s) => s.sourceVersionId) ?? []),
+          ...composerContext.knowledge.flatMap((doc) =>
+            doc.sourceVersionId ? [doc.sourceVersionId] : [],
+          ),
+        ]),
+      ];
       const r = await api.post<Run>(`${path}/runs`, {
+        ...(mode === 'real' ? { canvasFileIds } : {}),
         baseRevision: inquiry.currentRevision,
         action,
-        context: runContext(composerContext),
+        context,
         assetVersionIds: selectedAssets ?? revision?.assetRefs ?? [],
+        ...(mode === 'real'
+          ? {
+              sourceVersionIds,
+              ...(offerId ? { selectedSupplierOfferId: offerId, costInputs } : {}),
+            }
+          : {}),
         instruction:
-          evidence ||
-          input.trim() ||
-          (action === 'analyze'
-            ? '分析客户原始询盘，提取需求与待确认项'
-            : '根据当前事实更新方案与回复'),
+          mode === 'real' && context?.skills.length
+            ? `${instruction}\n\n本次技能要求：\n${context.skills.map((skill) => `${skill.name}：${skill.instructions.join('；')}`).join('\n')}`
+            : instruction,
         ...(run?.status === 'needs_input'
           ? {
               replyToRunId: run.id,
@@ -315,6 +376,26 @@ export function InquiryWorkspace({
       queryClient.setQueryData(['run', scope, r.runId || r.id], r);
       await refresh();
     });
+  }
+  async function restoreRevision(number: number, target: string): Promise<number | undefined> {
+    if (!inquiry || running || busy) return;
+    let created: number | undefined;
+    await operate(async () => {
+      const result = await api.post<Revision>(`${path}/revisions/${number}/restore`, {
+        baseRevision: inquiry.currentRevision,
+        target,
+      });
+      created = result.number;
+      setRevisionNumber(null);
+      setLastRunId('');
+      setDraftRefresh((v) => v + 1);
+      setReview(null);
+      await refresh();
+      setNotice(
+        `已从 V${number} 恢复${target === 'all' ? '全部节点' : '所选节点'}到 V${result.number}，可以继续编辑。历史仍保留。`,
+      );
+    });
+    return created;
   }
   async function transition(to: BusinessStatus, extra: Record<string, unknown> = {}) {
     if (!inquiry) return;
@@ -423,10 +504,7 @@ export function InquiryWorkspace({
       deferred={deferredResults.includes(revision.number)}
       onDefer={() => setDeferredResults((values) => [...values, revision.number])}
       onSave={() => {
-        if (!canWrite || draftsPending) return;
-        const result = resultSnapshot(revision, draftState.texts);
-        setSaveResultRequest((old) => ({ result, seq: (old?.seq || 0) + 1 }));
-        setMobilePane('chat');
+        openDocument('result:hub');
       }}
     />
   ) : null;
@@ -480,6 +558,19 @@ export function InquiryWorkspace({
           <History size={16} />
           正在查看 V{revisionNumber} 历史快照，内容只读。
           <button onClick={() => setRevisionNumber(null)}>回到当前版本</button>
+          {mode === 'real' && (
+            <button
+              disabled={
+                busy ||
+                running ||
+                inquiry.businessStatus === 'done' ||
+                inquiry.businessStatus === 'waiting'
+              }
+              onClick={() => void restoreRevision(selectedNumber!, 'all')}
+            >
+              从此版本继续编辑
+            </button>
+          )}
         </div>
       )}
       {inquiry.businessStatus === 'done' && (
@@ -549,6 +640,19 @@ export function InquiryWorkspace({
             base={base}
             path={path}
             readOnly={readOnly}
+            onGenerate={
+              mode === 'real'
+                ? (node, instruction) => setGeneration({ node, instruction })
+                : undefined
+            }
+            onRestore={mode === 'real' ? restoreRevision : undefined}
+            canRestore={
+              mode === 'real' &&
+              !busy &&
+              !running &&
+              inquiry.businessStatus !== 'done' &&
+              inquiry.businessStatus !== 'waiting'
+            }
             openRequest={documentRequest}
             saveResultRequest={saveResultRequest}
             onSavedResultsChange={setSavedResults}
@@ -662,6 +766,10 @@ export function InquiryWorkspace({
                 <FileText size={16} />
                 <div>
                   <strong>客户原始询盘</strong>
+                  <small>
+                    {channelLabels[inquiry.customerContext?.channel || 'unknown']}
+                    {inquiry.customerContext?.email ? ` · ${inquiry.customerContext.email}` : ''}
+                  </small>
                   <p>
                     {inquiry.originalText.slice(0, 110)}
                     {inquiry.originalText.length > 110 ? '…' : ''}
@@ -709,6 +817,33 @@ export function InquiryWorkspace({
                       <TriangleAlert size={13} /> {q.question}
                     </p>
                   ))}
+                  {!!run.fileOutputs?.length && (
+                    <div aria-label="本次生成的文件">
+                      <p>已生成文件草稿，需审核后使用。</p>
+                      {run.fileOutputs.map((file) => (
+                        <button
+                          key={file.file_id}
+                          className="button button-ghost"
+                          title={`SHA-256: ${file.sha256}`}
+                          onClick={() =>
+                            void operate(async () => {
+                              const blob = await api.download(
+                                file.downloadUrl.replace(/^\/api\/v1/, ''),
+                              );
+                              const url = URL.createObjectURL(blob);
+                              const anchor = document.createElement('a');
+                              anchor.href = url;
+                              anchor.download = file.name;
+                              anchor.click();
+                              URL.revokeObjectURL(url);
+                            })
+                          }
+                        >
+                          <Download size={13} /> {file.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <div className="iw-run-actions">
                     <details className="iw-run-details">
                       <summary>运行详情</summary>
@@ -728,7 +863,7 @@ export function InquiryWorkspace({
                         恢复指令并重试
                       </button>
                     )}
-                    {running && (
+                    {(running || run.status === 'needs_input') && (
                       <button
                         className="button button-ghost iw-run-cancel"
                         disabled={busy}
@@ -749,6 +884,84 @@ export function InquiryWorkspace({
               )}
               <ErrorNotice error={runQuery.error} onRetry={() => void runQuery.refetch()} />
             </div>
+            {mode === 'real' && (
+              <details>
+                <summary>引用知识与核价条件</summary>
+                <ErrorNotice
+                  error={references.error || supplierOffers.error}
+                  onRetry={() => {
+                    void references.refetch();
+                    void supplierOffers.refetch();
+                  }}
+                />
+                <label className="field">
+                  本次参考资料（草稿仅供参考）
+                  <select
+                    multiple
+                    aria-label="本次参考资料"
+                    disabled={!canWrite}
+                    value={
+                      selectedSources ?? revision?.sourceRefs.map((s) => s.sourceVersionId) ?? []
+                    }
+                    onChange={(e) =>
+                      setSelectedSources(Array.from(e.target.selectedOptions, (o) => o.value))
+                    }
+                  >
+                    {references.data?.items
+                      .filter((s) => s.status !== 'revoked')
+                      .map((s) => (
+                        <option
+                          key={`${s.sourceId}:v${s.version}`}
+                          value={`${s.sourceId}:v${s.version}`}
+                        >
+                          {s.title} · V{s.version} · {s.status === 'published' ? '已发布' : '草稿'}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <label className="field">
+                  供应商报价
+                  <select
+                    aria-label="供应商报价"
+                    value={offerId}
+                    disabled={!canWrite}
+                    onChange={(e) => setOfferId(e.target.value)}
+                  >
+                    <option value="">请选择已录入的报价</option>
+                    {supplierOffers.data?.items.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.supplier} · MOQ {o.moq}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {(['exchangeRate', 'margin', 'quantity'] as const).map((key) => (
+                  <label className="field" key={key}>
+                    {
+                      { exchangeRate: '汇率（CNY/USD）', margin: '毛利率（%）', quantity: '数量' }[
+                        key
+                      ]
+                    }
+                    <input
+                      type="number"
+                      step={key === 'quantity' ? '1' : 'any'}
+                      value={costInputs[key]}
+                      disabled={!canWrite}
+                      onChange={(e) => setCostInputs((old) => ({ ...old, [key]: e.target.value }))}
+                    />
+                  </label>
+                ))}
+                <Link to={`/workbench?case=${encodeURIComponent(inquiryId)}`}>
+                  维护供应商原件、报价及业务审批
+                </Link>
+                <button
+                  className="button button-ghost"
+                  onClick={() => void supplierOffers.refetch()}
+                >
+                  刷新报价列表
+                </button>
+              </details>
+            )}
             <InquiryComposer
               session={session}
               inquiryId={inquiryId}
@@ -766,6 +979,9 @@ export function InquiryWorkspace({
               onOriginal={() => openDocument('original')}
             />
             <div className="iw-case-actions">
+              {mode === 'real' && (
+                <Link to={`/workbench?case=${encodeURIComponent(inquiryId)}`}>业务资料与审批</Link>
+              )}
               {inquiry.businessStatus === 'active' && (
                 <button
                   disabled={running || busy || (!!revision && draftsPending)}
@@ -792,8 +1008,27 @@ export function InquiryWorkspace({
       {modal === 'original' && (
         <Modal title="客户原始询盘" onClose={() => setModal(null)}>
           <p className="iw-muted">客户：{inquiry.customer} · 原文留档</p>
+          <CustomerContextCard inquiry={inquiry} />
           <pre className="iw-original-full">{inquiry.originalText}</pre>
         </Modal>
+      )}
+      {generation && (
+        <GenerateNodeDialog
+          inquiry={inquiry}
+          base={base}
+          path={path}
+          node={generation.node}
+          instruction={generation.instruction}
+          onClose={() => setGeneration(null)}
+          onStarted={(r) => {
+            setGeneration(null);
+            setLastRunId(r.id);
+            setRevisionNumber(null);
+            showAIChat();
+            queryClient.setQueryData(['run', scope, r.id], r);
+            void refresh();
+          }}
+        />
       )}
       {modal === 'waiting' && (
         <Modal title="标记为待确认" onClose={() => setModal(null)}>

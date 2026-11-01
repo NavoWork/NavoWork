@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "catalog_id": "bom-demo-v1",
+  "scenarios": [
+    {
+      "id": "clear",
+      "workflow": "bom",
+      "operation": "extract",
+      "inputs": {
+        "image": {
+          "kind": "bytes",
+          "sha256": "b2444d6d13436fec7ea01e88356838a7ce62250de6d970818608fedd8d52297d"
+        }
+      },
+      "output": {
+        "path": "clear.fake.json",
+        "sha256": "abfa5bb5e86df0d438e1d207ab3e4f363618e7e0568db596e6c847d581000846"
+      }
+    },
+    {
+      "id": "missing_price",
+      "workflow": "bom",
+      "operation": "extract",
+      "inputs": {
+        "image": {
+          "kind": "bytes",
+          "sha256": "0ab4eea80b2f84f9bdb1b744c96af6a3817ac61f857733e69ec1e301d638aa27"
+        }
+      },
+      "output": {
+        "path": "missing_price.fake.json",
+        "sha256": "24c40aee67c119f12932b55f18430ab0264845a39f867d948b66bbb779965290"
+      }
+    },
+    {
+      "id": "blurry_digit",
+      "workflow": "bom",
+      "operation": "extract",
+      "inputs": {
+        "image": {
+          "kind": "bytes",
+          "sha256": "73b1ddc338909aab2bccb46f120a6272e362ac5aee11d95693f2afe4673e34bc"
+        }
+      },
+      "output": {
+        "path": "blurry_digit.fake.json",
+        "sha256": "e0b2a5b521dc7dbbf1ec558caa92807a799e6030bd58e3023a2945939fd9bd33"
+      }
+    },
+    {
+      "id": "total_conflict",
+      "workflow": "bom",
+      "operation": "extract",
+      "inputs": {
+        "image": {
+          "kind": "bytes",
+          "sha256": "78f00ddd583632420f2e7260ce16ad480caa7e679e1d6d2b91e9e6aa1833a6fb"
+        }
+      },
+      "output": {
+        "path": "total_conflict.fake.json",
+        "sha256": "e075c9868d175b2848b40c217f021fdbc05061425bced6bdb7e432a535f57980"
+      }
+    },
+    {
+      "id": "changed_number",
+      "workflow": "bom",
+      "operation": "extract",
+      "inputs": {
+        "image": {
+          "kind": "bytes",
+          "sha256": "57e80215e164b0d65030d9b961766db3d3aa18277942d6908502c5b288f2c315"
+        }
+      },
+      "output": {
+        "path": "changed_number.fake.json",
+        "sha256": "1d52170f8e95acdda599f105ced640eb3f6b88e0217fefcc32dd87262ce16f70"
+      }
+    }
+  ]
+}

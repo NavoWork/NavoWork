@@ -14,7 +14,8 @@
     "test": "npm run test --workspaces --if-present",
     "test:e2e": "npm run test:e2e --workspace=fontend --",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "test:e2e:mock": "npm run test:e2e:mock --workspace=fontend --"
   },
   "devDependencies": {
     "prettier": "^3.9.10"

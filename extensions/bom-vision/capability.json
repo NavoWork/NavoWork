@@ -1,0 +1,59 @@
+{
+  "id": "bom-vision",
+  "version": "0.2.0",
+  "demo_mode": "mock",
+  "mock_implementation": "complete_independent_entrypoint",
+  "mock_acceptance": "five_bom_fixtures_and_two_json_steps_passed",
+  "mock_entrypoints": {
+    "generic": "demo_mock.Catalog.replay",
+    "generic_cli": "python -m demo_mock",
+    "bom": "bom_vision.mock.mock_recognize",
+    "bom_cli": "python -m bom_vision.mock_cli"
+  },
+  "mock_dependencies": ["preconfigured local fixture catalog", "host-authorized input bytes and runtime FileRef"],
+  "maturity": "independent_candidate_capability",
+  "standalone_implementation": "complete",
+  "real_vision_acceptance": "not_accepted_model_not_configured",
+  "main_chain_integration": "blocked_missing_host_file_tools_and_agent_kit",
+  "input": {
+    "media_types": ["image/png", "image/jpeg"],
+    "max_bytes": 10485760,
+    "max_pixels": 25000000,
+    "scope": "single clear BOM image; printed table, no multi-page stitching"
+  },
+  "entrypoints": {
+    "recognize": "bom_vision.core.recognize",
+    "correct": "bom_vision.core.correct",
+    "revalidate": "bom_vision.core.revalidate",
+    "host_seam": "bom_vision.integration.recognize_tool",
+    "cli": "python -m bom_vision"
+  },
+  "result_data": {
+    "schema_version": "bom-vision-candidate-v1",
+    "status": "candidate",
+    "fields": ["material_name", "specification", "quantity", "unit", "unit_price", "currency", "subtotal"],
+    "table_fields": ["table_total", "currency"],
+    "evidence": ["opaque_file_ref", "sha256", "raw_model_response", "original_extraction", "visual_row_number", "row_raw_text"],
+    "review": ["missing_fields_as_issues", "uncertain_fields", "notes", "versioned_correction_history"]
+  },
+  "real_vision_dependencies": [
+    "vision-capable OpenAI-compatible Chat Completions model",
+    "MODEL_NAME and MODEL_API_KEY supplied by runtime",
+    "host Case authorization and immutable versioned file read",
+    "host ExecutionContext, FileRef, Citation and ToolResult factories",
+    "host candidate persistence, optimistic concurrency and audit identity"
+  ],
+  "agent_kit_compatibility": {
+    "revision": "d23ab0a9ecba4dffd4ce0aa97bd496bf668aa156",
+    "contract_tests": "3 passed",
+    "registration": "not_connected_host_owned"
+  },
+  "non_capabilities": [
+    "supplier price approval",
+    "quotation calculator",
+    "automatic currency or unit conversion",
+    "reliable image coordinates",
+    "Worker registration or Case authorization implementation",
+    "automatic production release"
+  ]
+}

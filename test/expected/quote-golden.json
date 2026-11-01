@@ -1,0 +1,36 @@
+{
+  "kind": "deterministic_quote_oracle",
+  "all_values_simulated": true,
+  "case_id": "BAG-2026-DE-001",
+  "source_ids": {
+    "supplier_a": "src-bag-2026-de-001-factory-a-quote",
+    "supplier_b": "src-bag-2026-de-001-factory-b-quote",
+    "supplier_a_color_box_update": "src-bag-2026-de-001-factory-a-color-box-update"
+  },
+  "formula": "ceil_cent((cost_cny_per_piece / fx_cny_per_usd) / (1 - target_gross_margin))",
+  "rounding": "ROUND_UP to USD 0.01 per unit, then multiply by quantity",
+  "assumptions": {
+    "fx_cny_per_usd": "7.20",
+    "target_gross_margin": "0.20",
+    "quantity_pieces": "3000"
+  },
+  "results": {
+    "supplier_a_v1": {
+      "cost_cny_per_piece": "50.00",
+      "unit_usd": "8.69",
+      "total_usd": "26070.00"
+    },
+    "supplier_b": {
+      "cost_cny_per_piece": "52.00",
+      "unit_usd": "9.03",
+      "total_usd": "27090.00"
+    },
+    "supplier_a_v2": {
+      "cost_cny_per_piece": "53.00",
+      "unit_usd": "9.21",
+      "total_usd": "27630.00",
+      "delta_unit_usd": "0.52",
+      "delta_total_usd": "1560.00"
+    }
+  }
+}

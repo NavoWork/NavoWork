@@ -59,7 +59,7 @@ test('快捷输入、键盘选择和移除保留正文，Esc 关闭，中文输�
   await expect(work(page).getByRole('region', { name: 'AI 处理进度' })).toHaveCount(0);
 });
 
-test('选择按询盘保存，发送后消息、运行和版本保留快照，刷新后仍可回看', async ({ page }) => {
+test('选择按询盘保存，发送后消息、运行和版本保留快照，刷新后仍可回看', async ({ page }, info) => {
   await open(page);
   await selectContext(page);
   await input(page).fill('核对600件报价和交期');
@@ -68,7 +68,7 @@ test('选择按询盘保存，发送后消息、运行和版本保留快照，�
   await expect(composer(page).getByLabel('移除知识 交付与承诺规则', { exact: true })).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 960 });
   await composer(page).getByRole('button', { name: '选择技能', exact: true }).click();
-  await page.screenshot({ path: '../tmp/inquiry-context-desktop.png' });
+  await page.screenshot({ path: info.outputPath('inquiry-context-desktop.png') });
   await composer(page).getByLabel('关闭选择器', { exact: true }).click();
   await open(page, 'inq_de014');
   await expect(composer(page).locator('.iw-context-chip')).toHaveCount(0);
@@ -131,7 +131,7 @@ test('本机存储失败时保留输入与选择并提示，恢复后可以重�
   await expect(composer(page).locator('.iw-context-chip')).toHaveCount(2);
 });
 
-test('新建与导入知识可以立即引用，移动端深色选择器保持在视口内', async ({ page }) => {
+test('新建与导入知识可以立即引用，移动端深色选择器保持在视口内', async ({ page }, info) => {
   await open(page, 'inq_de014');
   await page.getByRole('button', { name: '知识库', exact: true }).click();
   await page.getByRole('button', { name: '新建文档', exact: true }).click();
@@ -178,7 +178,7 @@ test('新建与导入知识可以立即引用，移动端深色选择器保持�
   const box = await composer(page).getByRole('dialog').boundingBox();
   expect(box!.y).toBeGreaterThanOrEqual(0);
   expect(box!.x + box!.width).toBeLessThanOrEqual(390);
-  await page.screenshot({ path: '../tmp/inquiry-context-mobile.png' });
+  await page.screenshot({ path: info.outputPath('inquiry-context-mobile.png') });
 });
 
 test('提交失败保留选择，运行失败可以恢复同一份上下文重试', async ({ page }) => {

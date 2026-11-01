@@ -55,7 +55,7 @@ test('笔记、分类、草稿和附件自动归档，修改与刷新不重复�
     .locator('.ic-directory')
     .getByRole('button', { name: '客户需求与规格', exact: true })
     .press('Enter');
-  await work.getByLabel('编辑客户需求与规格').fill('客户确认需要牛皮纸包装。');
+  await work.getByLabel('需求规格', { exact: true }).fill('客户确认需要牛皮纸包装。');
   await work.getByLabel('新建资料', { exact: true }).click();
   await work.getByRole('button', { name: '新建文件夹', exact: true }).click();
   await page.getByLabel('文件夹名称', { exact: true }).fill('客户包装');

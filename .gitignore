@@ -5,4 +5,18 @@ dist/
 *.tsbuildinfo
 test-results/
 playwright-report/
+backend/.venv/
+backend/data/
+backend/storage/
+backend/.pytest_cache/
+backend/**/__pycache__/
+backend/*.egg-info/
 .DS_Store
+demo/.previews/
+demo/__pycache__/
+__pycache__/
+demo/competition_v1/sources/*.inspect.ndjson
+
+# local root-level test data
+data/
+storage/

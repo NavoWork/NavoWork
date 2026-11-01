@@ -1,0 +1,875 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "order-skills/pi-prepare/output (domain data only)",
+  "$ref": "#/$defs/piResult",
+  "$defs": {
+    "piResult": {
+      "type": "object",
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "document_kind": {
+          "const": "proforma_invoice"
+        },
+        "status": {
+          "const": "draft"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content": {
+          "type": "object",
+          "properties": {
+            "pi_number": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "issue_date": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "commercial_terms": {
+              "$ref": "#/$defs/document"
+            },
+            "comparison_basis": {
+              "$ref": "#/$defs/basis"
+            }
+          },
+          "required": [
+            "pi_number",
+            "issue_date",
+            "commercial_terms",
+            "comparison_basis"
+          ],
+          "additionalProperties": false
+        },
+        "sample_review": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sampleResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "po_review": {
+          "$ref": "#/$defs/poResult"
+        },
+        "execution_prerequisites": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "minLength": 1
+              },
+              "state": {
+                "enum": [
+                  "pending",
+                  "evidence_supported"
+                ]
+              },
+              "sample_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "spec_version_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "key",
+              "state"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "pending_confirmations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "key",
+              "reason"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/finding"
+          }
+        },
+        "signed": {
+          "const": false
+        },
+        "payment_received": {
+          "const": false
+        },
+        "production_released": {
+          "const": false
+        },
+        "file_generation": {
+          "const": "host_tool_required"
+        },
+        "notice": {
+          "type": "string",
+          "minLength": 1
+        },
+        "order_skills": {
+          "$ref": "#/$defs/bindingMetadata"
+        }
+      },
+      "required": [
+        "case_id",
+        "document_kind",
+        "status",
+        "title",
+        "content",
+        "sample_review",
+        "po_review",
+        "execution_prerequisites",
+        "pending_confirmations",
+        "findings",
+        "signed",
+        "payment_received",
+        "production_released",
+        "file_generation",
+        "notice"
+      ],
+      "additionalProperties": false
+    },
+    "document": {
+      "type": "object",
+      "properties": {
+        "buyer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "seller": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "total_quantity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "total_amount": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "currency": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "incoterm": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "named_place": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "incoterms_edition": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payment_terms": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "spec_version_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "delivery_terms": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lines": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/line"
+          }
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "field": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "raw": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evidence": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/evidence"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "object",
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quote": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "locator": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "object",
+              "minProperties": 1
+            }
+          ]
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "line": {
+      "type": "object",
+      "properties": {
+        "line_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sku": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "quantity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unit_price": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "amount": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "line_id"
+      ],
+      "additionalProperties": false
+    },
+    "basis": {
+      "type": "object",
+      "properties": {
+        "version_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "draft",
+            "reviewed",
+            "released",
+            "superseded"
+          ]
+        },
+        "customer_acceptance_supported": {
+          "type": "boolean"
+        },
+        "customer_acceptance": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/statement"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "version_id",
+        "status",
+        "customer_acceptance_supported",
+        "customer_acceptance"
+      ],
+      "additionalProperties": false
+    },
+    "statement": {
+      "type": "object",
+      "properties": {
+        "decision": {
+          "enum": [
+            "full",
+            "partial",
+            "conditional",
+            "rejected",
+            null
+          ]
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sample_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/evidence"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "sampleResult": {
+      "type": "object",
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sample_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "spec_version_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "response_kind": {
+          "enum": [
+            "full",
+            "partial",
+            "conditional",
+            "rejected",
+            "unknown"
+          ]
+        },
+        "sample_approval_supported": {
+          "type": "boolean"
+        },
+        "approval_scope": {
+          "const": "sample_review_only"
+        },
+        "feedback": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/feedback"
+          }
+        },
+        "modifications": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/modification"
+          }
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "response": {
+          "$ref": "#/$defs/statement"
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/finding"
+          }
+        },
+        "production_release": {
+          "const": "not_evaluated"
+        },
+        "order_skills": {
+          "$ref": "#/$defs/bindingMetadata"
+        }
+      },
+      "required": [
+        "case_id",
+        "sample_id",
+        "spec_version_id",
+        "response_kind",
+        "sample_approval_supported",
+        "approval_scope",
+        "feedback",
+        "modifications",
+        "conditions",
+        "response",
+        "findings",
+        "production_release"
+      ],
+      "additionalProperties": false
+    },
+    "feedback": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requested_change": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/evidence"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "field",
+        "observation"
+      ],
+      "additionalProperties": false
+    },
+    "modification": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requested_change": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/evidence"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sample_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "spec_version_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "const": "proposed_requires_review"
+        }
+      },
+      "required": [
+        "sample_id",
+        "spec_version_id",
+        "field",
+        "observation",
+        "requested_change",
+        "evidence",
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "finding": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "enum": [
+            "review",
+            "block",
+            "info"
+          ]
+        }
+      },
+      "required": [
+        "code",
+        "path",
+        "message",
+        "severity"
+      ],
+      "additionalProperties": false
+    },
+    "bindingMetadata": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contract_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "citations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "file_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "locator": {
+                "type": "object"
+              },
+              "excerpt": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000
+              }
+            },
+            "required": [
+              "file_id",
+              "sha256",
+              "locator",
+              "excerpt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "host_draft_data": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "operation",
+        "contract_revision",
+        "citations",
+        "blockers"
+      ],
+      "additionalProperties": false
+    },
+    "poResult": {
+      "type": "object",
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "basis": {
+          "$ref": "#/$defs/basis"
+        },
+        "differences": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/difference"
+          }
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/finding"
+          }
+        },
+        "po": {
+          "$ref": "#/$defs/document"
+        },
+        "baseline_document": {
+          "$ref": "#/$defs/document"
+        },
+        "comparison_complete": {
+          "type": "boolean"
+        },
+        "order_execution_authorized": {
+          "const": false
+        },
+        "order_skills": {
+          "$ref": "#/$defs/bindingMetadata"
+        }
+      },
+      "required": [
+        "case_id",
+        "basis",
+        "differences",
+        "findings",
+        "po",
+        "baseline_document",
+        "comparison_complete",
+        "order_execution_authorized"
+      ],
+      "additionalProperties": false
+    },
+    "difference": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "po": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "baseline": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "path",
+        "po",
+        "baseline"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

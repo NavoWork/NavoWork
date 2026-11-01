@@ -3,7 +3,7 @@ import { ArrowUp, BookOpen, Check, Paperclip, Search, Sparkles, X } from 'lucide
 import type { Session } from '../api';
 import { ErrorNotice } from '../components/ui';
 import { inlineContextToken, type ComposerContext } from './inquiry-context';
-import { marketItems } from './skill-market-data';
+import { useAvailableSkills } from './skill-catalog';
 import { useWikiDocuments } from './wiki-store';
 import './inquiry-composer.css';
 
@@ -42,6 +42,7 @@ export function InquiryComposer({
   onOriginal: () => void;
 }) {
   const wiki = useWikiDocuments(session);
+  const catalog = useAvailableSkills(session);
   const [picker, setPicker] = useState<Picker | null>(null);
   const [active, setActive] = useState(0);
   const [dismissed, setDismissed] = useState('');
@@ -53,7 +54,7 @@ export function InquiryComposer({
   const keyword = picker?.query.trim().toLocaleLowerCase() || '';
   const items =
     picker?.kind === 'skills'
-      ? marketItems.skills
+      ? catalog.skills
           .filter((item) =>
             `${item.name} ${item.id} ${item.description} ${item.tags.join(' ')}`
               .toLocaleLowerCase()
@@ -125,12 +126,12 @@ export function InquiryComposer({
     } else {
       const doc = wiki.docs.find((value) => value.id === item.id);
       if (!doc) return;
-      const { id, title, folder, content, updated } = doc;
+      const { id, title, folder, content, updated, sourceVersionId } = doc;
       onSelection({
         ...selection,
         knowledge: item.selected
           ? selection.knowledge.filter((value) => value.id !== id)
-          : [...selection.knowledge, { id, title, folder, content, updated }],
+          : [...selection.knowledge, { id, title, folder, content, updated, sourceVersionId }],
       });
     }
     let caret = textarea.current?.selectionStart ?? input.length;
@@ -232,6 +233,9 @@ export function InquiryComposer({
           {picker.kind === 'knowledge' && (
             <ErrorNotice error={wiki.error} onRetry={() => void wiki.retry()} />
           )}
+          {picker.kind === 'skills' && (
+            <ErrorNotice error={catalog.error} onRetry={() => void catalog.retry()} />
+          )}
           <div
             className="iw-picker-options"
             role="listbox"
@@ -263,8 +267,8 @@ export function InquiryComposer({
             ))}
             {!items.length && (
               <p className="iw-picker-empty" role="status">
-                {picker.kind === 'knowledge' && wiki.loading
-                  ? '正在读取知识库…'
+                {(picker.kind === 'knowledge' ? wiki.loading : catalog.loading)
+                  ? '正在读取可用内容…'
                   : '没有找到匹配内容'}
               </p>
             )}
@@ -275,7 +279,7 @@ export function InquiryComposer({
       {(selection.skillIds.length > 0 || selection.knowledge.length > 0) && (
         <div className="iw-context-chips" aria-label="本次消息的技能与知识">
           {selection.skillIds.map((skillId) => {
-            const skill = marketItems.skills.find((item) => item.id === skillId);
+            const skill = catalog.skills.find((item) => item.id === skillId);
             return (
               <span className="iw-context-chip skill" key={skillId}>
                 <Sparkles size={12} />

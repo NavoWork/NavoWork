@@ -1,0 +1,25 @@
+E03 step=1 [EVENT_COVERAGE] operation lacks read event for selected source
+E03 step=1 [AMOUNT_MISMATCH] quote must equal independent per-unit ceiling oracle
+E03 step=1 [SOURCE_VERSION_MISMATCH] citation must use explicitly pinned source bytes
+E03 step=1 [EVENT_COVERAGE] no read event for pinned cost source
+E03 step=1 [FILE_CONTENT_MISMATCH] actual artifact quote differs from result/oracle
+E03 step=1 [CITATION_FIELD_MISMATCH] resolved citation does not support artifact cost
+E07 step=1 [EVENT_COVERAGE] operation lacks read event for selected source
+E07 step=1 [AMOUNT_MISMATCH] quote must equal independent per-unit ceiling oracle
+E07 step=1 [SOURCE_VERSION_MISMATCH] citation must use explicitly pinned source bytes
+E07 step=1 [EVENT_COVERAGE] no read event for pinned cost source
+E07 step=1 [FILE_CONTENT_MISMATCH] actual artifact quote differs from result/oracle
+E07 step=1 [CITATION_FIELD_MISMATCH] resolved citation does not support artifact cost
+E12 step=1 [STATUS_MISMATCH] expected conflict, got draft
+E12 step=1 [EVENT_COVERAGE] operation lacks read event for selected source
+E12 step=1 [BLOCK_REASON] missing or incorrect actionable blocker
+E12 step=1 [ACCESS_STATUS] expected permission/conflict status
+PRECONDITION [FIXTURE_HASH_MISMATCH] test/inputs/BAG-2026-DE-001/factory-B-quote.pdf
+PRECONDITION [FIXTURE_HASH_MISMATCH] test/inputs/BAG-2026-DE-001/po-correct.pdf
+PRECONDITION [FIXTURE_HASH_MISMATCH] test/inputs/BAG-2026-DE-001/po-conflict.pdf
+PRECONDITION [FIXTURE_HASH_MISMATCH] test/inputs/BAG-2026-DE-002/supplier-incomplete.pdf
+PRECONDITION [FIXTURE_HASH_MISMATCH] test/inputs/BAG-2026-DE-003/supplier-reply.pdf
+PRECONDITION [FIXTURE_HASH_MISMATCH] test/core15/evidence/original-inquiry.eml
+PRECONDITION [FIXTURE_HASH_MISMATCH] test/core15/evidence/original-change-color-box.eml
+PRECONDITION [FIXTURE_HASH_MISMATCH] test/core15/evidence/original-customer-conditional-confirmation.eml
+NOT_ACCEPTED [MAIN_CHAIN_BLOCKED] Real Agent/Worker integration and independent model/visual evidence are pending.

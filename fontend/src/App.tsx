@@ -33,6 +33,7 @@ import { api, mode, setMockFault } from './api';
 import type { Inquiry, Session } from './api/types';
 import { ErrorNotice, IconButton, Loading, Modal } from './components/ui';
 import { CreateInquiry } from './features/CreateInquiry';
+import { InquiryWorkbench } from './features/workbench-v2/InquiryWorkbench';
 import { InquiryWorkspace } from './features/InquiryWorkspace';
 import { WorkHome } from './features/workbench/WorkHome';
 import { BrandMark } from './components/BrandMark';
@@ -44,9 +45,13 @@ const SkillMarket = lazy(() =>
   import('./features/SkillMarket').then((module) => ({ default: module.SkillMarket })),
 );
 const TradeWorkbench = lazy(() =>
-  import('./features/workbench/TradeWorkbench').then((module) => ({
-    default: module.TradeWorkbench,
-  })),
+  mode === 'real'
+    ? import('./features/workbench/RealWorkbench').then((module) => ({
+        default: module.RealWorkbench,
+      }))
+    : import('./features/workbench/TradeWorkbench').then((module) => ({
+        default: module.TradeWorkbench,
+      })),
 );
 
 function Brand({ onClick }: { onClick?: () => void }) {
@@ -295,6 +300,8 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
     if (isTrade) setTradeOpened(true);
   }, [isTrade]);
   const { id, invalid: invalidPath } = parseInquiryPath(path);
+  const canvasView =
+    mode === 'mock' || new URLSearchParams(location.search).get('view') === 'canvas';
   const page =
     path === '/knowledge'
       ? 'knowledge'
@@ -304,7 +311,9 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
           ? 'capabilities'
           : 'home';
   const activeTitle = isTrade
-    ? '德国客户 · 定制背包'
+    ? mode === 'real'
+      ? '包袋出口工作台'
+      : '德国客户 · 定制背包'
     : id
       ? tabs.find((t) => t.id === id)?.title || '询盘详情'
       : {
@@ -457,10 +466,10 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
                 }}
               >
                 <FileText size={15} />
-                <span>德国定制背包 · 报价</span>
+                <span>{mode === 'real' ? '包袋出口工作台' : '德国定制背包 · 报价'}</span>
               </button>
               <IconButton
-                label="关闭德国背包工作标签"
+                label={mode === 'real' ? '关闭包袋出口工作台标签' : '关闭德国背包工作标签'}
                 onClick={() => {
                   setTradeOpened(false);
                   if (isTrade) navigate(homeUrl.current);
@@ -534,10 +543,28 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
             <strong>{id ? '询盘工作区' : activeTitle}</strong>
           </div>
           <div className="topbar-actions">
+            {id && mode === 'real' && (
+              <div role="group" aria-label="询盘视图">
+                <button
+                  className="button button-ghost"
+                  aria-pressed={!canvasView}
+                  onClick={() => navigate(`/inquiries/${encodeURIComponent(id)}`)}
+                >
+                  业务流程
+                </button>
+                <button
+                  className="button button-ghost"
+                  aria-pressed={canvasView}
+                  onClick={() => navigate(`/inquiries/${encodeURIComponent(id)}?view=canvas`)}
+                >
+                  资料画板
+                </button>
+              </div>
+            )}
             <ThemeSwitch />
             <span className="mode-label">
               <span className="connection-dot" />
-              {isTrade ? '前端演示 · 本地保存' : mode === 'mock' ? '演示工作空间' : '真实服务'}
+              {mode === 'mock' ? '演示工作空间 · 本地保存' : '真实服务 · 服务端保存'}
             </span>
             <IconButton label="工作空间设置" onClick={() => setSettings(true)}>
               <Settings2 size={15} />
@@ -582,7 +609,7 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
           {!id && !isTrade && page !== 'home' && (
             <Suspense fallback={<Loading label="正在打开资源" />}>
               {page === 'capabilities' ? (
-                <SkillMarket />
+                <SkillMarket session={session} />
               ) : (
                 <Resources key={page} page={page} session={session} />
               )}
@@ -591,7 +618,11 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
           {tabs.map((t) => (
             <div key={t.id} hidden={id !== t.id} className="inquiry-mount">
               <FeatureBoundary>
-                <InquiryWorkspace inquiryId={t.id} session={session} onChanged={changed} />
+                {canvasView ? (
+                  <InquiryWorkspace inquiryId={t.id} session={session} onChanged={changed} />
+                ) : (
+                  <InquiryWorkbench inquiryId={t.id} session={session} onChanged={changed} />
+                )}
               </FeatureBoundary>
             </div>
           ))}
@@ -637,7 +668,7 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
                   </select>
                 </label>
                 <p className="preferences-note">
-                  用于检查错误提示和重试路径。关闭弹窗后执行对应操作；模拟故障不会调用真实模型。
+                  用于检查错误提示和重试路径。关闭弹窗后执行对应操作；故障注入不会调用真实模型。
                 </p>
               </>
             )}

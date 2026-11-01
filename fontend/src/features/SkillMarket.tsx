@@ -1,12 +1,21 @@
 import { useId, useRef, useState, type KeyboardEvent } from 'react';
 import { ArrowRight, Check, Layers3, Puzzle, Search, Sparkles, X } from 'lucide-react';
-import { EmptyState, Modal } from '../components/ui';
+import { EmptyState, ErrorNotice, Loading, Modal } from '../components/ui';
+import { useQuery } from '@tanstack/react-query';
+import { api, mode, type Session } from '../api';
 import { marketItems, marketTabs, type MarketItem, type MarketTab } from './skill-market-data';
 import './skill-market.css';
 
 const tabIcons = { skills: Sparkles, plugins: Puzzle, suites: Layers3 };
 
-export function SkillMarket() {
+export function SkillMarket({ session }: { session: Session }) {
+  type ServerItem = Omit<MarketItem, 'icon'> & { tab: MarketTab; status: 'available' | 'disabled' | 'planned' };
+  const catalog = useQuery({ queryKey: ['skill-market', session.workspace.id, session.user.id], enabled: mode === 'real',
+    queryFn: ({ signal }) => api.get<{ items: ServerItem[] }>(`/workspaces/${session.workspace.id}/skill-market`, signal) });
+  const catalogItems: Record<MarketTab, MarketItem[]> = mode === 'mock' ? marketItems : { skills: [], plugins: [], suites: [] };
+  if (mode === 'real') for (const item of catalog.data?.items || []) {
+    catalogItems[item.tab].push({ ...item, icon: tabIcons[item.tab], tags: [{ available: '已接入', disabled: '已停用', planned: '规划中' }[item.status], ...item.tags] });
+  }
   const [tab, setTab] = useState<MarketTab>('skills');
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<MarketItem | null>(null);
@@ -14,7 +23,7 @@ export function SkillMarket() {
   const id = useId();
   const current = marketTabs.find((item) => item.id === tab)!;
   const keyword = query.trim().toLocaleLowerCase();
-  const items = marketItems[tab].filter((item) =>
+  const items = catalogItems[tab].filter((item) =>
     [item.name, item.description, item.category, ...item.tags, ...item.includes]
       .join(' ')
       .toLocaleLowerCase()
@@ -41,6 +50,8 @@ export function SkillMarket() {
 
   return (
     <div className="feature-page skill-market">
+      <ErrorNotice error={catalog.error} onRetry={() => void catalog.refetch()} />
+      {mode === 'real' && catalog.isLoading && <Loading label="正在读取可用能力" />}
       <header className="market-heading">
         <h1>技能市场</h1>
       </header>
@@ -66,7 +77,7 @@ export function SkillMarket() {
               >
                 <Icon size={16} />
                 {item.label}
-                <span className="market-tab-count">{marketItems[item.id].length}</span>
+                <span className="market-tab-count">{catalogItems[item.id].length}</span>
               </button>
             );
           })}

@@ -1,0 +1,12 @@
+From: Navo Demo Pricing Manager <approvals@navo-demo.invalid>
+To: Sales <sales@navo-demo.invalid>
+Subject: Approval: BAG-2026-DE-001 quotation V2
+Date: Fri, 23 Oct 2026 13:00:00 +0800
+Message-ID: <fedba5c0c3048e0f@demo.invalid>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+X-Demo-Data: SIMULATED
+
+I approve Quotation V2 for BAG-2026-DE-001 only: 3,000 pieces at USD 9.21 each, total USD 27,630, FOB Ningbo, based on Factory A's simulated CNY 53.00 estimated cost and 7.20 FX / 20% target gross margin demo assumptions. This approval is version- and pricing-scope-specific. It does not confirm supplier production capacity, sample approval, MOQ for custom box or production release.
+
+SIMULATED INTERNAL APPROVAL.

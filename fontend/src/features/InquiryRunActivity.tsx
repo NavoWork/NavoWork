@@ -15,13 +15,13 @@ const phases = [
     id: 'retrieving',
     label: '查阅资料',
     title: '正在查阅相关资料',
-    detail: '查找已发布的商品与价格资料，为方案补充依据。',
+    detail: '读取本次任务已选定的资料版本，为处理提供依据。',
   },
   {
     id: 'calculating',
-    label: '计算报价',
-    title: '正在计算方案报价',
-    detail: '结合商品、数量和交付条件，整理可行的报价方案。',
+    label: '业务分析',
+    title: '正在执行本次业务分析',
+    detail: '根据任务计算成本，或分析变更对流程节点的影响。',
   },
   {
     id: 'composing',
@@ -119,18 +119,20 @@ export function InquiryRunActivity({ run }: { run: Run }) {
       )}
       <ol className="iw-run-steps" aria-label="处理阶段">
         {phases.map((step, index) => {
-          const complete = run.status === 'succeeded' || (!queued && index < phaseIndex);
+          const complete = run.completedPhases ? run.completedPhases.includes(step.id) : run.status === 'succeeded' || (!queued && index < phaseIndex);
+          const skipped = run.status === 'succeeded' && !complete;
           const current = active && !queued && index === phaseIndex;
           return (
             <li
               key={step.id}
               className={complete ? 'is-complete' : current ? 'is-current' : ''}
               aria-current={current ? 'step' : undefined}
-              title={`${step.label} · ${complete ? '已完成' : current ? '处理中' : '未完成'}`}
+              title={`${step.label} · ${complete ? '已完成' : current ? '处理中' : skipped ? '本次未执行' : '未完成'}`}
             >
               <span className="iw-run-step-track" aria-hidden="true" />
               <span>{step.label}</span>
               {complete && <span className="sr-only">，已完成</span>}
+              {skipped && <span className="sr-only">，本次未执行</span>}
             </li>
           );
         })}

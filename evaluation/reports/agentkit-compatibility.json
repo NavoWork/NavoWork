@@ -1,0 +1,214 @@
+{
+  "schema": "navowork-committed-protocol-compatibility/1",
+  "revision": "d23ab0a9ecba4dffd4ce0aa97bd496bf668aa156",
+  "status": "passed",
+  "summary": {
+    "checks": 11,
+    "passed": 11,
+    "failed": 0,
+    "blocked": 0
+  },
+  "implementation_files": {
+    "evaluation/__init__.py": "e1e754a7746ab8a984a51b5ab98c0a9e7faab0eb07ac3025c0e3cc109327ba30",
+    "evaluation/__main__.py": "c6878055ec9c587fcdb9213c634928c414d260c3b97d5ca7071d68a3f2d301f9",
+    "evaluation/adapters.py": "0ade74b750b0ebc11629993c4d4d7e48942b13d388224a3b9236d0cf2c6fcafc",
+    "evaluation/backend_probe.py": "1f9ae8b3a6db9c03a782fd7960904fa8ecba364d8de39bace6c2e332a45c09b5",
+    "evaluation/checker.py": "061a9ea4945e18e86a3057101287833f910628d80e195f5b879cf8e328b9689f",
+    "evaluation/compatibility.py": "bb00c653d2fcc3850ad2ea9eedfb78351b083fd56f16bbd0c83f293481084b7e",
+    "evaluation/fixture_audit.py": "bd3d0f3618167a6897ad365dd3b5cf7d33b6a941bbb5a8fa022f1ce545608b4c",
+    "evaluation/inspection.py": "fd1312d5a8e5770455dc3ae50d65b6eb3cb374411260056a8b38e2e33540a0fb",
+    "evaluation/mutants.py": "9dd18a931877c5988134662f43492849c92c882e59843774b2f3054b52257536",
+    "evaluation/reference_adapter.py": "726bfe91ea04f16010a7337400a0c36cbd80110edfe6e98fb93991c57b1a06c1",
+    "evaluation/runner.py": "51b840c9bd77ac99459fa3d24cb2d721c49abbef94b3134751fe5b804e6c312b",
+    "evaluation/selftest.py": "93b3b5cd7fac15e0154fda486166bffff671dce5b5758f22740fb839ca3bfefc",
+    "evaluation/stdio_adapter.py": "be0fdd353c105c0f771ddd1a2b124fe8f9ba5abd4bf5b43088d61a85988459bf",
+    "evaluation/suite.py": "6e26172f70d082b7f3b16250da816f528765cd5c69731d3248fce0e24c742d76",
+    "evaluation/tests/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "evaluation/tests/test_evaluation.py": "f0e9a5ab4cf1a00281c6d6c93993b70d56be30789228df8f8bc06aa73476a1ef"
+  },
+  "committed_source_sha256": {
+    "agent-kit/src/navowork_agent/__init__.py": "112cfb5d891a65ef067d90dd4553afd8722cf518299d1570046a066bf7612832",
+    "agent-kit/src/navowork_agent/adapters/local.py": "1e8b3cea65345efb59a46ec97b87b7c02096636c73ec3c5ae6f0dcb8b3339931",
+    "agent-kit/src/navowork_agent/cli.py": "6354e9ad6681e106dc42f0af04c4f45c740d3f4888c6599130b6f303aa645ed6",
+    "agent-kit/src/navowork_agent/contracts/__init__.py": "a86261f69de47571c6f940fb99af01d4fc292e70f1694c2e83d15cc5a449eb58",
+    "agent-kit/src/navowork_agent/ports/__init__.py": "29589d8ca50a160051f3b441ba1d8b9521828c464fead6a3f909613dc5330039",
+    "agent-kit/src/navowork_agent/runtime/agent.py": "f0a3f856231563d86344b94d209e7649b6700d5123a35fcca86a041b009516a6",
+    "agent-kit/src/navowork_agent/skills/prepare-quotation/SKILL.md": "d49bdac4e30f5159bc417f9a6afe31267f768525b867a948e5989a8f0774c101",
+    "agent-kit/src/navowork_agent/skills/revise-related-files/SKILL.md": "d0e538a7e1f1c2b30b4720d7a40352f6c7cbd04f329c5fec1490ca8eee532fc1",
+    "agent-kit/src/navowork_agent/tools/documents.py": "a521c88c013ea23b3a848bbb458d75ac9eedbb87256f916a8dfafd01b6976a06",
+    "agent-kit/src/navowork_agent/tools/formulas.py": "c79df4eb9dcc0e2cdb63eebe4a8a6b5725132ac09df1ad8c1db503d2e97403b9",
+    "agent-kit/src/navowork_agent/tools/pricing.py": "4e86d79a07cd53c2b570194a0a373c4c82a45df97e58b2e43836eb41927b6928",
+    "agent-kit/src/navowork_agent/tools/readers.py": "c7a0cccc4f956a6b9023e422ed645eb9d831f6338c841d98f938b0f7c8a78b5a",
+    "agent-kit/src/navowork_agent/tools/service.py": "e53d0527f09975849905a9613cde38d73f8493baa6ba13904c146df3eef9b774"
+  },
+  "checks": [
+    {
+      "name": "strict_dtos_and_status_roundtrip",
+      "status": "passed",
+      "evidence": {
+        "extra_field_rejection": [
+          "ExecutionContext",
+          "FileRef",
+          "Citation",
+          "ToolResult"
+        ],
+        "native_statuses_preserved": [
+          "success",
+          "needs_info",
+          "needs_review",
+          "blocked",
+          "conflict",
+          "error"
+        ],
+        "mapping": "Evaluation step status is contextual; never collapse needs_review or partial failures into approved/sent."
+      }
+    },
+    {
+      "name": "actual_ports_xlsx_pdf_and_citations",
+      "status": "passed",
+      "evidence": {
+        "xlsx_sha256": "1c5f30c00f2b86fd2df3859462508bbb96e85206589e80e26162468f40db37e3",
+        "pdf_sha256": "341999b783b5a41adee705fe484cb30bc5a2f7dc25a0072e2e47a8c19b464cc4",
+        "pdf_locator": {
+          "page": 1
+        }
+      }
+    },
+    {
+      "name": "sourced_numeric_oracle_and_missing_cost",
+      "status": "passed",
+      "evidence": {
+        "actual_quote": {
+          "cost_cny_per_piece": "50",
+          "unit_usd": "8.69",
+          "total_usd": "26070.00",
+          "quantity": 3000,
+          "rounding": "unit ROUND_CEILING 0.01 USD, then multiply quantity",
+          "rule_version": "quote-v1"
+        },
+        "missing_status": "needs_info"
+      }
+    },
+    {
+      "name": "actual_publish_files_and_amounts",
+      "status": "passed",
+      "evidence": {
+        "outputs": [
+          {
+            "name": "spec-v1.docx",
+            "sha256": "78f8a0743c6cdbddaaa2e28f2465dbe32a3cc280ff4d2ea979f4cd09f5f9b6f5",
+            "bytes": 37058
+          },
+          {
+            "name": "cost-v1.xlsx",
+            "sha256": "d9b64a3c510842f4dad5fff09813972b7b9821f7e7524ab28feaa244bc9a7f24",
+            "bytes": 5887
+          },
+          {
+            "name": "quotation-v1.xlsx",
+            "sha256": "90fc0decaef4ebfedf7f4ca95d806f5ec1f061ae3271729ddfc0d38c76e14efe",
+            "bytes": 5503
+          },
+          {
+            "name": "quotation-v1.pdf",
+            "sha256": "d18602d58a97ffcd4f57926756e1caaaf87e14fff18c3ee291b799f29bd93a09",
+            "bytes": 2069
+          }
+        ],
+        "status": "needs_review",
+        "visual_review": "not_performed"
+      }
+    },
+    {
+      "name": "idempotency_and_conflicting_key",
+      "status": "passed",
+      "evidence": {
+        "retries": 3,
+        "artifact_versions": [
+          1,
+          1,
+          1
+        ],
+        "conflict_code": "IDEMPOTENCY_CONFLICT"
+      }
+    },
+    {
+      "name": "actual_customer_zip_cost_exclusion",
+      "status": "passed",
+      "evidence": {
+        "zip_sha256": "cd32b73e8647994c8ea72470407925c11de922588f7a2b3d09f3309e66dffe02",
+        "bytes": 6954,
+        "audience": "customer",
+        "status": "needs_review"
+      }
+    },
+    {
+      "name": "actual_partial_export_and_branch_retry",
+      "status": "passed",
+      "evidence": {
+        "native_status": "error",
+        "completed_files": 3,
+        "retryable": [
+          "quotation.pdf"
+        ],
+        "incomplete_package_code": "EXPORT_INCOMPLETE",
+        "recovered_pdf_sha256": "23c01a844de00c98a6d90b25260abace74f162a722f313b799b8586e3f43cd12",
+        "mapping": "Preserve native error plus completed outputs and retryable branches; evaluation UI may describe partial completion."
+      }
+    },
+    {
+      "name": "same_name_opaque_identity_and_old_bytes",
+      "status": "passed",
+      "evidence": {
+        "version_1_id": "f_e77b7a9477779a89424154e02662c234",
+        "version_2_id": "f_e74266850b31b306ffdc21aa875bf9d8",
+        "version_field_policy": "FileRef has no version; host retains source-version-to-opaque-ID registry."
+      }
+    },
+    {
+      "name": "actual_immutable_history_and_baseline_CAS",
+      "status": "passed",
+      "evidence": {
+        "old_version": 1,
+        "new_version": 2,
+        "old_snapshot_hash": "e8614ecea181409b1cb265a5e11b0bf3c24384bd20c801f0b4bee98f6da5b5a2",
+        "stale_code": "BASELINE_CONFLICT"
+      }
+    },
+    {
+      "name": "no_shell_external_send_or_approval_tools",
+      "status": "passed",
+      "evidence": {
+        "registered_tools": [
+          "calculate_quote",
+          "edit_file",
+          "export_artifact",
+          "list_artifacts",
+          "list_context",
+          "load_skill",
+          "package_customer_files",
+          "publish_documents",
+          "read_document",
+          "request_info",
+          "validate_artifact"
+        ],
+        "send_rejection": "UNKNOWN_TOOL"
+      }
+    },
+    {
+      "name": "actual_foreign_case_readonly_and_generation_fence",
+      "status": "passed",
+      "evidence": {
+        "foreign_code": "FILE_UNAVAILABLE",
+        "read_only_code": "WRITE_DENIED",
+        "stale_code": "STALE_CONTEXT"
+      }
+    }
+  ],
+  "execution_layer": "offline_actual_committed_agentkit_tools",
+  "backend_worker_integration": "blocked",
+  "real_model_executed": false,
+  "file_visual_review": "not_performed",
+  "product_acceptance": "not_accepted",
+  "evidence_directory": "evaluation/runs/compat-d23ab0a-initial"
+}

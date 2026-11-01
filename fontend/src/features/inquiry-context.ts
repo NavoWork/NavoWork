@@ -7,9 +7,12 @@ export interface ComposerContext {
 }
 export const emptyComposerContext = (): ComposerContext => ({ skillIds: [], knowledge: [] });
 
-export function runContext(selection: ComposerContext): RunContext | undefined {
+export function runContext(
+  selection: ComposerContext,
+  availableSkills: { id: string; name: string; includes: string[] }[] = marketItems.skills,
+): RunContext | undefined {
   const skills = selection.skillIds.map((id) => {
-    const skill = marketItems.skills.find((item) => item.id === id);
+    const skill = availableSkills.find((item) => item.id === id);
     if (!skill) throw new Error('选中的技能已不可用，请移除后重新选择。');
     return { id: skill.id, name: skill.name, instructions: skill.includes };
   });

@@ -1,4 +1,6 @@
 export type WikiDocument = {
+  sourceVersionId?: string;
+  version?: number;
   id: string;
   title: string;
   folder: string;
@@ -96,6 +98,8 @@ export const wikiDocuments: WikiDocument[] = [
 export type AssetKind = 'image' | 'video' | 'spreadsheet' | 'document' | 'other';
 export type AssetSpace = 'company' | 'personal';
 export type LibraryAsset = {
+  downloadPath?: string;
+  version?: number;
   id: string;
   name: string;
   kind: AssetKind;
@@ -110,7 +114,6 @@ export type LibraryAsset = {
   mime?: string;
   file?: File;
   content?: string;
-  downloadPath?: string;
   unavailable?: string;
   inquiry?: {
     id: string;

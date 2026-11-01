@@ -1,4 +1,5 @@
 import { openDB } from 'idb';
+import { channelLabels } from './CustomerContextCard';
 import type {
   Asset,
   Inquiry,
@@ -40,6 +41,8 @@ export interface WorkspaceDocument {
   revision?: Revision;
 }
 export interface WorkspaceFile {
+  serverFileId?: string;
+  caseId?: string;
   id: string;
   name: string;
   title: string;
@@ -142,7 +145,7 @@ export function resultSnapshot(
   };
 }
 export function revisionDocuments(
-  inquiry: Pick<Inquiry, 'originalText' | 'customer' | 'currentRevision'>,
+  inquiry: Pick<Inquiry, 'originalText' | 'customer' | 'currentRevision' | 'customerContext'>,
   revision: Revision | undefined,
   messages: Message[],
   revisions: Revision[],
@@ -154,8 +157,8 @@ export function revisionDocuments(
       title: '客户原始询盘',
       kind: 'original',
       folder: 'inquiry',
-      text: inquiry.originalText,
-      caption: inquiry.customer,
+      text: `${inquiry.customerContext ? `来源：${channelLabels[inquiry.customerContext.channel]}\n邮箱：${inquiry.customerContext.email || '待补充'}\n\n` : ''}${inquiry.originalText}`,
+      caption: `${inquiry.customer}`,
     },
     {
       id: 'conversation',
@@ -248,9 +251,34 @@ export function revisionDocuments(
         hour: '2-digit',
         minute: '2-digit',
       }).format(new Date(r.createdAt)),
-      text: r.changeSummary.join('\n') || `保存了需求、方案、报价与回复的完整快照。`,
+      text: [
+        r.changeSummary.join('\n') || '保存了需求、报价和回复。',
+        r.restoredFromRevision
+          ? `从 V${r.restoredFromRevision} 恢复${r.restoredNode === 'all' ? '全部节点' : ` ${r.restoredNode} 节点`}；上一个当前版本 V${r.parentRevision}`
+          : r.generatedNode
+            ? `生成节点：${r.generatedNode}`
+            : '',
+      ]
+        .filter(Boolean)
+        .join('\n'),
     })),
   );
+  if (!r) {
+    for (const [kind, title, folder] of [
+      ['requirements', '客户需求与规格', 'analysis'],
+      ['risks', '风险与待确认项', 'analysis'],
+      ['quote', '方案与报价草稿', 'analysis'],
+      ['reply', '双语回复草稿', 'replies'],
+    ] as const)
+      docs.push({
+        id: `${kind}:0`,
+        kind,
+        title,
+        folder,
+        text: '尚未生成。选择现有原件和知识库依据，生成此节点的第一份草稿。',
+        caption: '等待生成',
+      });
+  }
   return docs;
 }
 
@@ -330,14 +358,14 @@ export function workspaceDocuments({
     });
   }
   docs.push(
-    ...state.notes.map((note) => ({ ...note, kind: 'note' as const, caption: '本机笔记' })),
+    ...state.notes.map((note) => ({ ...note, kind: 'note' as const, caption: '工作笔记' })),
     ...state.files.map((file) => ({
       id: file.id,
       title: file.title,
       kind: 'file' as const,
       folder: file.folder,
       text: '',
-      caption: '本机附件',
+      caption: '询盘附件',
       file,
     })),
     ...bundles.map((bundle) => ({
