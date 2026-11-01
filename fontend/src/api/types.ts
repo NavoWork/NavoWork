@@ -28,6 +28,18 @@ export interface Message {
   text: string;
   runId?: string;
   createdAt: string;
+  context?: RunContext;
+}
+export interface KnowledgeContext {
+  id: string;
+  title: string;
+  folder: string;
+  content: string;
+  updated: string;
+}
+export interface RunContext {
+  skills: { id: string; name: string; instructions: string[] }[];
+  knowledge: KnowledgeContext[];
 }
 export interface Quote {
   sku: string;
@@ -99,6 +111,7 @@ export interface Revision {
   ruleSetVersion: string;
   createdAt: string;
   changeSummary: string[];
+  context?: RunContext;
 }
 export interface Run {
   id: string;
@@ -114,6 +127,7 @@ export interface Run {
   error?: { code: string; message: string };
   clarification?: { questions: { id: string; question: string }[] };
   createdAt: string;
+  context?: RunContext;
 }
 export interface Draft {
   inquiryId: string;

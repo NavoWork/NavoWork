@@ -12,6 +12,7 @@ import type {
   Locale,
   MaterialBundle,
   Run,
+  RunContext,
 } from './types';
 import type { RequestOptions } from './index';
 type MockFault = 'none' | 'network' | 'session' | 'forbidden' | 'draft-conflict' | 'run-failure';
@@ -150,6 +151,7 @@ function reconcile(s: State) {
         revision.risks = previous.risks.filter((r) => r.id !== 'customization-difference');
       }
       revision.assetRefs = clone(run.assetVersionIds ?? previous?.assetRefs ?? []);
+      revision.context = run.context ? clone(run.context) : undefined;
       revision.runId = run.id;
       revision.createdAt = now();
       revision.changeSummary =
@@ -212,6 +214,30 @@ function reconcile(s: State) {
       createdAt: now(),
     });
   }
+}
+function validateRunContext(value: unknown): RunContext | undefined {
+  if (value === undefined) return undefined;
+  const record = (item: unknown): item is Record<string, unknown> =>
+    typeof item === 'object' && item !== null && !Array.isArray(item);
+  const text = (item: unknown): item is string => typeof item === 'string' && !!item.trim();
+  if (
+    !record(value) ||
+    !Array.isArray(value.skills) ||
+    !Array.isArray(value.knowledge) ||
+    value.skills.some((skill) =>
+      !record(skill) || !text(skill.id) || !text(skill.name) ||
+      !Array.isArray(skill.instructions) || !skill.instructions.length || !skill.instructions.every(text),
+    ) ||
+    value.knowledge.some((doc) =>
+      !record(doc) || !['id', 'title', 'folder', 'content', 'updated'].every((key) => text(doc[key])),
+    )
+  ) fail('INVALID_INPUT', '技能或知识库引用不完整，请重新选择后提交', 400);
+  const context = value as RunContext;
+  if (
+    new Set(context.skills.map((skill) => skill.id)).size !== context.skills.length ||
+    new Set(context.knowledge.map((doc) => doc.id)).size !== context.knowledge.length
+  ) fail('INVALID_INPUT', '同一技能或知识文档不能重复引用', 400);
+  return clone(context);
 }
 function validateAssets(s: State, refs: unknown, sku: string | null): string[] {
   if (!Array.isArray(refs) || refs.some((ref) => typeof ref !== 'string'))
@@ -538,6 +564,7 @@ function route(
         fail('TOOL_UNAVAILABLE', '必需能力已停用，请联系管理员启用后重试', 503);
       if (!['analyze', 'revise', 'accept_proposal'].includes(b.action))
         fail('INVALID_INPUT', '未知运行动作', 400);
+      const context = validateRunContext(b.context);
       if (b.action === 'accept_proposal') {
         const previous = s.revisions[id].at(-1);
         const evidence =
@@ -576,6 +603,7 @@ function route(
         createdAt: now(),
         fail: fault === 'run-failure',
         assetVersionIds,
+        context,
       };
       run.runId = run.id;
       if (run.fail) fault = 'none';
@@ -588,6 +616,7 @@ function route(
         inquiryId: id,
         role: 'user',
         text: String(b.instruction || '开始处理此询盘'),
+        context: context ? clone(context) : undefined,
         runId: run.id,
         createdAt: now(),
       });

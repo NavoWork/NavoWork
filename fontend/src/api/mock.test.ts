@@ -7,9 +7,11 @@ import type {
   ExportResult,
   Inquiry,
   MaterialBundle,
+  Message,
   Page,
   Revision,
   Run,
+  RunContext,
   Session,
 } from './types';
 const w = '/workspaces/ws_demo';
@@ -27,6 +29,38 @@ beforeEach(async () => {
 });
 afterEach(() => vi.useRealTimers());
 describe('Mock contract boundaries', () => {
+  it('freezes invocation context on its run, user message and output revision', async () => {
+    const context: RunContext = {
+      skills: [{ id: 'reply-review', name: '回复质量检查', instructions: ['检查报价和交期表述'] }],
+      knowledge: [{ id: 'delivery', title: '交付与承诺规则', folder: '业务流程', content: '交期需要核实', updated: '2026-10-31' }],
+    };
+    const run = await post<Run>(`${i}/runs`, {
+      baseRevision: 2, action: 'revise', instruction: '请核对600件报价', context,
+    });
+    expect(run.context).toEqual(context);
+    const snapshot = structuredClone(context);
+    context.knowledge[0].content = '修改后的文档';
+    context.skills[0].instructions.push('新指令');
+    const messages = await get<{ items: Message[] }>(`${i}/messages`);
+    expect(messages.items.find((message) => message.runId === run.id)?.context).toEqual(snapshot);
+    vi.setSystemTime(new Date('2026-10-31T08:00:08Z'));
+    expect((await get<Run>(`${w}/runs/${run.id}`)).context).toEqual(snapshot);
+    expect((await get<Revision>(`${i}/revisions/3`)).context).toEqual(snapshot);
+    expect((await get<Revision>(`${i}/revisions/2`)).context).toBeUndefined();
+    expect((await get<{ items: Message[] }>(`${w}/inquiries/inq_de014/messages`)).items.some((message) => message.context)).toBe(false);
+  });
+  it('rejects incomplete or duplicated invocation context without creating a run or message', async () => {
+    for (const context of [
+      null,
+      { skills: [], knowledge: [{ id: 'missing-content' }] },
+      { skills: [{ id: 'x', name: 'x', instructions: 'not-an-array' }], knowledge: [] },
+      { skills: [{ id: 'x', name: 'x', instructions: ['a'] }, { id: 'x', name: 'x', instructions: ['a'] }], knowledge: [] },
+    ]) {
+      await expect(post(`${i}/runs`, { baseRevision: 2, action: 'revise', context })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+    }
+    expect((await get<Inquiry>(i)).activeRunId).toBeNull();
+    expect((await get<{ items: Message[] }>(`${i}/messages`)).items.some((message) => message.context)).toBe(false);
+  });
   it('counts all states independently of searched pages and rejects foreign workspaces', async () => {
     expect(await get(`${w}/inquiries/summary`)).toEqual({
       todo: 1,

@@ -1,0 +1,38 @@
+.iw-context-composer { position: relative; }
+.iw-composer-tools { display: flex; align-items: center; gap: 3px; min-width: 0; }
+.iw-composer-tool { display: flex; align-items: center; gap: 4px; border: 0; background: none; color: var(--navo-color-text-secondary); border-radius: 5px; padding: 5px; font-size: 11px; white-space: nowrap; }
+.iw-composer-tool:hover:not(:disabled), .iw-composer-tool[aria-expanded='true'] { background: var(--navo-color-surface-muted); color: var(--navo-color-text); }
+.iw-composer-tool:disabled { opacity: .45; cursor: not-allowed; }
+.iw-composer-status { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.iw-context-chips { display: flex; flex-wrap: wrap; gap: 5px; max-height: 88px; overflow-y: auto; padding-bottom: 7px; }
+.iw-context-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; min-width: 0; border: 1px solid var(--navo-color-border-subtle); border-radius: 5px; padding: 4px 5px; font-size: 10px; background: var(--navo-color-surface-muted); color: var(--navo-color-text-secondary); }
+.iw-context-chip.skill { color: var(--navo-color-selection-text); background: var(--navo-color-selection-background); }
+.iw-context-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.iw-context-chip svg, .iw-context-chip button { flex-shrink: 0; }
+.iw-context-chip button { display: grid; place-items: center; border: 0; color: inherit; background: none; padding: 2px; border-radius: 3px; }
+.iw-context-chip button:hover:not(:disabled) { background: var(--navo-color-surface); }
+.iw-context-picker { position: absolute; z-index: 30; bottom: calc(100% + 8px); left: 0; right: 0; padding: 8px; background: var(--navo-color-surface); color: var(--navo-color-text); border: 1px solid var(--navo-color-border-control); border-radius: 12px; box-shadow: 0 8px 32px #0003; }
+.iw-picker-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
+.iw-picker-heading > div { display: flex; gap: 4px; }
+.iw-picker-heading > div button { display: inline-flex; align-items: center; gap: 5px; padding: 6px 9px; border: 0; border-radius: 6px; color: var(--navo-color-text-secondary); background: none; font-size: 11px; }
+.iw-picker-heading > div button[aria-pressed='true'] { color: var(--navo-color-selection-text); background: var(--navo-color-selection-background); }
+.iw-picker-search { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; padding: 6px 8px; border: 1px solid var(--navo-color-border-subtle); border-radius: 6px; color: var(--navo-color-text-muted); }
+.iw-picker-search input { min-width: 0; width: 100%; border: 0; background: none; color: var(--navo-color-text); font-size: 11px; outline-offset: 4px; }
+.iw-picker-options { max-height: min(270px, 32vh); overflow-y: auto; overscroll-behavior: contain; }
+.iw-picker-options > button { display: flex; align-items: flex-start; text-align: left; width: 100%; gap: 9px; padding: 9px 8px; border: 0; border-radius: 6px; background: none; color: var(--navo-color-text-secondary); }
+.iw-picker-options > button[aria-selected='true'] { background: var(--navo-color-surface-muted); }
+.iw-picker-options > button > svg { flex-shrink: 0; margin-top: 3px; }
+.iw-picker-options > button > span { min-width: 0; flex: 1; }
+.iw-picker-options strong { display: block; font-size: 12px; line-height: 1.5; color: var(--navo-color-text); overflow-wrap: anywhere; }
+.iw-picker-options small { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 3px; font-size: 10px; line-height: 1.6; }
+.iw-picker-options em { display: block; margin-top: 5px; font-size: 9px; font-style: normal; color: var(--navo-color-text-muted); }
+.iw-picker-empty { padding: 18px 8px; font-size: 11px; color: var(--navo-color-text-muted); }
+.iw-picker-hint { margin-top: 6px; padding: 6px 4px 0; border-top: 1px solid var(--navo-color-border-subtle); font-size: 9px; color: var(--navo-color-text-muted); }
+.iw-invocation-context { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 5px; margin-top: 9px; font-size: 10px; }
+.iw-invocation-context > span, .iw-invocation-context details { max-width: 100%; min-width: 0; padding: 4px 6px; border-radius: 5px; border: 1px solid var(--navo-color-border-subtle); color: var(--navo-color-text-secondary); background: var(--navo-color-surface-muted); }
+.iw-invocation-skill, .iw-invocation-context summary { display: flex; align-items: center; gap: 4px; overflow-wrap: anywhere; }
+.iw-invocation-context summary { cursor: pointer; }
+.iw-invocation-context details[open] { width: 100%; }
+.iw-invocation-context pre { max-height: 200px; overflow: auto; font: inherit; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 0 0; }
+.iw-invocation-context small { display: block; margin-top: 8px; color: var(--navo-color-text-muted); }
+@media (max-width: 600px) { .iw-context-picker { bottom: calc(100% + 5px); } .iw-picker-options { max-height: 24vh; } .iw-composer-status { font-size: 9px; } }

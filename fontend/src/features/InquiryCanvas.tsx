@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode, type CSSProperties } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode, type CSSProperties } from 'react';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import {
   Background,
@@ -20,6 +20,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  CircleHelp,
   FileText,
   Folder,
   FolderOpen,
@@ -50,6 +51,8 @@ import {
   initialCanvas,
   readCanvas,
   revisionDocuments,
+  workspaceDocuments,
+  inquiryAssetsChangedEvent,
   saveCanvasFile,
   type CanvasState,
   type SavedResult,
@@ -145,6 +148,39 @@ const edgeOptions = {
   selectable: false,
   deletable: false,
 };
+
+function CanvasHelp() {
+  const [open, setOpen] = useState(false);
+  const tooltipId = useId();
+  return (
+    <div
+      className="ic-canvas-help"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onFocus={() => setOpen(true)}
+      onBlur={() => setOpen(false)}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') setOpen(false);
+      }}
+    >
+      <button
+        type="button"
+        className="ic-icon"
+        aria-label="画板操作说明"
+        aria-describedby={open ? tooltipId : undefined}
+        onClick={() => setOpen(true)}
+      >
+        <CircleHelp size={16} />
+      </button>
+      {open && (
+        <div className="ic-canvas-tooltip" id={tooltipId} role="tooltip">
+          单击预览 · 双击打开 · 对话成果确认后添加
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface Props {
   inquiry: Inquiry;
   revision?: Revision;
@@ -257,85 +293,30 @@ function CanvasWorkspace({
       setStorageError('本机空间不足或存储不可用，当前修改尚未保存。请保留此页并导出笔记。');
     }
   }, [state, scope, initial.error]);
-  const docs = revisionDocuments(inquiry, revision, messages, revisions, replyText);
-  const initialRevision = revisions.find((r) => r.number === state.initialRevision);
-  const initialDocuments = revisionDocuments(
+  const docs = workspaceDocuments({
     inquiry,
-    initialRevision,
+    revision,
+    revisions,
     messages,
-    revisions.filter((r) => r.number <= (state.initialRevision || 0)),
-  );
-  for (const document of initialDocuments) {
-    if (!docs.some((doc) => doc.id === document.id)) docs.push(document);
-  }
-  docs.push(
-    ...(state.results || []).map((result) => ({
-      id: `result:${result.revision}`,
-      title: result.title,
-      kind: 'result' as const,
-      folder: 'notes',
-      text: result.text,
-      caption: `V${result.revision} · 已确认保留`,
-      revision: revisions.find((r) => r.number === result.revision),
-    })),
-  );
-  sourceRefs.forEach((ref, index) => {
-    const doc = docs.find((d) => d.id === `source:${ref.sourceVersionId}`);
-    if (doc && sources[index]?.data) {
-      doc.source = sources[index].data;
-      doc.text = sources[index].data!.content;
-    }
+    state,
+    replyText,
+    sources: Object.fromEntries(
+      sourceRefs.flatMap((ref, index) =>
+        sources[index]?.data ? [[ref.sourceVersionId, sources[index].data!]] : [],
+      ),
+    ),
+    assets: assets.data?.items,
+    bundles: bundles.data?.items,
   });
-  assetIds.forEach((id) => {
-    const asset = assets.data?.items.find((a) => `${a.id}:v${a.version}` === id);
-    const version = Number(id.match(/:v(\d+)$/)?.[1] || 1);
-    const file: WorkspaceFile = {
-      id: `asset:${id}`,
-      title: asset?.title || id,
-      name: asset?.name || id,
-      size: asset?.size || 0,
-      mediaType: asset?.mediaType || 'application/octet-stream',
-      folder: 'materials',
-      assetId: asset?.id || id.replace(/:v\d+$/, ''),
-      version,
-    };
-    docs.push({
-      id: file.id,
-      kind: 'file',
-      title: file.title,
-      folder: file.folder,
-      text: '',
-      caption: `已引用 · V${version}`,
-      file,
-    });
+  const assetSyncSignature = JSON.stringify({
+    title: inquiry.title,
+    updatedAt: inquiry.updatedAt,
+    documents: docs.map(({ id, title, text, file, folder }) => ({ id, title, text, file, folder })),
+    folders: state.folders,
   });
-  docs.push(
-    ...state.notes.map((n) => ({ ...n, kind: 'note' as const, caption: '本机笔记' })),
-    ...state.files.map((file) => ({
-      id: file.id,
-      title: file.title,
-      kind: 'file' as const,
-      folder: file.folder,
-      text: '',
-      caption: '本机附件',
-      file,
-    })),
-  );
-  docs.push(
-    ...(bundles.data?.items || []).map((b) => ({
-      id: `bundle:${b.id}`,
-      title: `V${b.revision} · 材料草稿`,
-      kind: 'source' as const,
-      folder: 'materials',
-      caption: '已整理 · 未发送',
-      text: `业务版本 V${b.revision}\n英语草稿 V${b.draftVersions['en-US'] ?? '—'}\n西语草稿 V${b.draftVersions['es-MX'] ?? '—'}\n\n素材：\n${b.assetVersionIds.join('\n') || '无'}\n\n资料来源：\n${b.sourceVersionIds.join('\n') || '无'}`,
-    })),
-  );
-  for (const doc of docs) {
-    if (doc.kind !== 'original' && state.drafts[doc.id] !== undefined)
-      doc.text = state.drafts[doc.id];
-    if (state.drafts[`title:${doc.id}`]) doc.title = state.drafts[`title:${doc.id}`];
-  }
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent(inquiryAssetsChangedEvent, { detail: scope }));
+  }, [scope, assetSyncSignature]);
   const folders = [...defaultFolders, ...state.folders];
   const tabs = state.tabs.filter((id) => docs.some((d) => d.id === id));
   const active = state.active === 'canvas' || tabs.includes(state.active) ? state.active : 'canvas';
@@ -412,7 +393,14 @@ function CanvasWorkspace({
     }
   }
   // Put the main working documents first; supporting files continue below them.
-  const initialIds = new Set(initialDocuments.map((doc) => doc.id));
+  const initialIds = new Set(
+    revisionDocuments(
+      inquiry,
+      revisions.find((item) => item.number === state.initialRevision),
+      messages,
+      revisions.filter((item) => item.number <= (state.initialRevision || 0)),
+    ).map((doc) => doc.id),
+  );
   const ordered = docs
     .filter(
       (doc) =>
@@ -814,11 +802,7 @@ function CanvasWorkspace({
                 size={1}
                 color="var(--ic-dot)"
               />
-              <Panel position="top-left" className="ic-board-label">
-                <span>INQUIRY CANVAS</span>
-                <small>单击预览 · 双击打开 · 对话成果确认后添加</small>
-              </Panel>
-              <Panel position="top-right">
+              <Panel position="top-right" className="ic-board-tools">
                 <button
                   className="ic-arrange"
                   onClick={() => {
@@ -831,6 +815,7 @@ function CanvasWorkspace({
                   <LayoutGrid size={12} />
                   整理画板
                 </button>
+                <CanvasHelp />
               </Panel>
               <Controls showInteractive={false} aria-label="画板缩放工具" />
               <MiniMap

@@ -1,5 +1,15 @@
 import { openDB } from 'idb';
-import type { Inquiry, Locale, Message, Revision, Source } from '../api/types';
+import type {
+  Asset,
+  Inquiry,
+  Locale,
+  MaterialBundle,
+  Message,
+  Revision,
+  Source,
+} from '../api/types';
+
+export const inquiryAssetsChangedEvent = 'navowork:inquiry-assets-changed';
 
 export type DocumentKind =
   | 'original'
@@ -241,6 +251,109 @@ export function revisionDocuments(
       text: r.changeSummary.join('\n') || `保存了需求、方案、报价与回复的完整快照。`,
     })),
   );
+  return docs;
+}
+
+export function workspaceDocuments({
+  inquiry,
+  revision,
+  revisions,
+  messages,
+  state,
+  replyText,
+  sources = {},
+  assets = [],
+  bundles = [],
+}: {
+  inquiry: Inquiry;
+  revision?: Revision;
+  revisions: Revision[];
+  messages: Message[];
+  state: CanvasState;
+  replyText?: string;
+  sources?: Record<string, Source>;
+  assets?: Asset[];
+  bundles?: MaterialBundle[];
+}): WorkspaceDocument[] {
+  const docs = revisionDocuments(inquiry, revision, messages, revisions, replyText);
+  const firstRevision = state.initialRevision ?? inquiry.currentRevision;
+  for (const document of revisionDocuments(
+    inquiry,
+    revisions.find((item) => item.number === firstRevision),
+    messages,
+    revisions.filter((item) => item.number <= firstRevision),
+  )) {
+    if (!docs.some((doc) => doc.id === document.id)) docs.push(document);
+  }
+  docs.push(
+    ...(state.results || []).map((result) => ({
+      id: `result:${result.revision}`,
+      title: result.title,
+      kind: 'result' as const,
+      folder: 'notes',
+      text: result.text,
+      caption: `V${result.revision} · 已确认保留`,
+      revision: revisions.find((item) => item.number === result.revision),
+    })),
+  );
+  for (const doc of docs) {
+    const source =
+      doc.kind === 'source' && doc.id.startsWith('source:')
+        ? sources[doc.id.slice('source:'.length)]
+        : undefined;
+    if (source) {
+      doc.source = source;
+      doc.text = source.content;
+    }
+  }
+  for (const id of revision?.assetRefs || []) {
+    const asset = assets.find((item) => `${item.id}:v${item.version}` === id);
+    const version = Number(id.match(/:v(\d+)$/)?.[1] || 1);
+    const file: WorkspaceFile = {
+      id: `asset:${id}`,
+      title: asset?.title || id,
+      name: asset?.name || id,
+      size: asset?.size || 0,
+      mediaType: asset?.mediaType || 'application/octet-stream',
+      folder: 'materials',
+      assetId: asset?.id || id.replace(/:v\d+$/, ''),
+      version,
+    };
+    docs.push({
+      id: file.id,
+      kind: 'file',
+      title: file.title,
+      folder: file.folder,
+      text: '',
+      caption: `已引用 · V${version}`,
+      file,
+    });
+  }
+  docs.push(
+    ...state.notes.map((note) => ({ ...note, kind: 'note' as const, caption: '本机笔记' })),
+    ...state.files.map((file) => ({
+      id: file.id,
+      title: file.title,
+      kind: 'file' as const,
+      folder: file.folder,
+      text: '',
+      caption: '本机附件',
+      file,
+    })),
+    ...bundles.map((bundle) => ({
+      id: `bundle:${bundle.id}`,
+      title: `V${bundle.revision} · 材料草稿`,
+      kind: 'source' as const,
+      folder: 'materials',
+      caption: '已整理 · 未发送',
+      text: `业务版本 V${bundle.revision}\n英语草稿 V${bundle.draftVersions['en-US'] ?? '—'}\n西语草稿 V${bundle.draftVersions['es-MX'] ?? '—'}\n\n素材：\n${bundle.assetVersionIds.join('\n') || '无'}\n\n资料来源：\n${bundle.sourceVersionIds.join('\n') || '无'}`,
+    })),
+  );
+  for (const doc of docs) {
+    if (doc.kind !== 'original' && state.drafts[doc.id] !== undefined)
+      doc.text = state.drafts[doc.id];
+    if (state.drafts[`title:${doc.id}`]) doc.title = state.drafts[`title:${doc.id}`];
+  }
   return docs;
 }
 async function fileDB() {

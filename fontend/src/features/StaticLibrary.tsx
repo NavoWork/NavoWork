@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import {
   ArrowDownToLine,
   ArrowLeft,
@@ -25,12 +26,13 @@ import {
   UserRound,
   X,
 } from 'lucide-react';
-import { EmptyState, Modal } from '../components/ui';
-import type { Session } from '../api';
+import { EmptyState, ErrorNotice, Loading, Modal } from '../components/ui';
+import { api, type Session } from '../api';
+import { inquiryFolderKey, useInquiryAssets } from './inquiry-assets';
+import { useWikiDocuments } from './wiki-store';
 import {
   assetKinds,
   libraryAssets,
-  wikiDocuments,
   wikiFolders,
   type AssetKind,
   type AssetSpace,
@@ -386,7 +388,7 @@ function WikiCreate({
           />
         </label>
         <div className="library-dialog-footer">
-          <span>仅在当前页面演示，离开后恢复示例内容</span>
+          <span>保存在当前浏览器，可在询盘中通过 @ 引用</span>
           <div className="library-actions">
             <button type="button" className="button button-ghost" onClick={onClose}>
               取消
@@ -401,8 +403,9 @@ function WikiCreate({
   );
 }
 
-function WikiLibrary() {
-  const [docs, setDocs] = useState(wikiDocuments);
+function WikiLibrary({ session }: { session: Session }) {
+  const wiki = useWikiDocuments(session);
+  const { docs, update: setDocs } = wiki;
   const [folder, setFolder] = useState('all');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<SortOrder>('updated');
@@ -444,6 +447,8 @@ function WikiLibrary() {
         </div>
       </header>
       {notice && <Notice text={notice} onClose={() => setNotice('')} />}
+      <ErrorNotice error={wiki.error} onRetry={() => void wiki.retry()} />
+      {wiki.loading && <Loading label="正在读取知识库" />}
       <div className="wiki-layout">
         <aside className="wiki-sidebar" aria-label="知识目录">
           <button className={folder === 'all' ? 'is-active' : ''} onClick={() => setFolder('all')}>
@@ -543,11 +548,11 @@ function WikiLibrary() {
           folder={folder}
           onClose={() => setCreating(false)}
           onCreate={(doc) => {
-            setDocs((current) => [doc, ...current]);
+            if (!setDocs((current) => [doc, ...current])) return;
             setCreating(false);
             setFolder(doc.folder);
             setQuery('');
-            setNotice('文档已添加到当前演示');
+            setNotice('文档已保存，可在询盘中引用');
           }}
         />
       )}
@@ -570,11 +575,11 @@ function WikiLibrary() {
               updated: new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' }),
               starred: false,
             }));
-            setDocs((current) => [...added, ...current]);
+            if (!setDocs((current) => [...added, ...current])) return;
             setFolder(added[0].folder);
             setQuery('');
             setImporting(false);
-            setNotice(`已导入 ${added.length} 篇文档到当前演示`);
+            setNotice(`已导入 ${added.length} 篇文档，可在询盘中引用`);
           }}
         />
       )}
@@ -723,7 +728,7 @@ function ImportDialog({
         </p>
       )}
       <div className="library-dialog-footer">
-        <span>仅在当前页面演示，离开后恢复示例内容</span>
+        <span>{kind === 'wiki' ? '保存在当前浏览器，可在询盘中通过 @ 引用' : '仅在当前页面演示，离开后恢复示例内容'}</span>
         <button
           className="button button-primary"
           disabled={!files.length || busy}
@@ -748,14 +753,55 @@ function ImportDialog({
   );
 }
 
-function AssetArtwork({ asset, large = false }: { asset: LibraryAsset; large?: boolean }) {
+function useAssetUrl(asset: LibraryAsset) {
+  const [url, setUrl] = useState(asset.url);
+  useEffect(() => {
+    if (
+      asset.url ||
+      !asset.file ||
+      !(/^(image|video|audio)\//.test(asset.mime || '') || asset.mime === 'application/pdf')
+    ) {
+      setUrl(asset.url);
+      return;
+    }
+    const next = URL.createObjectURL(asset.file);
+    setUrl(next);
+    return () => URL.revokeObjectURL(next);
+  }, [asset.file, asset.url, asset.mime]);
+  return url;
+}
+
+function AssetArtwork({
+  asset: originalAsset,
+  large = false,
+}: {
+  asset: LibraryAsset;
+  large?: boolean;
+}) {
+  const url = useAssetUrl(originalAsset);
+  const asset = { ...originalAsset, url };
+  if (asset.content !== undefined) {
+    return (
+      <div className="library-document-thumbnail" aria-hidden="true">
+        <FileText size={23} />
+        <strong>{asset.name.replace(/\.md$/, '')}</strong>
+        <span>
+          {asset.content
+            .replace(/^#.*\n/, '')
+            .replace(/^>.*$/gm, '')
+            .trim()
+            .slice(0, 180)}
+        </span>
+      </div>
+    );
+  }
   if (asset.url && asset.kind === 'image')
     return (
       <div className="library-art uploaded-image">
         <img src={asset.url} alt={asset.name} />
       </div>
     );
-  if (asset.url) {
+  if (asset.url || asset.file || asset.inquiry) {
     const Icon = typeIcons[asset.kind];
     return (
       <div className={`library-art art-${asset.kind}`}>
@@ -876,7 +922,17 @@ function AssetArtwork({ asset, large = false }: { asset: LibraryAsset; large?: b
   );
 }
 
-function AssetPreview({ asset, onClose }: { asset: LibraryAsset; onClose: () => void }) {
+function AssetPreview({
+  asset: originalAsset,
+  onClose,
+}: {
+  asset: LibraryAsset;
+  onClose: () => void;
+}) {
+  const url = useAssetUrl(originalAsset);
+  const asset = { ...originalAsset, url };
+  const [error, setError] = useState<unknown>();
+  const [downloading, setDownloading] = useState(false);
   const kindLabel = assetKinds.find((item) => item.id === asset.kind)?.label;
   const pdf = asset.mime === 'application/pdf';
   const canPreview =
@@ -894,35 +950,68 @@ function AssetPreview({ asset, onClose }: { asset: LibraryAsset; onClose: () => 
           {kindLabel} · {asset.size}
         </span>
       </div>
-      <div className="library-preview-stage">
-        {asset.url && asset.kind === 'video' ? (
-          <video controls src={asset.url} preload="metadata" aria-label={asset.name} />
-        ) : asset.url && asset.mime?.startsWith('audio/') ? (
-          <audio controls src={asset.url} aria-label={asset.name} />
-        ) : asset.url && pdf ? (
-          <iframe title={asset.name} src={asset.url} />
-        ) : (
-          <AssetArtwork asset={asset} large />
-        )}
-        {!asset.file && (
-          <span className="library-preview-caption">
-            {asset.kind === 'video'
-              ? '示例视频封面'
-              : asset.kind === 'spreadsheet'
-                ? '示例表格预览'
-                : '示例文件预览'}
-          </span>
-        )}
-        {asset.file && !canPreview && (
-          <p className="library-preview-unavailable">此格式暂不支持在线预览，可下载后查看。</p>
-        )}
-      </div>
+      {asset.inquiry && (
+        <Link
+          className="library-inquiry-link"
+          to={`/inquiries/${encodeURIComponent(asset.inquiry.id)}`}
+        >
+          <ArrowUpRight size={14} />
+          返回询盘：{asset.inquiry.title}
+        </Link>
+      )}
+      <ErrorNotice error={error} />
+      {asset.content !== undefined ? (
+        <div className="library-preview-document wiki-markdown">
+          <Markdown content={asset.content} />
+        </div>
+      ) : (
+        <div className="library-preview-stage">
+          {asset.url && asset.kind === 'video' ? (
+            <video controls src={asset.url} preload="metadata" aria-label={asset.name} />
+          ) : asset.url && asset.mime?.startsWith('audio/') ? (
+            <audio controls src={asset.url} aria-label={asset.name} />
+          ) : asset.url && pdf ? (
+            <iframe title={asset.name} src={asset.url} />
+          ) : (
+            <AssetArtwork asset={asset} large />
+          )}
+          {!asset.file && !asset.inquiry && (
+            <span className="library-preview-caption">
+              {asset.kind === 'video'
+                ? '示例视频封面'
+                : asset.kind === 'spreadsheet'
+                  ? '示例表格预览'
+                  : '示例文件预览'}
+            </span>
+          )}
+          {asset.file && !canPreview && (
+            <p className="library-preview-unavailable">此格式暂不支持在线预览，可下载后查看。</p>
+          )}
+          {asset.unavailable && <p className="library-preview-unavailable">{asset.unavailable}</p>}
+        </div>
+      )}
       <div className="library-dialog-footer">
-        <span>更新于 {asset.updated}</span>
-        {asset.file ? (
+        <span>更新于 {asset.updated.slice(0, 10)}</span>
+        {asset.file || asset.content !== undefined || asset.downloadPath ? (
           <button
             className="button button-primary"
-            onClick={() => download(asset.file!, asset.name)}
+            disabled={downloading}
+            onClick={async () => {
+              setDownloading(true);
+              setError(undefined);
+              try {
+                const blob =
+                  asset.file ||
+                  (asset.downloadPath
+                    ? await api.download(asset.downloadPath)
+                    : new Blob([asset.content!], { type: asset.mime }));
+                download(blob, asset.name);
+              } catch (error) {
+                setError(error);
+              } finally {
+                setDownloading(false);
+              }
+            }}
           >
             <ArrowDownToLine size={15} />
             下载文件
@@ -947,8 +1036,19 @@ function detectKind(file: File): AssetKind {
   return 'other';
 }
 
-function AssetLibrary() {
-  const [assets, setAssets] = useState(libraryAssets);
+function AssetLibrary({ session }: { session: Session }) {
+  const [localAssets, setAssets] = useState(libraryAssets);
+  const synced = useInquiryAssets(session);
+  const [syncedStars, setSyncedStars] = useState<Record<string, boolean>>({});
+  const assets = [
+    ...localAssets,
+    ...synced.groups
+      .flatMap((group) => group.assets)
+      .map((asset) => ({
+        ...asset,
+        starred: syncedStars[asset.id] ?? asset.starred,
+      })),
+  ];
   const [space, setSpace] = useState<AssetSpace>('personal');
   const [folder, setFolder] = useState('all');
   const [foldersOpen, setFoldersOpen] = useState(false);
@@ -960,6 +1060,7 @@ function AssetLibrary() {
   const [selected, setSelected] = useState<LibraryAsset | null>(null);
   const [uploading, setUploading] = useState(false);
   const [notice, setNotice] = useState('');
+  const [expandedInquiries, setExpandedInquiries] = useState<string[]>([]);
   const urls = useRef<string[]>([]);
   useEffect(
     () => () => {
@@ -968,12 +1069,32 @@ function AssetLibrary() {
     [],
   );
   const spaceAssets = assets.filter((asset) => asset.space === space);
-  const folders = Array.from(new Set(spaceAssets.map((asset) => asset.folder)));
+  const folders = Array.from(
+    new Set(spaceAssets.filter((asset) => !asset.inquiry).map((asset) => asset.folder)),
+  );
+  const selectedInquiry = synced.groups.find(
+    (group) =>
+      folder === inquiryFolderKey(group.id) ||
+      group.folders.some((category) => folder === inquiryFolderKey(group.id, category.id)),
+  );
+  const selectedCategory = selectedInquiry?.folders.find(
+    (category) => folder === inquiryFolderKey(selectedInquiry.id, category.id),
+  );
+  const folderLabel = selectedInquiry
+    ? `${selectedInquiry.title}${selectedCategory ? ` / ${selectedCategory.title}` : ''}`
+    : folder === 'all'
+      ? '全部文件'
+      : folder;
+  const uploadFolder = folder === 'all' || selectedInquiry ? '未分类' : folder;
   const search = query.trim().toLocaleLowerCase();
   const filtered = spaceAssets
     .filter(
       (asset) =>
-        (folder === 'all' || asset.folder === folder) &&
+        (folder === 'all' ||
+          (asset.inquiry
+            ? folder === inquiryFolderKey(asset.inquiry.id) ||
+              folder === inquiryFolderKey(asset.inquiry.id, asset.inquiry.folderId)
+            : asset.folder === folder)) &&
         (kind === 'all' || asset.kind === kind) &&
         (!favorites || asset.starred) &&
         `${asset.name} ${asset.folder}`.toLocaleLowerCase().includes(search),
@@ -988,16 +1109,22 @@ function AssetLibrary() {
     setFavorites(false);
     setQuery('');
   };
-  const toggleStar = (id: string) =>
+  const toggleStar = (id: string) => {
+    const asset = assets.find((item) => item.id === id);
+    if (asset?.inquiry) {
+      setSyncedStars((current) => ({ ...current, [id]: !asset.starred }));
+      return;
+    }
     setAssets((current) =>
       current.map((asset) => (asset.id === id ? { ...asset, starred: !asset.starred } : asset)),
     );
+  };
   return (
     <div className="feature-page library-page asset-library">
       <header className="library-heading">
         <div>
           <h1>资产库</h1>
-          <p>文件各归其位，需要时一眼找到。</p>
+          <p>文件各归其位，询盘资料自动同步到个人资产库。</p>
         </div>
         <button className="button button-primary" onClick={() => setUploading(true)}>
           <Upload size={16} />
@@ -1005,6 +1132,7 @@ function AssetLibrary() {
         </button>
       </header>
       {notice && <Notice text={notice} onClose={() => setNotice('')} />}
+      <ErrorNotice error={synced.error} onRetry={() => void synced.retry()} />
       <div className="asset-space-bar">
         <div className="asset-spaces" aria-label="资产空间">
           {(['personal', 'company'] as const).map((item) => (
@@ -1035,7 +1163,7 @@ function AssetLibrary() {
             onClick={() => setFoldersOpen(!foldersOpen)}
           >
             <FolderOpen size={17} />
-            <span>文件夹 · {folder === 'all' ? '全部文件' : folder}</span>
+            <span>文件夹 · {folderLabel}</span>
             <ChevronRight size={15} />
           </button>
           <nav className="asset-folders" id="asset-folder-list" aria-label="资产文件夹">
@@ -1067,6 +1195,63 @@ function AssetLibrary() {
                 </span>
               </button>
             ))}
+            {space === 'personal' &&
+              synced.groups.map((group) => {
+                const expanded = expandedInquiries.includes(group.id);
+                return (
+                  <div className="asset-inquiry-folders" key={group.id}>
+                    <button
+                      aria-label={`询盘文件夹 ${group.title}`}
+                      aria-pressed={folder === inquiryFolderKey(group.id)}
+                      aria-expanded={expanded}
+                      aria-controls={`asset-inquiry-${group.id}`}
+                      onClick={() => {
+                        setFolder(inquiryFolderKey(group.id));
+                        setExpandedInquiries((current) =>
+                          expanded
+                            ? current.filter((id) => id !== group.id)
+                            : [...current, group.id],
+                        );
+                      }}
+                    >
+                      <ChevronRight size={13} className="asset-inquiry-chevron" />
+                      <Folder size={17} className="asset-folder-icon" />
+                      <span className="asset-folder-name" title={group.title}>
+                        {group.title}
+                      </span>
+                      <span className="asset-folder-count">{group.assets.length}</span>
+                    </button>
+                    {expanded && (
+                      <div
+                        id={`asset-inquiry-${group.id}`}
+                        className="asset-inquiry-categories"
+                        aria-label={`${group.title}资料分类`}
+                      >
+                        {group.folders.map((category) => (
+                          <button
+                            key={category.id}
+                            aria-pressed={folder === inquiryFolderKey(group.id, category.id)}
+                            onClick={() => {
+                              setFolder(inquiryFolderKey(group.id, category.id));
+                              setFoldersOpen(false);
+                            }}
+                          >
+                            <Folder size={15} className="asset-folder-icon" />
+                            <span className="asset-folder-name">{category.title}</span>
+                            <span className="asset-folder-count">
+                              {
+                                group.assets.filter(
+                                  (asset) => asset.inquiry?.folderId === category.id,
+                                ).length
+                              }
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
           </nav>
         </aside>
         <section className="asset-files" aria-label={`${spaceLabels[space]}文件`}>
@@ -1081,7 +1266,9 @@ function AssetLibrary() {
                   <ArrowLeft size={16} />
                 </button>
               )}
-              {folder === 'all' ? '全部文件' : folder}
+              <strong className="asset-folder-label" title={folderLabel}>
+                {folderLabel}
+              </strong>
               <span>{filtered.length}</span>
             </div>
             <div className="library-toolbar-controls">
@@ -1158,13 +1345,18 @@ function AssetLibrary() {
                     )}
                     <span className="library-asset-info">
                       <strong title={asset.name}>{asset.name}</strong>
+                      {view === 'grid' && asset.inquiry && (
+                        <span className="library-asset-origin" title={asset.folder}>
+                          {asset.inquiry.title}
+                        </span>
+                      )}
                       <span>
                         {view === 'grid' ? (
                           <>
                             <Icon size={12} />
                             {asset.size}
                             <span className="library-dot">·</span>
-                            {asset.updated.slice(5).replace('-', '/')}
+                            {asset.updated.slice(5, 10).replace('-', '/')}
                           </>
                         ) : (
                           asset.folder
@@ -1176,7 +1368,7 @@ function AssetLibrary() {
                     <>
                       <span className="asset-list-size">{asset.size}</span>
                       <time dateTime={asset.updated}>
-                        {asset.updated.slice(5).replace('-', '/')}
+                        {asset.updated.slice(5, 10).replace('-', '/')}
                       </time>
                     </>
                   )}
@@ -1189,14 +1381,22 @@ function AssetLibrary() {
               );
             })}
           </div>
-          {!filtered.length && <LibraryEmpty title="没有找到相关文件" onReset={reset} />}
+          {space === 'personal' && synced.loading && <Loading label="正在同步询盘资料" />}
+          {!filtered.length && (space === 'company' || !synced.loading) && (
+            <LibraryEmpty title="没有找到相关文件" onReset={reset} />
+          )}
         </section>
       </div>
-      {selected && <AssetPreview asset={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <AssetPreview
+          asset={assets.find((asset) => asset.id === selected.id) || selected}
+          onClose={() => setSelected(null)}
+        />
+      )}
       {uploading && (
         <ImportDialog
           kind="asset"
-          destination={`${spaceLabels[space]} / ${folder === 'all' ? '未分类' : folder}`}
+          destination={`${spaceLabels[space]} / ${uploadFolder}`}
           onClose={() => setUploading(false)}
           onImport={async (files) => {
             const added = files.map((file): LibraryAsset => {
@@ -1207,7 +1407,7 @@ function AssetLibrary() {
                 name: file.name,
                 kind: detectKind(file),
                 space,
-                folder: folder === 'all' ? '未分类' : folder,
+                folder: uploadFolder,
                 size:
                   file.size < 1024 * 1024
                     ? `${Math.max(1, Math.round(file.size / 1024))} KB`
@@ -1221,6 +1421,7 @@ function AssetLibrary() {
               };
             });
             setAssets((current) => [...added, ...current]);
+            if (selectedInquiry) setFolder(uploadFolder);
             setKind('all');
             setFavorites(false);
             setQuery('');
@@ -1233,6 +1434,16 @@ function AssetLibrary() {
   );
 }
 
-export function StaticLibrary({ page }: { page: 'knowledge' | 'assets'; session: Session }) {
-  return page === 'knowledge' ? <WikiLibrary /> : <AssetLibrary />;
+export function StaticLibrary({
+  page,
+  session,
+}: {
+  page: 'knowledge' | 'assets';
+  session: Session;
+}) {
+  return page === 'knowledge' ? (
+    <WikiLibrary key={`${session.user.id}:${session.workspace.id}`} session={session} />
+  ) : (
+    <AssetLibrary key={`${session.user.id}:${session.workspace.id}`} session={session} />
+  );
 }

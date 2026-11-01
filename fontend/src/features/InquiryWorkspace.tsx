@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from 're
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowRight,
-  ArrowUp,
   BookOpen,
   Check,
   CheckCheck,
@@ -16,7 +15,6 @@ import {
   MessageSquare,
   PanelRightClose,
   PanelRightOpen,
-  Paperclip,
   ShieldCheck,
   Sparkles,
   Square,
@@ -39,8 +37,15 @@ import { EmptyState, ErrorNotice, Loading, Modal, StatusBadge } from '../compone
 import { ReplyEditor, type DraftState } from './inquiry-replies';
 import { InquiryResult } from './InquiryResult';
 import { InquiryRunActivity } from './InquiryRunActivity';
-import { resultSnapshot, type SavedResult } from './inquiry-canvas-model';
+import {
+  inquiryAssetsChangedEvent,
+  resultSnapshot,
+  type SavedResult,
+} from './inquiry-canvas-model';
 import { InquiryCanvas } from './InquiryCanvas';
+import { InquiryComposer } from './InquiryComposer';
+import { InvocationContext } from './InvocationContext';
+import { emptyComposerContext, restoreContext, runContext, type ComposerContext } from './inquiry-context';
 import { ResizeHandle } from '../components/ResizeHandle';
 import './inquiry.css';
 
@@ -88,6 +93,7 @@ export function InquiryWorkspace({
   const initial = useRef(
     readPref(prefKey, {
       input: '',
+      composerContext: emptyComposerContext(),
       deferredResults: [] as number[],
       revision: null as number | null,
       lastRunId: '',
@@ -96,6 +102,7 @@ export function InquiryWorkspace({
     }),
   );
   const [input, setInput] = useState(initial.current.input);
+  const [composerContext, setComposerContext] = useState<ComposerContext>(initial.current.composerContext || emptyComposerContext());
   const [deferredResults, setDeferredResults] = useState<number[]>(
     initial.current.deferredResults || [],
   );
@@ -145,6 +152,9 @@ export function InquiryWorkspace({
   const [exportResult, setExportResult] = useState<ExportResult | null>(null);
   const [draftRefresh, setDraftRefresh] = useState(0);
   const queryClient = useQueryClient();
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent(inquiryAssetsChangedEvent, { detail: scope }));
+  }, [scope, draftState]);
   const changedRef = useRef(onChanged);
   changedRef.current = onChanged;
   const queryKey = ['inquiry', scope];
@@ -192,13 +202,14 @@ export function InquiryWorkspace({
   useEffect(() => {
     writePref(prefKey, {
       input,
+      composerContext,
       deferredResults,
       revision: revisionNumber,
       lastRunId,
       selectedAssets,
       assistantWidth,
     });
-  }, [input, deferredResults, revisionNumber, lastRunId, selectedAssets, assistantWidth, prefKey]);
+  }, [input, composerContext, deferredResults, revisionNumber, lastRunId, selectedAssets, assistantWidth, prefKey]);
   useEffect(() => {
     if (
       run &&
@@ -248,6 +259,7 @@ export function InquiryWorkspace({
       const r = await api.post<Run>(`${path}/runs`, {
         baseRevision: inquiry.currentRevision,
         action,
+        context: runContext(composerContext),
         assetVersionIds: selectedAssets ?? revision?.assetRefs ?? [],
         instruction:
           evidence ||
@@ -276,6 +288,7 @@ export function InquiryWorkspace({
       });
       setLastRunId(r.runId || r.id);
       setInput('');
+      setComposerContext(emptyComposerContext());
       showAIChat();
       setModal(null);
       setRevisionNumber(null);
@@ -544,6 +557,7 @@ export function InquiryWorkspace({
                       <time>{date(message.createdAt)}</time>
                     </header>
                     <p>{message.text}</p>
+                    <InvocationContext context={message.context} />
                   </article>
                 ))}
                 <button className="button" onClick={showAIChat}>
@@ -654,6 +668,7 @@ export function InquiryWorkspace({
                       <time>{date(message.createdAt)}</time>
                     </div>
                     <p>{message.text}</p>
+                    <InvocationContext context={message.context} />
                   </article>
                   {message.id === resultMessage?.id && resultPreview}
                 </div>
@@ -678,6 +693,7 @@ export function InquiryWorkspace({
                     <details className="iw-run-details">
                       <summary>运行详情</summary>
                       <small>runId: {run.id}</small>
+                      <InvocationContext context={run.context} />
                     </details>
                     {run.status === 'failed' && (
                       <button
@@ -685,6 +701,7 @@ export function InquiryWorkspace({
                         disabled={!canWrite}
                         onClick={() => {
                           setInput(run.instruction);
+                          setComposerContext(restoreContext(run.context));
                           setNotice('已恢复本次指令，确认后可重新处理。');
                         }}
                       >
@@ -712,71 +729,21 @@ export function InquiryWorkspace({
               )}
               <ErrorNotice error={runQuery.error} onRetry={() => void runQuery.refetch()} />
             </div>
-            <div className="iw-composer">
-              <label className="sr-only" htmlFor={`instruction-${inquiryId}`}>
-                补充要求或客户反馈
-              </label>
-              <textarea
-                id={`instruction-${inquiryId}`}
-                placeholder={
-                  readOnly
-                    ? '请回到当前版本、恢复处理或等待运行完成'
-                    : '例如：客户希望先试单 300 件，请准备现货方案…'
-                }
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                disabled={!canWrite}
-                onKeyDown={(e) => {
-                  if (
-                    e.key !== 'Enter' ||
-                    e.nativeEvent.isComposing ||
-                    e.nativeEvent.keyCode === 229
-                  )
-                    return;
-                  e.preventDefault();
-                  if (e.ctrlKey) {
-                    const textarea = e.currentTarget;
-                    textarea.setRangeText(
-                      '\n',
-                      textarea.selectionStart,
-                      textarea.selectionEnd,
-                      'end',
-                    );
-                    setInput(textarea.value);
-                    return;
-                  }
-                  if (canSend) void startRun();
-                }}
-              />
-              <div className="iw-composer-foot">
-                <button
-                  className="icon-button"
-                  aria-label="查看客户原始询盘"
-                  title="客户原始询盘"
-                  onClick={() => openDocument('original')}
-                >
-                  <Paperclip size={17} />
-                </button>
-                <span>
-                  {revision && draftsPending
-                    ? '正在载入回复草稿…'
-                    : input
-                      ? '草稿已暂存'
-                      : '仅当前询盘'}
-                  <span className="iw-send-shortcut"> · Enter 发送 · Ctrl + Enter 换行</span>
-                </span>
-                <button
-                  className="button button-primary iw-send-button"
-                  aria-label={inquiry.currentRevision ? '处理反馈' : '开始处理'}
-                  aria-keyshortcuts="Enter"
-                  title={inquiry.currentRevision ? '处理反馈' : '开始处理'}
-                  disabled={!canSend}
-                  onClick={() => startRun()}
-                >
-                  <ArrowUp size={18} />
-                </button>
-              </div>
-            </div>
+            <InquiryComposer
+              session={session}
+              inquiryId={inquiryId}
+              input={input}
+              selection={composerContext}
+              onInput={setInput}
+              onSelection={setComposerContext}
+              canWrite={canWrite}
+              canSend={canSend}
+              readOnly={readOnly}
+              draftsPending={!!revision && draftsPending}
+              sendLabel={inquiry.currentRevision ? '处理反馈' : '开始处理'}
+              onSend={() => void startRun()}
+              onOriginal={() => openDocument('original')}
+            />
             <div className="iw-case-actions">
               {inquiry.businessStatus === 'active' && (
                 <button
