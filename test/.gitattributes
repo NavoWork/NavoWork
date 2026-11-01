@@ -1,0 +1,11 @@
+# Source hashes and PDF byte offsets require the original bytes on every OS.
+*.pdf binary
+*.xlsx binary
+*.png binary
+*.jpg binary
+*.zip binary
+*.eml binary
+# These source files are also addressed by exact bytes in the asset manifest.
+workbench_demo/assets/*.txt binary
+workbench_demo/assets/*.md binary
+workbench_demo/assets/*.svg binary
