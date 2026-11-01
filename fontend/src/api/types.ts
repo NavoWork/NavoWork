@@ -288,6 +288,7 @@ export interface WorkbenchKnowledge {
   title: string;
   version: number;
   folder?: string;
+  caseId?: string;
 }
 export interface WorkbenchAsset {
   id: string;

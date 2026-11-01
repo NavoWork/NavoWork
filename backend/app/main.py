@@ -405,8 +405,6 @@ def create_run(request: Request, db: Session, user: User, case: Case, body: dict
     from .agent_files import enabled as file_tools_enabled, confirmed_facts
     file_tools = file_tools_enabled() and interactive and kind in ("prepare_quote", "apply_change", "confirm_requirements")
     if agent_mode:
-        evidence_rows = items(db, "evidence", case_id=case.id) if not body.get("inputRefs") else [db.get(Item, ref) for ref in body["inputRefs"]]
-        context["evidence"] = [{"id": row.id, **item_view(row)} for row in evidence_rows if row]
         facts = {**decode(case.payload).get("agentFacts", {}), **confirmed_facts(instruction)}
         history = [item_view(row) for row in items(db, "message", case_id=case.id)]
         history.sort(key=lambda message: message.get("createdAt", ""))

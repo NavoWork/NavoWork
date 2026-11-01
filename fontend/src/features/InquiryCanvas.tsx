@@ -41,13 +41,14 @@ import {
   X,
 } from 'lucide-react';
 import { api, mode } from '../api';
-import type { Asset, Inquiry, MaterialBundle, Message, Revision, Source } from '../api/types';
+import type { Asset, Inquiry, MaterialBundle, Message, Revision, Source, WorkbenchData } from '../api/types';
 import { ErrorNotice, Loading, Modal } from '../components/ui';
 import { CanvasPersistence } from './canvas-persistence';
 import { ResizeHandle } from '../components/ResizeHandle';
-import { FilePreview, OriginalDocument, WorkingDocument } from './InquiryDocument';
+import { FilePreview, NodeReferenceDocument, OriginalDocument, WorkingDocument } from './InquiryDocument';
+import { filterNodeFolders, nodeDirectoryFolders, nodeReferenceDocuments } from './inquiry-node-directory';
 import { ConversationResults } from './ConversationResults';
-import type { GenerationNode } from './GenerateNodeDialog';
+import type { GenerationNode } from './inquiry-generation';
 import {
   canvasKey,
   defaultFolders,
@@ -365,7 +366,7 @@ function CanvasWorkspace({
   const [directoryOpen, setDirectoryOpen] = useState(
     () => window.matchMedia('(min-width: 601px)').matches,
   );
-  const [collapsed, setCollapsed] = useState<string[]>(['history']);
+  const [collapsed, setCollapsed] = useState<string[]>(['history', 'records']);
   const [selected, setSelected] = useState('');
   const [folderModal, setFolderModal] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -391,6 +392,11 @@ function CanvasWorkspace({
     })),
   });
   const assetIds = revision?.assetRefs ?? [];
+  const nodeSources = useQuery({
+    queryKey: ['inquiry', scope, 'node-sources', inquiry.currentRevision, inquiry.updatedAt],
+    queryFn: ({ signal }) => api.get<WorkbenchData>(`${path}/workbench`, signal),
+    enabled: mode === 'real',
+  });
   const assets = useQuery({
     queryKey: ['assets-for-inquiry', scope],
     queryFn: ({ signal }) => api.get<{ items: Asset[] }>(`${base}/assets`, signal),
@@ -437,6 +443,11 @@ function CanvasWorkspace({
     text: `已保存 ${revisions.length} 个业务版本。统一查看每轮需求、报价、回复与来源；历史恢复请到版本记录。`,
     caption: '统一成果入口',
   });
+  for (const doc of nodeReferenceDocuments(nodeSources.data)) {
+    const existing = docs.find((item) => item.id === doc.id);
+    if (existing) existing.reference = doc.reference;
+    else docs.push(doc);
+  }
   useEffect(() => {
     if (mode !== 'real') return;
     const remap = (id: string) =>
@@ -566,10 +577,11 @@ function CanvasWorkspace({
     ).map((doc) => doc.id),
   );
   const candidates = docs
-    .filter((doc, index) =>
+    .filter((doc) => !doc.directoryOnly)
+    .filter((doc, index, visible) =>
       mode === 'real'
         ? doc.kind !== 'revision' &&
-          docs.findIndex((d) => d.id === doc.id) === index &&
+          visible.findIndex((d) => d.id === doc.id) === index &&
           (!['requirements', 'risks', 'quote', 'reply'].includes(doc.kind) ||
             doc.id.endsWith(`:${revision?.number || 0}`)) &&
           (doc.kind !== 'result' || doc.id === 'result:hub')
@@ -596,6 +608,9 @@ function CanvasWorkspace({
       return rank(a.kind) - rank(b.kind);
     });
   const ordered = progressiveCanvasDocuments(candidates, Boolean(state.results?.length));
+  const directoryFolders = nodeDirectoryFolders(ordered, docs, nodeSources.data);
+  const visibleFolders = filterNodeFolders(directoryFolders, search);
+  const directoryCount = new Set(directoryFolders.flatMap((folder) => folder.items.map(({ doc }) => doc.id))).size;
   const occupied = ordered.flatMap((doc) =>
     state.positions[doc.id] ? [state.positions[doc.id]] : [],
   );
@@ -725,7 +740,7 @@ function CanvasWorkspace({
           <ListTree size={16} />
         </button>
         <span className="ic-toolbar-title">询盘资料</span>
-        <span className="ic-count">{docs.length}</span>
+        <span className="ic-count">{directoryCount}</span>
         <div className="ic-toolbar-spacer" />
         <button
           className="ic-icon"
@@ -821,74 +836,48 @@ function CanvasWorkspace({
               <span>当前询盘</span>
             </div>
             <div className="ic-folder-list">
-              {folders.map((folder) => {
-                const items = docs.filter(
-                  (d) =>
-                    d.folder === folder.id &&
-                    `${d.title} ${d.text}`.toLowerCase().includes(search.toLowerCase()),
-                );
+              {visibleFolders.map((folder) => {
                 const closed = !search && collapsed.includes(folder.id);
-                if (search && !items.length) return null;
                 return (
-                  <div className="ic-folder" key={folder.id}>
+                  <div className="ic-folder" key={folder.id} data-node-id={folder.node?.id}>
                     <button
                       className="ic-folder-toggle"
+                      aria-label={`${folder.title}文件夹`}
                       aria-expanded={!closed}
-                      onClick={() =>
-                        setCollapsed((s) =>
-                          s.includes(folder.id)
-                            ? s.filter((v) => v !== folder.id)
-                            : [...s, folder.id],
-                        )
-                      }
+                      title={folder.title}
+                      onClick={() => {
+                        setCollapsed((s) => s.includes(folder.id)
+                          ? s.filter((v) => v !== folder.id) : [...s, folder.id]);
+                        if (closed && folder.node && active === 'canvas') focus(folder.node);
+                      }}
                     >
                       {closed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
-                      <Folder size={13} />
+                      {closed ? <Folder size={14} /> : <FolderOpen size={14} />}
                       <span>{folder.title}</span>
-                      <small>{items.length}</small>
+                      <small>{folder.items.length}</small>
                     </button>
                     {!closed && (
                       <div className="ic-folder-items">
-                        {items.length ? (
-                          items.map((doc) => {
-                            const Icon = icons[doc.kind];
-                            return (
-                              <button
-                                key={doc.id}
-                                aria-label={doc.title}
-                                className={
-                                  selected === doc.id || active === doc.id ? 'is-selected' : ''
-                                }
-                                title={`${doc.title} · 双击打开，Enter 打开`}
-                                onClick={() => focus(doc)}
-                                onDoubleClick={() => open(doc.id)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    open(doc.id);
-                                  }
-                                }}
-                              >
-                                <Icon size={13} />
-                                <span>{doc.title}</span>
-                                {state.drafts[doc.id] !== undefined && (
-                                  <i aria-label="有工作草稿" />
-                                )}
-                              </button>
-                            );
-                          })
-                        ) : (
-                          <span className="ic-folder-empty">暂无内容</span>
-                        )}
+                        {folder.items.map(({ doc, title }) => (
+                          <button
+                            key={doc.id}
+                            aria-label={title}
+                            className={active === doc.id ? 'is-selected' : ''}
+                            title={`${title} · 点击打开`}
+                            onClick={() => open(doc.id)}
+                          >
+                            <FileText size={14} />
+                            <span>{title}</span>
+                            {state.drafts[doc.id] !== undefined && <i aria-label="有工作草稿" />}
+                          </button>
+                        ))}
                       </div>
                     )}
                   </div>
                 );
               })}
-              {search &&
-                !docs.some((d) =>
-                  `${d.title} ${d.text}`.toLowerCase().includes(search.toLowerCase()),
-                ) && <p className="ic-no-match">没有找到相关资料</p>}
+              {search && !visibleFolders.length && <p className="ic-no-match">没有找到相关资料</p>}
+              {nodeSources.error && <ErrorNotice error={nodeSources.error} onRetry={() => void nodeSources.refetch()} />}
             </div>
             <div className="ic-directory-footer">
               <span className="ic-scope-dot" />
@@ -1108,6 +1097,8 @@ function CanvasWorkspace({
                           : undefined
                       }
                     />
+                  ) : doc.evidenceId || doc.reference ? (
+                    <NodeReferenceDocument doc={doc} path={path} base={base} />
                   ) : doc.kind === 'note' ? (
                     <div className="ic-document-sheet">
                       <div className="ic-document-eyebrow">WORKING NOTES</div>

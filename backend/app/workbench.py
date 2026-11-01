@@ -636,7 +636,8 @@ def workbench_view(db: Session, case: Case, user: User) -> dict:
         for value in [item_view(row)]
     ]
     knowledge = []
-    for row in items(db, "resource"):
+    from .run_context import inquiry_knowledge
+    for row in inquiry_knowledge(db, case):
         value = item_view(row)
         if value.get("kind") != "knowledge" or value.get("status") != "published":
             continue

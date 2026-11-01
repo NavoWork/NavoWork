@@ -98,9 +98,6 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
   useEffect(() => { setError(undefined); }, [inquiryId]);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [sourcesOpen, setSourcesOpen] = useState(false);
-  const [selectedEvidence, setSelectedEvidence] = useState<string[]>([]);
-  const [selectedKnowledge, setSelectedKnowledge] = useState<string[]>([]);
-  const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
   const [notice, setNotice] = useState('');
   const stageInitialized = useRef(false);
 
@@ -151,8 +148,7 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
     if (saved && data.stages.some((item) => item.key === saved)) setStage(saved);
     else if (next) setStage(next.key);
     stageInitialized.current = true;
-    if (!selectedEvidence.length) setSelectedEvidence(data.evidence.map((item) => item.id));
-  }, [data, selectedEvidence.length, stage]);
+  }, [data, stage]);
 
   useEffect(() => {
     try { localStorage.setItem(`easywork:wb-stage:${scope}`, stage); } catch { /* preference only */ }
@@ -204,9 +200,7 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
           : instruction,
         context,
         baseRevision: data.case.currentRevision,
-        inputRefs: selectedEvidence,
-        sourceVersionIds: [...new Set([...selectedKnowledge, ...(selection?.knowledge.flatMap((doc) => doc.sourceVersionId ? [doc.sourceVersionId] : []) || [])])],
-        assetVersionIds: selectedAssets,
+        sourceVersionIds: selection?.knowledge.flatMap((doc) => doc.sourceVersionId ? [doc.sourceVersionId] : []) || [],
       });
       qc.setQueryData(['workbench-run', scope, result.id], result);
       setRunId(result.id);
@@ -318,7 +312,7 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
   if (workbench.error) return <ErrorNotice error={workbench.error} onRetry={() => void workbench.refetch()} />;
   if (!data) return <EmptyHint>项目不存在或没有访问权限。</EmptyHint>;
 
-  const selectedRefCount = selectedEvidence.length + selectedKnowledge.length + selectedAssets.length;
+  const sourceCount = data.evidence.length + data.knowledge.length + data.assets.length;
 
   return (
     <div className="wbv2">
@@ -400,7 +394,7 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
           events={events.data?.items || []}
           running={!!data.case.activeRunId || (!!run.data && ['queued', 'running'].includes(run.data.status))}
           busy={busy}
-          selectedRefs={selectedRefCount}
+          selectedRefs={sourceCount}
           onSend={(text, selection) => sendAgent(text, undefined, selection)}
           onAnswer={answerAgent}
           onOpenSources={() => setSourcesOpen(true)}
@@ -423,12 +417,6 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
         <SourcesDialog
           data={data}
           path={path}
-          selectedEvidence={selectedEvidence}
-          selectedKnowledge={selectedKnowledge}
-          selectedAssets={selectedAssets}
-          onChangeEvidence={setSelectedEvidence}
-          onChangeKnowledge={setSelectedKnowledge}
-          onChangeAssets={setSelectedAssets}
           onClose={() => setSourcesOpen(false)}
           onUploaded={() => void operate(async () => {}, '原件已保存。')}
         />
@@ -482,15 +470,9 @@ function ConfirmDialog({ state, data, busy, error, onClose, onSubmit }: {
   );
 }
 
-function SourcesDialog({ data, path, selectedEvidence, selectedKnowledge, selectedAssets, onChangeEvidence, onChangeKnowledge, onChangeAssets, onClose, onUploaded }: {
+function SourcesDialog({ data, path, onClose, onUploaded }: {
   data: WorkbenchData;
   path: string;
-  selectedEvidence: string[];
-  selectedKnowledge: string[];
-  selectedAssets: string[];
-  onChangeEvidence: (value: string[]) => void;
-  onChangeKnowledge: (value: string[]) => void;
-  onChangeAssets: (value: string[]) => void;
   onClose: () => void;
   onUploaded: () => void;
 }) {
@@ -509,8 +491,7 @@ function SourcesDialog({ data, path, selectedEvidence, selectedKnowledge, select
       const form = new FormData();
       form.append('file', file);
       form.append('sourceRole', role);
-      const uploaded = await api.post<WorkbenchEvidence>(`${path}/evidence`, form);
-      onChangeEvidence([...selectedEvidence, uploaded.id]);
+      await api.post<WorkbenchEvidence>(`${path}/evidence`, form);
       setFile(null);
       onUploaded();
     } catch (e) {
@@ -550,7 +531,6 @@ function SourcesDialog({ data, path, selectedEvidence, selectedKnowledge, select
               {data.evidence.map((item) => (
                 <div className="wbv2-source-item" key={item.id}>
                   <label>
-                    <input type="checkbox" checked={selectedEvidence.includes(item.id)} onChange={(event) => onChangeEvidence(event.target.checked ? [...selectedEvidence, item.id] : selectedEvidence.filter((id) => id !== item.id))} />
                     <div><strong>{item.title}</strong><small>{sourceRoleLabel[item.sourceRole] || item.sourceRole}</small></div>
                   </label>
                   <button className="wbv2-text-button" onClick={() => setPreview(preview === item.id ? '' : item.id)}>{preview === item.id ? '收起' : '查看'}</button>
@@ -568,7 +548,6 @@ function SourcesDialog({ data, path, selectedEvidence, selectedKnowledge, select
           <div className="wbv2-source-pick">
             {data.knowledge.map((item) => (
               <label key={item.id}>
-                <input type="checkbox" checked={selectedKnowledge.includes(item.id)} onChange={(event) => onChangeKnowledge(event.target.checked ? [...selectedKnowledge, item.id] : selectedKnowledge.filter((id) => id !== item.id))} />
                 <div><strong>{item.title}</strong><small>V{item.version} · 固定版本</small></div>
               </label>
             ))}
@@ -579,7 +558,6 @@ function SourcesDialog({ data, path, selectedEvidence, selectedKnowledge, select
           <div className="wbv2-source-pick">
             {data.assets.map((item) => (
               <label key={item.id}>
-                <input type="checkbox" checked={selectedAssets.includes(`${item.id}:v${item.version}`)} onChange={(event) => onChangeAssets(event.target.checked ? [...selectedAssets, `${item.id}:v${item.version}`] : selectedAssets.filter((id) => id !== `${item.id}:v${item.version}`))} />
                 <div><strong>{item.title}</strong><small>V{item.version} · {item.mediaType}</small></div>
               </label>
             ))}
@@ -587,7 +565,7 @@ function SourcesDialog({ data, path, selectedEvidence, selectedKnowledge, select
           </div>
         )}
         <div className="wbv2-dialog-actions">
-          <span>选中的资料会冻结在本轮任务输入中。</span>
+          <span>Agent 自动读取本询盘资料，无需勾选。</span>
           <button className="button button-primary" onClick={onClose}>完成</button>
         </div>
       </div>

@@ -61,7 +61,7 @@ class Empty(BaseModel):
 
 
 class ReadSourceArgs(BaseModel):
-    source_id: str = Field(description="证据 ID、知识库版本 ID、资产版本 ID（asset:vN）或 case 原文 ID。")
+    source_id: str = Field(description="证据 ID、画板附件 ID、知识库版本 ID、资产版本 ID（asset:vN）或 case 原文 ID。")
     max_chars: int = Field(default=8000, ge=500, le=20000, description="最多返回的字符数。")
 
 
@@ -400,7 +400,8 @@ class WorkbenchToolbox:
             # Case-specific confirmation documents may carry approved pricing
             # assumptions (FX, margin, quantity). They are still only inputs;
             # formal approval remains a separate human gate.
-            for row in items(db, "resource"):
+            from .run_context import inquiry_knowledge
+            for row in inquiry_knowledge(db, case):
                 value = item_view(row)
                 if (
                     value.get("kind") == "knowledge"
@@ -445,7 +446,8 @@ class WorkbenchToolbox:
             offers = [item_view(row) for row in items(db, "supplier_offer", case_id=case.id)]
             knowledge = []
             project_knowledge = []
-            for row in items(db, "resource"):
+            from .run_context import inquiry_knowledge
+            for row in inquiry_knowledge(db, case):
                 value = item_view(row)
                 if value.get("kind") == "knowledge" and value.get("status") == "published":
                     if value.get("caseId") and value.get("caseId") != case.id:
@@ -479,6 +481,7 @@ class WorkbenchToolbox:
                 "customerContext": decode(case.payload).get("customerContext"),
                 "stages": [{"key": s["key"], "status": s["status"], "summary": s["summary"], "missing": s["missing"], "nextAction": s["nextAction"]} for s in stages],
                 "artifacts": artifacts,
+                "canvasFiles": decode(job.payload).get("canvasManifest", []),
                 "evidence": [{"id": row.id, "title": item_view(row).get("title"), "sourceRole": item_view(row).get("sourceRole")} for row in items(db, "evidence", case_id=case.id)],
                 "knowledge": knowledge,
                 "projectKnowledge": project_knowledge,
@@ -510,10 +513,21 @@ class WorkbenchToolbox:
             return {"id": row.id, "title": value.get("title"), "sourceRole": value.get("sourceRole"), "text": text[:max_chars], "truncated": len(text) > max_chars}
         if row and row.kind == "resource" and row.workspace_id == case.workspace_id:
             value = item_view(row)
+            if ((value.get("caseId") and value["caseId"] != case.id) or (row.case_id and row.case_id != case.id)
+                or value.get("space") == "personal"):
+                raise AgentToolError("SOURCE_NOT_FOUND", "资料不存在或不属于本项目")
             if value.get("status") == "revoked":
                 raise AgentToolError("SOURCE_REVOKED", "该知识版本已撤销")
             text = value.get("content") or ""
             return {"id": row.id, "title": value.get("title"), "sourceRole": "knowledge", "version": row.version, "text": text[:max_chars], "truncated": len(text) > max_chars}
+        if row and row.kind == "canvas_file" and row.case_id == case.id and row.parent_id == user.id:
+            blob = db.get(Blob, decode(row.payload).get("blobId"))
+            if not blob:
+                raise AgentToolError("SOURCE_UNAVAILABLE", "画板附件不可用")
+            from .sop_api import _extract_file
+            text = _extract_file(Path(blob.path).read_bytes(), blob.filename)
+            return {"id": row.id, "title": blob.filename, "sourceRole": "canvas_file", "mediaType": blob.media_type,
+                    "text": text[:max_chars], "truncated": len(text) > max_chars}
         match = re.fullmatch(r"(.+):v(\d+)", source_id)
         if match:
             from .workspace_api import asset_version
@@ -541,7 +555,8 @@ class WorkbenchToolbox:
         with self._tx(write=True) as (db, case, user, run, job):
             terms = [term for term in re.split(r"[\s,，。;；]+", args.query.lower()) if term]
             rows = []
-            for row in items(db, "resource"):
+            from .run_context import inquiry_knowledge
+            for row in inquiry_knowledge(db, case):
                 value = item_view(row)
                 if value.get("kind") != "knowledge" or value.get("status") != "published":
                     continue

@@ -40,6 +40,9 @@ export interface WorkspaceDocument {
   source?: Source;
   file?: WorkspaceFile;
   revision?: Revision;
+  directoryOnly?: boolean;
+  evidenceId?: string;
+  reference?: { sourceId: string; version: number };
 }
 
 const workflowKinds: DocumentKind[] = ['requirements', 'quote', 'risks', 'reply'];

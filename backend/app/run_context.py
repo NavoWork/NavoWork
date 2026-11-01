@@ -5,7 +5,7 @@ import re
 from .agent import price_quote
 from .core import create_item, decode, encode, fail, idem_store, item_view, items, touch, uid
 from .models import Blob, Item, Job, Run, WorkItem, now
-from .workspace_api import asset_version
+from .workspace_api import asset_rows, asset_version, canvas_file
 
 
 def require_capability(db, key):
@@ -39,19 +39,68 @@ def ref_list(body, name):
     return list(dict.fromkeys(refs))
 
 
+def inquiry_knowledge(db, case):
+    """Latest published versions of this inquiry's references and shared knowledge."""
+    latest = {}
+    for row in items(db, "resource"):
+        value = item_view(row)
+        if (value.get("kind") != "knowledge" or value.get("status") != "published"
+            or value.get("space") == "personal"
+            or (value.get("caseId") and value["caseId"] != case.id)
+            or (row.case_id and row.case_id != case.id)):
+            continue
+        key = value.get("sourceId", row.id)
+        if key not in latest or row.version > latest[key].version:
+            latest[key] = row
+    return sorted(latest.values(), key=lambda row: (decode(row.payload).get("caseId") != case.id, row.id))
+
+
+def inquiry_canvas_manifest(db, user, case, body):
+    refs = ref_list(body, "canvasFileIds")
+    canvas = db.get(Item, f"canvas:{case.id}:{user.id}")
+    if canvas:
+        refs.extend(file["serverFileId"] for file in decode(canvas.payload).get("files", []) if file.get("serverFileId"))
+    manifest = []
+    for ref in dict.fromkeys(refs):
+        row = canvas_file(db, user, case, ref)
+        blob = db.get(Blob, decode(row.payload)["blobId"])
+        if not blob:
+            fail("NOT_FOUND", "画板附件不存在", 404)
+        manifest.append({"id": row.id, "blobId": blob.id, "sha256": blob.sha256,
+                         "name": blob.filename, "mediaType": blob.media_type})
+    return manifest
+
+
 def prepare_context(db, user, case, body):
     source_refs, asset_refs, evidence, source_texts = [], [], [], []
+    auto = body.get("agentMode") or body.get("contextScope") == "inquiry"
+    refs = {name: ref_list(body, name) for name in ("inputRefs", "sourceVersionIds", "assetVersionIds")}
+    if auto:
+        refs["inputRefs"].extend(row.id for row in items(db, "evidence", case_id=case.id))
+        refs["sourceVersionIds"].extend(row.id for row in inquiry_knowledge(db, case))
+        latest_assets = {}
+        for row in asset_rows(db, user):
+            value = item_view(row)
+            if value.get("space") == "personal" or not value.get("blobId"):
+                continue
+            key = value.get("id", row.id)
+            if key not in latest_assets or row.version > latest_assets[key].version:
+                latest_assets[key] = row
+        refs["assetVersionIds"].extend(f"{key}:v{row.version}" for key, row in latest_assets.items())
     budget = 32000
-    for ref in ref_list(body, "inputRefs"):
+    for ref in dict.fromkeys(refs["inputRefs"]):
         row = db.get(Item, ref)
         if not row or row.case_id != case.id or row.kind != "evidence":
             fail("NOT_FOUND", "证据不属于当前询盘", 404)
         evidence.append({"id": row.id, "version": row.version, **item_view(row)})
-    for ref in ref_list(body, "sourceVersionIds"):
+    for ref in dict.fromkeys(refs["sourceVersionIds"]):
         row = db.get(Item, ref)
         if not row or row.kind != "resource" or row.workspace_id != case.workspace_id:
             fail("NOT_FOUND", "资料版本不存在", 404)
         value = item_view(row)
+        if ((value.get("caseId") and value["caseId"] != case.id) or (row.case_id and row.case_id != case.id)
+            or value.get("space") == "personal"):
+            fail("NOT_FOUND", "资料不属于当前询盘或共享知识库", 404)
         if value.get("status") == "revoked":
             fail("SOURCE_REVOKED", "所选资料已撤销", 422)
         source_refs.append({"sourceVersionId": row.id, "sourceId": value["sourceId"], "version": row.version,
@@ -60,7 +109,7 @@ def prepare_context(db, user, case, body):
         excerpt = value["content"][:min(budget, 8000)]
         budget -= len(excerpt)
         source_texts.append({"id": row.id, "content": excerpt, "truncated": len(excerpt) < len(value["content"]), "status": value["status"]})
-    for ref in ref_list(body, "assetVersionIds"):
+    for ref in dict.fromkeys(refs["assetVersionIds"]):
         match = re.fullmatch(r"(.+):v(\d+)", ref)
         if not match:
             fail("INVALID_INPUT", "素材引用必须指定版本")
@@ -93,6 +142,7 @@ def prepare_context(db, user, case, body):
         offers.append(item_view(row))
     return {"originalText": decode(case.payload).get("originalText", ""), "evidence": evidence,
             "sourceRefs": source_refs, "sourceTexts": source_texts, "assetManifest": asset_refs,
+            "canvasManifest": inquiry_canvas_manifest(db, user, case, body) if auto else [],
             "supplierOffers": offers, "acceptedProposal": proposal, "priorExtracted": prior if baseline else {}, "createdBy": user.id}
 
 
@@ -142,6 +192,8 @@ def resume_run(request, db, user, case, body, marker):
         if not isinstance(canvas_refs, list) or len(canvas_refs) > 50 or any(not isinstance(v, str) for v in canvas_refs):
             fail("INVALID_INPUT", "画板附件引用无效")
         manifest = {x["id"]: x for x in payload.get("canvasManifest", [])}
+        if payload.get("agentMode"):
+            manifest.update({x["id"]: x for x in inquiry_canvas_manifest(db, user, case, body)})
         for ref in canvas_refs:
             row = canvas_file(db, user, case, ref)
             blob = db.get(Blob, decode(row.payload)["blobId"])

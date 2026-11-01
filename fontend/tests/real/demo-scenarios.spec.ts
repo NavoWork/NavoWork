@@ -60,13 +60,28 @@ test('create independent demo inquiries and use real Agent chat from both views'
     const node = await page.locator('.react-flow__node:visible').nth(1).boundingBox();
     return { board, node, fits: !!board && !!node && node.x >= board.x && node.x + node.width <= board.x + board.width + 1 };
   }).toMatchObject({ fits: true });
-  await page.getByRole('button', { name: '依据现有资料生成', exact: true }).click();
   const nodeDispatch = page.waitForResponse(r => r.url().endsWith('/workbench/agent') && r.request().method() === 'POST');
-  await page.getByRole('button', { name: '依据所选资料生成', exact: true }).click();
+  await page.getByRole('button', { name: '依据现有资料生成', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   const nodeResponse = await nodeDispatch;
   expect(nodeResponse.ok()).toBeTruthy();
   expect(nodeResponse.request().postDataJSON().node).toBe('requirements');
+  expect(nodeResponse.request().postDataJSON().contextScope).toBe('inquiry');
   const nodeRun = await nodeResponse.json();
   await page.request.post(`/api/v1/workspaces/ws_demo/runs/${nodeRun.id}/cancel`);
+  // Ordinary inquiries use the same one-click path, without a source-selection modal.
+  const blankResponse = await page.request.post('/api/v1/workspaces/ws_demo/inquiries', {
+    data: { title: 'Blank inquiry generation', customer: 'Test buyer', originalText: 'Please quote 100 backpacks.' },
+  });
+  const blank = await blankResponse.json();
+  await page.goto(`/inquiries/${blank.id}`);
+  await expect(page.locator('.react-flow__node:visible')).toHaveCount(2);
+  const blankDispatch = page.waitForResponse(r => r.url().endsWith('/workbench/agent') && r.request().method() === 'POST');
+  await page.getByRole('button', { name: '依据现有资料生成', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const blankRunResponse = await blankDispatch;
+  expect(blankRunResponse.ok()).toBeTruthy();
+  expect(blankRunResponse.request().postDataJSON().node).toBe('requirements');
+  await page.request.post(`/api/v1/workspaces/ws_demo/runs/${(await blankRunResponse.json()).id}/cancel`);
   expect(serverErrors).toEqual([]);
 });

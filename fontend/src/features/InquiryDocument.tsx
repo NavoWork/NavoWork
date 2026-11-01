@@ -1,11 +1,47 @@
 import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Check, Download, FileText, LockKeyhole, Send, Save } from 'lucide-react';
 import { api, mode } from '../api';
-import type { Inquiry } from '../api/types';
+import type { Inquiry, Source, WorkbenchEvidence } from '../api/types';
 import { ErrorNotice, Loading } from '../components/ui';
 import { getCanvasFile, type WorkspaceDocument, type WorkspaceFile } from './inquiry-canvas-model';
 import { CustomerContextCard } from './CustomerContextCard';
 import { RequirementsTable } from './RequirementsTable';
+
+export function NodeReferenceDocument({ doc, path, base }: { doc: WorkspaceDocument; path: string; base: string }) {
+  const [downloadError, setDownloadError] = useState<unknown>();
+  const source = useQuery({
+    queryKey: ['node-reference', path, doc.id],
+    queryFn: ({ signal }) => doc.evidenceId
+      ? api.get<WorkbenchEvidence>(`${path}/evidence/${encodeURIComponent(doc.evidenceId)}`, signal)
+      : api.get<Source>(`${base}/sources/${encodeURIComponent(doc.reference!.sourceId)}/versions/${doc.reference!.version}`, signal),
+  });
+  async function download() {
+    setDownloadError(undefined);
+    try {
+      const blob = await api.download(`${path}/evidence/${encodeURIComponent(doc.evidenceId!)}/download`);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = doc.title;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) { setDownloadError(error); }
+  }
+  return <div className="ic-document-sheet">
+    <h2>{doc.title}</h2>
+    <p className="ic-document-subtitle">{doc.caption}</p>
+    {source.isPending ? <Loading label="正在读取原件" /> : source.error ?
+      <ErrorNotice error={source.error} onRetry={() => void source.refetch()} /> : <>
+        {doc.evidenceId && (source.data as WorkbenchEvidence)?.blobId &&
+          <button className="button" onClick={() => void download()}><Download size={14} />下载原件</button>}
+        <pre className="ic-source-content">{doc.evidenceId
+          ? (source.data as WorkbenchEvidence)?.text || '此原件没有可提取的文字，请下载查看。'
+          : (source.data as Source)?.content}</pre>
+      </>}
+    {downloadError ? <ErrorNotice error={downloadError} onRetry={() => void download()} /> : null}
+  </div>;
+}
 
 export function FilePreview({
   file,

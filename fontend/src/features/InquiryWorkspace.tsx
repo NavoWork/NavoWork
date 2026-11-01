@@ -56,7 +56,7 @@ import {
   runContext,
   type ComposerContext,
 } from './inquiry-context';
-import { GenerateNodeDialog, type GenerationNode } from './GenerateNodeDialog';
+import { generateInquiryNode, type GenerationNode } from './inquiry-generation';
 import { CustomerContextCard, channelLabels } from './CustomerContextCard';
 import { ResizeHandle } from '../components/ResizeHandle';
 import './inquiry.css';
@@ -165,10 +165,7 @@ export function InquiryWorkspace({
   useEffect(() => { setError(undefined); setRevisionNumber(null); }, [inquiryId]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
-  const [generation, setGeneration] = useState<{
-    node: GenerationNode;
-    instruction?: string;
-  } | null>(null);
+  const generationPending = useRef(false);
   const [draftState, setDraftState] = useState<DraftState>({
     revision: null,
     versions: {},
@@ -286,6 +283,22 @@ export function InquiryWorkspace({
       }
     } finally {
       setBusy(false);
+    }
+  }
+  async function generateNode(node: GenerationNode, instruction?: string) {
+    if (!inquiry || generationPending.current || busy || readOnly || inquiry.pendingRunId || replyEditsPending) return;
+    generationPending.current = true;
+    showAIChat();
+    try {
+      await operate(async () => {
+        const next = await generateInquiryNode(path, inquiry, node, instruction);
+        setLastRunId(next.id);
+        setRevisionNumber(null);
+        queryClient.setQueryData(['run', scope, next.id], next);
+        await refresh();
+      });
+    } finally {
+      generationPending.current = false;
     }
   }
   async function startRun(
@@ -625,7 +638,7 @@ export function InquiryWorkspace({
             readOnly={readOnly}
             onGenerate={
               mode === 'real'
-                ? (node, instruction) => setGeneration({ node, instruction })
+                ? (node, instruction) => void generateNode(node, instruction)
                 : undefined
             }
             onRestore={mode === 'real' ? restoreRevision : undefined}
@@ -862,24 +875,6 @@ export function InquiryWorkspace({
           <CustomerContextCard inquiry={inquiry} />
           <pre className="iw-original-full">{inquiry.originalText}</pre>
         </Modal>
-      )}
-      {generation && (
-        <GenerateNodeDialog
-          inquiry={inquiry}
-          base={base}
-          path={path}
-          node={generation.node}
-          instruction={generation.instruction}
-          onClose={() => setGeneration(null)}
-          onStarted={(r) => {
-            setGeneration(null);
-            setLastRunId(r.id);
-            setRevisionNumber(null);
-            showAIChat();
-            queryClient.setQueryData(['run', scope, r.id], r);
-            void refresh();
-          }}
-        />
       )}
       {modal === 'waiting' && (
         <Modal title="标记为待确认" onClose={() => setModal(null)}>
