@@ -7,7 +7,6 @@ import {
   CircleAlert,
   Download,
   FileText,
-  Link2,
   PackageCheck,
   PencilLine,
   Plus,
@@ -22,6 +21,7 @@ import type {
   WorkbenchArtifact,
   WorkbenchData,
 } from '../../api/types';
+import { channelLabels } from '../CustomerContextCard';
 import { EmptyHint, Field, MissingList, Pill, Section, money, shortDate, stageStatusLabel } from './ui';
 
 type SaveArtifact = (kind: string, content: Record<string, any>, baseVersion: number) => Promise<boolean>;
@@ -49,13 +49,20 @@ const specValue = (fields: Record<string, any> | undefined, key: string) => {
 export function InquiryPanel({ data, onAgent }: { data: WorkbenchData; onAgent: RunAgent }) {
   const profile = data.customerProfile?.profile || data.customerContext || {};
   const assessment = data.artifacts.inquiry_assessment?.content || {};
+  const summary = assessment.summary || data.customerContext.summary;
+  const checks = [...(data.customerContext.checks || []), ...(profile.checks || [])]
+    .filter((check) => check.status !== 'matched');
+  const missing: string[] = [...new Set<string>([
+    ...(assessment.missing || []),
+    ...checks.map((check) => `${check.label}${check.detail ? `：${check.detail}` : ''}`),
+  ])];
+  const risks: string[] = assessment.risks || [];
+  const channel = (profile.channel || data.customerContext.channel || 'unknown') as keyof typeof channelLabels;
   return (
     <div className="wbv2-stack">
       <Section
         className="wbv2-inquiry-card"
-        eyebrow="01 · QUALIFY"
-        title="客户与询盘"
-        description="先确认客户背景、采购条件和缺项，再进入规格与报价。"
+        title="客户原始询盘"
         actions={
           <button className="button button-primary" onClick={() => onAgent('请阅读客户询盘，核验客户背景与采购条件，整理需要向客户澄清的关键问题。不要生成规格或报价。', 'inquiry')}>
             <Sparkles size={14} /> 让 Agent 分析
@@ -67,58 +74,45 @@ export function InquiryPanel({ data, onAgent }: { data: WorkbenchData; onAgent: 
             <span className="wbv2-avatar">{String(profile.company || data.case.customer || 'C').slice(0, 1).toUpperCase()}</span>
             <div>
               <h3>{profile.company || data.case.customer}</h3>
-              <p>{[profile.country, profile.business].filter(Boolean).join(' · ') || '客户背景待补充'}</p>
+              {data.case.destination && <p>{data.case.destination}</p>}
             </div>
           </div>
+        </div>
+        <pre className="wbv2-original" tabIndex={0} aria-label="客户原文">{data.case.originalText}</pre>
+        {summary && <p className="wbv2-note wbv2-inquiry-summary">{summary}</p>}
+        <details className="wbv2-customer-details">
+          <summary>客户信息</summary>
           <div className="wbv2-kv">
-            <div><span>来源</span><strong>{(profile.channel || data.customerContext.channel) === 'unknown' ? '待补充' : profile.channel || data.customerContext.channel || '待补充'}</strong></div>
+            <div><span>来源</span><strong>{channelLabels[channel] || channel}</strong></div>
             <div><span>邮箱</span><strong>{profile.email || data.customerContext.email || '待补充'}</strong></div>
-            <div><span>目的地</span><strong>{data.case.destination || '待确认'}</strong></div>
-            <div><span>当前版本</span><strong>V{data.case.currentRevision}</strong></div>
+            <div><span>国家 / 地区</span><strong>{profile.country || '待补充'}</strong></div>
+            <div><span>主营业务</span><strong>{profile.business || '待补充'}</strong></div>
           </div>
-        </div>
-        <p className="wbv2-note wbv2-inquiry-summary">{assessment.summary || data.customerContext.summary || '尚未形成客户与询盘摘要，可让 Agent 根据现有资料分析。'}</p>
-        <div className="wbv2-split">
-          <div>
-            <h4 className="wbv2-label">客户原文</h4>
-            <pre className="wbv2-original" tabIndex={0} aria-label="客户原文">{data.case.originalText}</pre>
-          </div>
-          <div>
-            <h4 className="wbv2-label">待确认</h4>
-            {assessment.missing?.length ? (
-              <ul className="wbv2-check-list">
-                {assessment.missing.map((item: string) => <li key={item}><CircleAlert size={13} />{item}</li>)}
-              </ul>
-            ) : data.customerContext.checks?.some((check) => check.status !== 'matched') ? (
-              <ul className="wbv2-check-list">
-                {data.customerContext.checks.filter((check) => check.status !== 'matched').map((check) => <li key={check.label}><CircleAlert size={13} />{check.label}：{check.detail}</li>)}
-              </ul>
-            ) : (
-              <p className="wbv2-inquiry-empty">{data.artifacts.inquiry_assessment ? '当前评估未列出待确认项。' : '尚未完成询盘评估，待确认项将显示在这里。'}</p>
-            )}
-            <h4 className="wbv2-label wbv2-label-gap">风险</h4>
-            {assessment.risks?.length > 0 ? (
-              <ul className="wbv2-check-list is-warn">
-                {assessment.risks.map((item: string) => <li key={item}><CircleAlert size={13} />{item}</li>)}
-              </ul>
-            ) : (
-              <p className="wbv2-inquiry-empty">{data.artifacts.inquiry_assessment ? '当前评估未列出风险项。' : '风险尚待评估。'}</p>
-            )}
-          </div>
-        </div>
-        {profile.checks?.length > 0 && (
-          <div className="wbv2-checks">
-            {profile.checks.map((check: any) => (
-              <div key={check.label}>
-                <span className={`wbv2-dot wbv2-dot-${check.status === 'matched' ? 'confirmed' : check.status === 'review' ? 'draft' : 'empty'}`} />
-                <strong>{check.label}</strong>
-                <small>{check.detail}</small>
-              </div>
-            ))}
-          </div>
-        )}
+          {profile.checks?.length > 0 && (
+            <div className="wbv2-checks">
+              {profile.checks.map((check: any) => (
+                <div key={check.label}>
+                  <span className={`wbv2-dot wbv2-dot-${check.status === 'matched' ? 'confirmed' : check.status === 'review' ? 'draft' : 'empty'}`} />
+                  <strong>{check.label}</strong>
+                  <small>{check.detail}</small>
+                </div>
+              ))}
+            </div>
+          )}
+        </details>
       </Section>
-      <Section eyebrow="SOURCES" title="资料与依据" description="Agent 只读取本项目已授权的原件、知识库和公司资产。">
+      {(missing.length > 0 || risks.length > 0) && (
+        <Section title="风险与待确认项">
+          {missing.length > 0 && <><h3 className="wbv2-label">待确认</h3><ul className="wbv2-check-list">
+            {missing.map((item) => <li key={item}><CircleAlert size={14} />{item}</li>)}
+          </ul></>}
+          {risks.length > 0 && <><h3 className={`wbv2-label ${missing.length ? 'wbv2-label-gap' : ''}`}>风险</h3><ul className="wbv2-check-list is-warn">
+            {risks.map((item) => <li key={item}><CircleAlert size={14} />{item}</li>)}
+          </ul></>}
+        </Section>
+      )}
+      {data.evidence.length > 0 && <details className="wbv2-card wbv2-source-details">
+        <summary>资料与依据 · {data.evidence.length}</summary>
         <div className="wbv2-source-list">
           {data.evidence.slice(0, 8).map((item) => (
             <div key={item.id} className="wbv2-source-row">
@@ -127,9 +121,8 @@ export function InquiryPanel({ data, onAgent }: { data: WorkbenchData; onAgent: 
               <Pill tone={item.sourceRole === 'customer_request' ? 'blue' : 'neutral'}>{item.parseStatus === 'succeeded' ? '已解析' : '原件'}</Pill>
             </div>
           ))}
-          {!data.evidence.length && <EmptyHint>还没有上传原件。请先在“资料”中导入客户询盘或供应商报价。</EmptyHint>}
         </div>
-      </Section>
+      </details>}
     </div>
   );
 }
@@ -166,9 +159,7 @@ export function RequirementsPanel({ data, onAgent, onSave, onConfirm, busy }: { 
   return (
     <div className="wbv2-stack">
       <Section
-        eyebrow="02 · TECH PACK"
         title="客户需求与规格"
-        description="箱包 Tech Pack 是询价、打样、生产和验货的共同依据。未知字段保持空白。"
         actions={
           <>
             <button className="button" onClick={() => onAgent('请读取客户询盘与规格资料，补全箱包 Tech Pack 和 BOM；缺失的关键参数向我提问，不要编造。', 'requirements')}>
@@ -182,7 +173,7 @@ export function RequirementsPanel({ data, onAgent, onSave, onConfirm, busy }: { 
         }
       >
         {!spec ? (
-          <EmptyHint>尚未生成规格。点击“让 Agent 补齐”，从客户询盘开始整理 Tech Pack。</EmptyHint>
+          <EmptyHint>尚未生成规格</EmptyHint>
         ) : (
           <>
             <div className="wbv2-meta-row">
@@ -211,16 +202,11 @@ export function RequirementsPanel({ data, onAgent, onSave, onConfirm, busy }: { 
                 </div>
               ))}
             </div>
-            <div className="wbv2-inline-note">
-              <Link2 size={14} /> 已知字段由 Agent 从客户原件抽取；编辑后会生成新的规格版本，旧版本保留。
-            </div>
           </>
         )}
       </Section>
       <Section
-        eyebrow="BOM"
         title="物料与辅料清单"
-        description="主料、里布、拉链/五金、包装各自独立成行，便于询价和核价。"
         actions={<button className="button" onClick={() => onAgent('请根据当前规格和客户要求整理 BOM，包含面料、里布、拉链/五金、包装；没有单价的先留空。', 'requirements')}><Sparkles size={14} /> 让 Agent 补 BOM</button>}
       >
         {!bom?.content?.rows?.length ? (
@@ -290,9 +276,7 @@ export function CostingPanel({ data, onAgent, onSave, onConfirm, onExport, busy 
   return (
     <div className="wbv2-stack">
       <Section
-        eyebrow="03 · COSTING"
         title="供应商报价与核价"
-        description="多家报价先归一化，再由确定性工具计算；Agent 不手算金额。"
         actions={
           <>
             <button className="button" onClick={() => onAgent('请读取本项目的供应商报价原件，逐家登记报价，并按我为本次任务提供的汇率、毛利和数量核价。不要编造缺失价格。', 'costing')}>
@@ -303,7 +287,7 @@ export function CostingPanel({ data, onAgent, onSave, onConfirm, onExport, busy 
         }
       >
         {!data.supplierOffers.length ? (
-          <EmptyHint>还没有结构化供应商报价。上传报价原件后，让 Agent 读取或手动登记。</EmptyHint>
+          <EmptyHint>上传供应商报价后开始核价</EmptyHint>
         ) : (
           <div className="wbv2-table-wrap">
             <table className="wbv2-table">
@@ -325,7 +309,7 @@ export function CostingPanel({ data, onAgent, onSave, onConfirm, onExport, busy 
             </table>
           </div>
         )}
-        <div className="wbv2-inline-note"><CircleAlert size={14} /> 核价需要你明确汇率和毛利率，例如“汇率 7.20、毛利率 20%”；Agent 不会自行假设。</div>
+        <div className="wbv2-inline-note"><CircleAlert size={14} /> 核价前请填写汇率、毛利率和数量。</div>
         {cost && (
           <div className="wbv2-cost-grid">
             <div><span>单件成本</span><strong>¥{cost.content.unitCostCny}</strong></div>
@@ -337,9 +321,8 @@ export function CostingPanel({ data, onAgent, onSave, onConfirm, onExport, busy 
         )}
       </Section>
       <Section
-        eyebrow="QUOTATION"
-        title="客户报价单"
-        description="贸易术语、付款方式、有效期与不含项必须写清。草稿不等于已批准或已发送。"
+        title="方案与报价草稿"
+        description="草稿需批准后发送。"
         actions={
           <>
             {quote && <button className="button" disabled={!dirty || saving || busy} onClick={() => void saveTerms()}>{saving ? '保存中…' : '保存条款'}</button>}
@@ -350,7 +333,7 @@ export function CostingPanel({ data, onAgent, onSave, onConfirm, onExport, busy 
         }
       >
         {!quote ? (
-          <EmptyHint>尚未生成客户报价。先完成核价，再让 Agent 写报价条款。</EmptyHint>
+          <EmptyHint>尚未生成客户报价</EmptyHint>
         ) : (
           <>
             <div className="wbv2-quote-head">
@@ -383,9 +366,7 @@ export function SamplePanel({ data, onAgent, onConfirm, busy }: { data: Workbenc
   const approved = data.stages.find((item) => item.key === 'sample')?.status === 'confirmed';
   return (
     <Section
-      eyebrow="04 · SAMPLE"
       title="打样与样品确认"
-      description="样品种类、轮次、检查、反馈和客户书面批准必须形成证据链。"
       actions={
         <>
           <button className="button" onClick={() => onAgent('请记录本轮样品：样品种类、轮次、编号、规格版本、费用、快递单号、检查项、客户反馈和封样；客户批准保持待确认。', 'sample')}>
@@ -397,7 +378,7 @@ export function SamplePanel({ data, onAgent, onConfirm, busy }: { data: Workbenc
       }
     >
       {!sample ? (
-        <EmptyHint>尚未记录样品。规格和报价形成后，安排开发样/确认样/产前样。</EmptyHint>
+        <EmptyHint>尚未记录样品</EmptyHint>
       ) : (
         <>
           <div className="wbv2-quote-head">
@@ -437,9 +418,7 @@ export function OrderPanel({ data, onAgent, onConfirm, busy }: { data: Workbench
   return (
     <div className="wbv2-stack">
       <Section
-        eyebrow="05 · ORDER"
         title="PO、PI 与付款保障"
-        description="PO 必须与已报价、已确认的规格对齐；双方确认和付款核验由人记录。"
         actions={
           <button className="button" onClick={() => onAgent('请读取客户 PO，核对数量、单价、贸易术语、指定地点、付款方式和交期，生成 PI 草稿、PO 差异和付款计划；双方确认保持待确认。', 'order')}>
             <Sparkles size={14} /> 让 Agent 核对 PO
@@ -447,7 +426,7 @@ export function OrderPanel({ data, onAgent, onConfirm, busy }: { data: Workbench
         }
       >
         {!order ? (
-          <EmptyHint>尚未登记订单。客户 PO 到达后，让 Agent 读取并核对。</EmptyHint>
+          <EmptyHint>上传客户 PO 后核对订单</EmptyHint>
         ) : (
           <>
             <div className="wbv2-order-grid">
@@ -489,9 +468,8 @@ export function OrderPanel({ data, onAgent, onConfirm, busy }: { data: Workbench
         )}
       </Section>
       <Section
-        eyebrow="PAYMENT"
         title="付款计划与确认"
-        description="定金、尾款或信用证节点逐项登记；到账只能由人工核验。"
+        description="到账需人工核验。"
         actions={
           <>
             {order && !buyer && <button className="button" disabled={busy || orderBlocked} onClick={() => onConfirm('order_buyer_confirmation', order, 'customer_approval')}>买方确认</button>}
@@ -536,9 +514,7 @@ export function ProductionPanel({ data, onAgent, onConfirm, onRelease, busy, onS
   return (
     <div className="wbv2-stack">
       <Section
-        eyebrow="06 · PRODUCTION"
         title="生产资料与验货准备"
-        description="生产资料、T&A、QC 检查表引用固定版本；放行前逐项核对门禁。"
         actions={
           <>
             <button className="button" onClick={() => onAgent('请基于当前规格、样品和订单生成生产资料、T&A 和 QC 检查表，并列出放行缺口；不要放行。', 'production')}>
@@ -551,7 +527,7 @@ export function ProductionPanel({ data, onAgent, onConfirm, onRelease, busy, onS
         }
       >
         {!production ? (
-          <EmptyHint>尚未生成生产资料。订单与样品就绪后，让 Agent 生成生产包。</EmptyHint>
+          <EmptyHint>尚未生成生产资料</EmptyHint>
         ) : (
           <>
             <div className="wbv2-quote-head">
@@ -580,9 +556,8 @@ export function ProductionPanel({ data, onAgent, onConfirm, onRelease, busy, onS
         )}
       </Section>
       <Section
-        eyebrow="RELEASE GATE"
         title="放行检查"
-        description="任何一项缺口未关闭，生产资料只能保留草稿。"
+        description="缺项处理完毕后可放行。"
         actions={<Pill tone={data.gate.status === 'passed' ? 'green' : 'amber'}>{data.gate.status === 'passed' ? '可以人工放行' : `${data.gate.missing.length} 项缺口`}</Pill>}
       >
         {!data.gate.missing.length ? (
@@ -606,7 +581,7 @@ export function ProductionPanel({ data, onAgent, onConfirm, onRelease, busy, onS
 export function ApprovalHistory({ approvals }: { approvals: WorkbenchApproval[] }) {
   if (!approvals.length) return null;
   return (
-    <Section eyebrow="AUDIT" title="确认记录" description="所有确认绑定具体成果版本和证据。">
+    <Section title="确认记录">
       <div className="wbv2-approval-list">
         {approvals.slice().reverse().map((item) => (
           <div key={item.id}>

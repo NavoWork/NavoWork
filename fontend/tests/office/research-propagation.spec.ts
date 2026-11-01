@@ -35,7 +35,7 @@ test('curated competitor sources, adopted ideas and deterministic propagation ar
     },
   });
   const sourceId = (await costSource.json()).id;
-  await page.goto(`/inquiries/${inquiry.id}`);
+  await page.goto(`/inquiries/${inquiry.id}?view=workflow`);
   await page.getByRole('button', { name: /02 需求与规格/ }).click();
   await page.getByText('竞品、概念图与 BOM 识别', { exact: true }).click();
   await page.getByLabel('竞品资料', { exact: true }).selectOption((await evidence.json()).id);

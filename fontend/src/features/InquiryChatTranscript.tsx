@@ -3,6 +3,7 @@ import { ChevronRight, FileText, MessageSquare, Sparkles } from 'lucide-react';
 import type { Inquiry, Message } from '../api/types';
 import { channelLabels } from './CustomerContextCard';
 import { InvocationContext } from './InvocationContext';
+import './inquiry-chat.css';
 
 const messageDate = (value: string) =>
   new Intl.DateTimeFormat('zh-CN', {

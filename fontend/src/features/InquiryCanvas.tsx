@@ -53,6 +53,7 @@ import {
   defaultFolders,
   initialCanvas,
   readCanvas,
+  progressiveCanvasDocuments,
   revisionDocuments,
   workspaceDocuments,
   inquiryAssetsChangedEvent,
@@ -285,31 +286,29 @@ function ServerCanvas(props: Props) {
   if (!loaded) return <Loading label="正在恢复服务端画板" />;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, minWidth: 0 }}>
-      <div role="status" style={{ padding: '4px 12px', fontSize: 12 }}>
-        {status}
-        {writer.error != null && (
-          <>
-            <button className="button button-ghost" onClick={() => writer.retry()}>
-              重试保存
-            </button>
-            <button
-              className="button button-ghost"
-              onClick={() => {
-                const url = URL.createObjectURL(
-                  new Blob([JSON.stringify(writer.pending, null, 2)], { type: 'application/json' }),
-                );
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = 'canvas-recovery.json';
-                link.click();
-                setTimeout(() => URL.revokeObjectURL(url), 1000);
-              }}
-            >
-              下载当前草稿
-            </button>
-          </>
-        )}
-      </div>
+      {writer.error != null && (
+        <div role="alert" style={{ padding: '4px 12px', fontSize: 12 }}>
+          {status}
+          <button className="button button-ghost" onClick={() => writer.retry()}>
+            重试保存
+          </button>
+          <button
+            className="button button-ghost"
+            onClick={() => {
+              const url = URL.createObjectURL(
+                new Blob([JSON.stringify(writer.pending, null, 2)], { type: 'application/json' }),
+              );
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = 'canvas-recovery.json';
+              link.click();
+              setTimeout(() => URL.revokeObjectURL(url), 1000);
+            }}
+          >
+            下载当前草稿
+          </button>
+        </div>
+      )}
       <CanvasWorkspace {...props} serverState={loaded} persist={(state) => writer.enqueue(state)} />
     </div>
   );
@@ -566,7 +565,7 @@ function CanvasWorkspace({
       revisions.filter((item) => item.number <= (state.initialRevision || 0)),
     ).map((doc) => doc.id),
   );
-  const ordered = docs
+  const candidates = docs
     .filter((doc, index) =>
       mode === 'real'
         ? doc.kind !== 'revision' &&
@@ -596,6 +595,7 @@ function CanvasWorkspace({
         })[kind];
       return rank(a.kind) - rank(b.kind);
     });
+  const ordered = progressiveCanvasDocuments(candidates, Boolean(state.results?.length));
   const occupied = ordered.flatMap((doc) =>
     state.positions[doc.id] ? [state.positions[doc.id]] : [],
   );
@@ -634,8 +634,8 @@ function CanvasWorkspace({
     ariaLabel: `${doc.title}，预览节点，双击打开`,
   }));
   const edges: Edge[] = [];
-  if (revision) {
-    const n = revision.number;
+  {
+    const n = revision?.number || 0;
     const pairs = [
       ['original', `requirements:${n}`],
       [`requirements:${n}`, `quote:${n}`],

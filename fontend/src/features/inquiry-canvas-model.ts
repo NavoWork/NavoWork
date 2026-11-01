@@ -36,9 +36,76 @@ export interface WorkspaceDocument {
   folder: string;
   text: string;
   caption: string;
+  hasContent?: boolean;
   source?: Source;
   file?: WorkspaceFile;
   revision?: Revision;
+}
+
+const workflowKinds: DocumentKind[] = ['requirements', 'quote', 'risks', 'reply'];
+
+function hasMeaningfulText(text: string): boolean {
+  return text.split('\n').some((line) => {
+    const value = line.replace(/^(产品|数量|规格|目的地|到货要求|定制)[：:]\s*/, '').trim();
+    return (
+      value !== '' &&
+      !/^(待确认|待补充|待填写|尚未生成。选择现有原件和知识库依据，生成此节点的第一份草稿。)$/.test(
+        value,
+      )
+    );
+  });
+}
+
+function revisionNodeHasContent(
+  revision: Revision | undefined,
+  kind: DocumentKind,
+  replyText?: string,
+): boolean {
+  if (!revision) return false;
+  switch (kind) {
+    case 'requirements':
+      return [
+        revision.requirements.requestedProduct,
+        revision.requirements.specification,
+        revision.requirements.quantity,
+        revision.requirements.destination,
+        revision.requirements.requestedArrival,
+        revision.requirements.customization,
+      ].some((value) => value != null && hasMeaningfulText(String(value)));
+    case 'quote':
+      return Boolean(
+        revision.quote ||
+        revision.proposal.differences.some(hasMeaningfulText) ||
+        (revision.generatedNode === 'quote' && revision.proposal.selectedSku),
+      );
+    case 'risks':
+      return (
+        revision.risks.length > 0 ||
+        revision.generatedNode === 'risks' ||
+        Boolean(revision.artifactVersionIds?.inquiry_assessment)
+      );
+    case 'reply':
+      return hasMeaningfulText(replyText ?? revision.replies['en-US']);
+    default:
+      return false;
+  }
+}
+
+// Keep existing content visible, and reveal only the first unfinished business node.
+// Conversation and result navigation remain available in the document directory.
+export function progressiveCanvasDocuments(
+  documents: WorkspaceDocument[],
+  includeResults = false,
+): WorkspaceDocument[] {
+  const next = workflowKinds
+    .map((kind) => documents.find((doc) => doc.kind === kind))
+    .find((doc) => doc && !doc.hasContent);
+  return documents.filter((doc) => {
+    if (doc.kind === 'conversation' || doc.kind === 'revision') return false;
+    if (doc.kind === 'result') return includeResults;
+    if (workflowKinds.includes(doc.kind)) return doc.hasContent || doc === next;
+    return true;
+  });
 }
 export interface WorkspaceFile {
   serverFileId?: string;
@@ -275,9 +342,17 @@ export function revisionDocuments(
         kind,
         title,
         folder,
-        text: '尚未生成。选择现有原件和知识库依据，生成此节点的第一份草稿。',
+        text: '',
         caption: '等待生成',
       });
+  }
+  for (const doc of docs) {
+    if (!workflowKinds.includes(doc.kind)) continue;
+    doc.hasContent = revisionNodeHasContent(r, doc.kind, replyText);
+    if (!doc.hasContent) {
+      doc.text = '';
+      doc.caption = '等待生成';
+    }
   }
   return docs;
 }
@@ -378,8 +453,10 @@ export function workspaceDocuments({
     })),
   );
   for (const doc of docs) {
-    if (doc.kind !== 'original' && state.drafts[doc.id] !== undefined)
+    if (doc.kind !== 'original' && state.drafts[doc.id] !== undefined) {
       doc.text = state.drafts[doc.id];
+      if (workflowKinds.includes(doc.kind)) doc.hasContent = hasMeaningfulText(doc.text);
+    }
     if (state.drafts[`title:${doc.id}`]) doc.title = state.drafts[`title:${doc.id}`];
   }
   return docs;

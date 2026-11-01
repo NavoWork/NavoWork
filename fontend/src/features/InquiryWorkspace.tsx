@@ -120,24 +120,6 @@ export function InquiryWorkspace({
     initial.current.composerContext || emptyComposerContext(),
   );
   const [draftStored, setDraftStored] = useState(true);
-  const [selectedSources, setSelectedSources] = useState<string[] | null>(null);
-  const [offerId, setOfferId] = useState('');
-  const [costInputs, setCostInputs] = useState({ exchangeRate: '', margin: '', quantity: '' });
-  const references = useQuery({
-    queryKey: ['inquiry-reference-library', scope],
-    enabled: mode === 'real' && active,
-    queryFn: ({ signal }) =>
-      api.get<{ items: (Source & { sourceVersionId?: string })[] }>(`${base}/sources`, signal),
-  });
-  const supplierOffers = useQuery({
-    queryKey: ['inquiry-offers', scope],
-    enabled: mode === 'real' && active,
-    queryFn: ({ signal }) =>
-      api.get<{ items: { id: string; supplier: string; moq: number }[] }>(
-        `${path}/supplier-offers`,
-        signal,
-      ),
-  });
   const [deferredResults, setDeferredResults] = useState<number[]>(
     initial.current.deferredResults || [],
   );
@@ -327,7 +309,7 @@ export function InquiryWorkspace({
         throw new Error('引用中包含本机旧资料，请移除后从团队知识库重新选择。');
       const sourceVersionIds = [
         ...new Set([
-          ...(selectedSources ?? revision?.sourceRefs.map((s) => s.sourceVersionId) ?? []),
+          ...(revision?.sourceRefs.map((s) => s.sourceVersionId) ?? []),
           ...composerContext.knowledge.flatMap((doc) =>
             doc.sourceVersionId ? [doc.sourceVersionId] : [],
           ),
@@ -339,12 +321,7 @@ export function InquiryWorkspace({
         action,
         context,
         assetVersionIds: selectedAssets ?? revision?.assetRefs ?? [],
-        ...(mode === 'real'
-          ? {
-              sourceVersionIds,
-              ...(offerId ? { selectedSupplierOfferId: offerId, costInputs } : {}),
-            }
-          : {}),
+        ...(mode === 'real' ? { sourceVersionIds } : {}),
         instruction:
           mode === 'real' && context?.skills.length
             ? `${instruction}\n\n本次技能要求：\n${context.skills.map((skill) => `${skill.name}：${skill.instructions.join('；')}`).join('\n')}`
@@ -846,84 +823,6 @@ export function InquiryWorkspace({
               )}
               <ErrorNotice error={runQuery.error} onRetry={() => void runQuery.refetch()} />
             </div>
-            {mode === 'real' && (
-              <details>
-                <summary>引用知识与核价条件</summary>
-                <ErrorNotice
-                  error={references.error || supplierOffers.error}
-                  onRetry={() => {
-                    void references.refetch();
-                    void supplierOffers.refetch();
-                  }}
-                />
-                <label className="field">
-                  本次参考资料（草稿仅供参考）
-                  <select
-                    multiple
-                    aria-label="本次参考资料"
-                    disabled={!canWrite}
-                    value={
-                      selectedSources ?? revision?.sourceRefs.map((s) => s.sourceVersionId) ?? []
-                    }
-                    onChange={(e) =>
-                      setSelectedSources(Array.from(e.target.selectedOptions, (o) => o.value))
-                    }
-                  >
-                    {references.data?.items
-                      .filter((s) => s.status !== 'revoked')
-                      .map((s) => (
-                        <option
-                          key={`${s.sourceId}:v${s.version}`}
-                          value={`${s.sourceId}:v${s.version}`}
-                        >
-                          {s.title} · V{s.version} · {s.status === 'published' ? '已发布' : '草稿'}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-                <label className="field">
-                  供应商报价
-                  <select
-                    aria-label="供应商报价"
-                    value={offerId}
-                    disabled={!canWrite}
-                    onChange={(e) => setOfferId(e.target.value)}
-                  >
-                    <option value="">请选择已录入的报价</option>
-                    {supplierOffers.data?.items.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.supplier} · MOQ {o.moq}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {(['exchangeRate', 'margin', 'quantity'] as const).map((key) => (
-                  <label className="field" key={key}>
-                    {
-                      { exchangeRate: '汇率（CNY/USD）', margin: '毛利率（%）', quantity: '数量' }[
-                        key
-                      ]
-                    }
-                    <input
-                      type="number"
-                      step={key === 'quantity' ? '1' : 'any'}
-                      value={costInputs[key]}
-                      disabled={!canWrite}
-                      onChange={(e) => setCostInputs((old) => ({ ...old, [key]: e.target.value }))}
-                    />
-                  </label>
-                ))}
-                <Link to={`/workbench?case=${encodeURIComponent(inquiryId)}`}>
-                  维护供应商原件、报价及业务审批
-                </Link>
-                <button
-                  className="button button-ghost"
-                  onClick={() => void supplierOffers.refetch()}
-                >
-                  刷新报价列表
-                </button>
-              </details>
-            )}
             <InquiryComposer
               session={session}
               inquiryId={inquiryId}

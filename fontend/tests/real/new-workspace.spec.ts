@@ -8,7 +8,7 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByRole('navigation', { name: '主导航' })).toBeVisible();
 });
 
-test('new inquiry opens the node workbench and only generates the requested node', async ({
+test('new inquiry opens the canvas and can switch to the node workbench', async ({
   page,
 }, info) => {
   const base = '/api/v1/workspaces/ws_demo';
@@ -25,6 +25,14 @@ test('new inquiry opens the node workbench and only generates the requested node
   const inquiry = await created.json();
   const path = `${base}/inquiries/${inquiry.id}`;
   await page.goto(`/inquiries/${inquiry.id}`);
+  const views = page.getByRole('group', { name: '询盘视图' });
+  await expect(views.getByRole('button')).toHaveText(['资料画板', '业务流程']);
+  await expect(views.getByRole('button', { name: '资料画板', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('tab', { name: '询盘画板', exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('tab', { name: '询盘画板', exact: true })).toBeVisible();
+  await views.getByRole('button', { name: '业务流程', exact: true }).click();
+  await expect(page).toHaveURL(`/inquiries/${inquiry.id}?view=workflow`);
   const work = page.locator('.wbv2');
   await expect(work).toBeVisible();
   await expect(work.locator('.wbv2-stage')).toHaveCount(6);
@@ -128,7 +136,7 @@ test('workbench keeps downstream nodes empty until the user advances them', asyn
     })
   ).json();
   const path = `${base}/inquiries/${inquiry.id}`;
-  await page.goto(`/inquiries/${inquiry.id}`);
+  await page.goto(`/inquiries/${inquiry.id}?view=workflow`);
   const work = page.locator('.wbv2');
   await expect(work).toBeVisible();
   const state = await (await page.request.get(`${path}/workbench`)).json();
@@ -193,7 +201,7 @@ test('assistant retains a rejected draft, then shows real run phases and cancell
     run.status = 'cancelled';
     return route.fulfill({ json: run });
   });
-  await page.goto(`/inquiries/${inquiry.id}`);
+  await page.goto(`/inquiries/${inquiry.id}?view=workflow`);
   const assistant = page.locator('.wbv2-agent');
   const input = assistant.getByLabel('补充要求或客户反馈');
   await assistant.getByRole('button', { name: '查看客户原始询盘', exact: true }).click();

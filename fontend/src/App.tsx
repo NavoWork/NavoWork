@@ -301,7 +301,7 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
   }, [isTrade]);
   const { id, invalid: invalidPath } = parseInquiryPath(path);
   const canvasView =
-    mode === 'mock' || new URLSearchParams(location.search).get('view') === 'canvas';
+    mode === 'mock' || new URLSearchParams(location.search).get('view') !== 'workflow';
   const page =
     path === '/knowledge'
       ? 'knowledge'
@@ -547,17 +547,17 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
               <div role="group" aria-label="询盘视图">
                 <button
                   className="button button-ghost"
-                  aria-pressed={!canvasView}
+                  aria-pressed={canvasView}
                   onClick={() => navigate(`/inquiries/${encodeURIComponent(id)}`)}
                 >
-                  业务流程
+                  资料画板
                 </button>
                 <button
                   className="button button-ghost"
-                  aria-pressed={canvasView}
-                  onClick={() => navigate(`/inquiries/${encodeURIComponent(id)}?view=canvas`)}
+                  aria-pressed={!canvasView}
+                  onClick={() => navigate(`/inquiries/${encodeURIComponent(id)}?view=workflow`)}
                 >
-                  资料画板
+                  业务流程
                 </button>
               </div>
             )}

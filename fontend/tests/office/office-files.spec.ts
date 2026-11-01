@@ -82,7 +82,7 @@ test('real inline Office editor saves native files, previews current values, and
     });
     expect(uploaded.ok()).toBeTruthy();
   }
-  await page.goto(`/inquiries/${inquiry.id}`);
+  await page.goto(`/inquiries/${inquiry.id}?view=workflow`);
   await page.getByText('文件编辑与预览', { exact: false }).first().click();
   await page.getByLabel('选择 Office 原件').selectOption({ label: 'spec.docx' });
   await page.getByRole('button', { name: '创建工作副本' }).click();
