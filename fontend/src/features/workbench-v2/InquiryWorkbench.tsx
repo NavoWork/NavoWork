@@ -184,7 +184,7 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
     }
   };
 
-  const sendAgent = async (instruction: string, node?: string, selection?: ComposerContext, simulation = false) => {
+  const sendAgent = async (instruction: string, node?: string, selection?: ComposerContext, simulation = false, imagePrompt?: string) => {
     if (!data || busy || data.case.activeRunId || (data.case.pendingRunId && !simulation)) return false;
     setBusy(true);
     setError(undefined);
@@ -196,6 +196,7 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
       }
       const result = await api.post<Run>(`${path}/workbench/${simulation ? 'simulations' : 'agent'}`, {
         node,
+        ...(imagePrompt !== undefined ? { imagePrompt } : {}),
         ...(simulation && data.case.pendingRunId ? { skipPendingRunId: data.case.pendingRunId } : {}),
         instruction: context?.skills.length
           ? `${instruction}\n\n本次技能要求：\n${context.skills.map((skill) => `${skill.name}：${skill.instructions.join('；')}`).join('\n')}`
@@ -206,7 +207,7 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
       });
       qc.setQueryData(['workbench-run', scope, result.id], result);
       setRunId(result.id);
-      setNotice(simulation ? '正在模拟生成节点资料。' : '任务已提交，Agent 正在处理。');
+      setNotice(result.executionMode === 'simulation' ? '正在用本地 mock 生成节点资料，无需 API Key。' : '任务已提交，Agent 正在处理。');
       void invalidate();
       return true;
     } catch (e) {
@@ -369,7 +370,8 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
 
           <div className="wbv2-file-tools">
             <OfficeFiles revision={data.case.currentRevision} path={path} disabled={busy || !!data.case.activeRunId || !!data.case.pendingRunId} onChanged={() => void invalidate()} />
-            {stage === 'requirements' && <ResearchPanel path={path} data={data} disabled={busy || !!data.case.activeRunId || !!data.case.pendingRunId} onChanged={() => void invalidate()} />}
+            {stage === 'requirements' && <ResearchPanel path={path} data={data} disabled={busy || !!data.case.activeRunId || !!data.case.pendingRunId} onChanged={() => void invalidate()}
+              onGenerateImage={(prompt) => sendAgent('根据修改后的 prompt 模拟生成图片', 'design', undefined, true, prompt)} />}
             <PropagationPanel path={path} revision={data.case.currentRevision} disabled={busy || !!data.case.activeRunId || !!data.case.pendingRunId} onChanged={() => void invalidate()} />
           </div>
 

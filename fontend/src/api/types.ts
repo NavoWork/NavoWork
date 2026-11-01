@@ -7,7 +7,7 @@ export interface Session {
 export interface Inquiry {
   nodeWarnings?: Record<string, { question: string; runId: string; skipped: boolean }[]>;
   demoScenarioId?: string;
-  demoDataScope?: 'reference' | 'full';
+  demoDataScope?: 'reference' | 'full' | 'incomplete';
   customerContext?: CustomerContext;
   id: string;
   workspaceId: string;

@@ -66,7 +66,9 @@ def test_skip_resumes_without_reasking_and_preserves_unresolved_node_warning(cli
     execute_agent_work(next_work, 1, model=model([
         call("update_requirements", {"fields": {"dimensions": "30x45x15cm"}}, id="fill"), AIMessage(content="尺寸已补齐。"),
     ]))
-    assert not client.get(path).json()["nodeWarnings"].get("requirements")
+    remaining = client.get(path).json()["nodeWarnings"].get("requirements", [])
+    assert not any(warning.get("field") == "dimensions" or warning["question"] == "请补充背包尺寸。" for warning in remaining)
+    assert any(warning.get("field") == "fabric" for warning in remaining)
 
 
 def test_skip_rejects_stale_revision_and_preserves_pending_run(client, monkeypatch, tmp_path):

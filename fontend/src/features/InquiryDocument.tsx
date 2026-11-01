@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Check, Download, FileText, LockKeyhole, Send, Save } from 'lucide-react';
+import { Check, Download, FileText, LockKeyhole, Save } from 'lucide-react';
 import { api, mode } from '../api';
 import type { Inquiry, Source, WorkbenchEvidence } from '../api/types';
 import { ErrorNotice, Loading } from '../components/ui';
@@ -166,7 +166,7 @@ export function OriginalDocument({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>();
   const [saved, setSaved] = useState(false);
-  const locked = readOnly || inquiry.currentRevision > 0;
+  const locked = readOnly;
   async function save() {
     if (locked || busy || !value.trim()) return;
     setBusy(true);
@@ -193,10 +193,10 @@ export function OriginalDocument({
         {locked ? (
           <>
             <LockKeyhole size={13} />
-            原文留档 · 补充内容请在沟通页提交
+            当前状态只读
           </>
         ) : value !== inquiry.originalText ? (
-          '原文有修改，保存后用于首次处理'
+          '原文有修改，保存后保留修订记录'
         ) : (
           <>
             <Check size={13} />
@@ -242,16 +242,16 @@ export function WorkingDocument({
   value,
   onChange,
   readOnly,
-  onInstruction,
   onGenerate,
+  onSave,
   onRestore,
 }: {
   doc: WorkspaceDocument;
   value: string;
   onChange: (text?: string) => void;
   readOnly: boolean;
-  onInstruction: (instruction: string) => void;
   onGenerate?: (text?: string) => void;
+  onSave?: (text: string) => void;
   onRestore?: () => void;
 }) {
   return (
@@ -265,7 +265,7 @@ export function WorkingDocument({
       </div>
       <h2>{doc.title}</h2>
       <p className="ic-document-subtitle">
-        {doc.revision ? `基于 V${doc.revision.number} 整理；编辑草稿后可生成新版本。` : '从现有询盘与原件生成节点内容。'}
+        {doc.revision ? `当前 V${doc.revision.number} · 修改后保存为新版本` : '从现有询盘与原件生成节点内容。'}
       </p>
       <div className="ic-document-actions">
         {onGenerate && <button className="button button-primary" disabled={readOnly} onClick={() => onGenerate()}>依据现有资料生成</button>}
@@ -273,7 +273,7 @@ export function WorkingDocument({
       </div>
       <div className="ic-document-status">
         <FileText size={13} />
-        {value !== doc.text ? `${mode === 'real' ? '工作草稿' : '本机工作草稿'} · 尚未生成新业务版本` : '版本内容 · 可编辑为工作草稿'}
+        {value !== doc.text ? '有未提交修改 · 工作草稿已保留' : '点击内容即可修改 · 本地 mock'}
       </div>
       {doc.kind === 'requirements' ? (
         <RequirementsTable value={value} onChange={onChange} readOnly={readOnly} />
@@ -295,15 +295,11 @@ export function WorkingDocument({
         </button>
         <button
           className="button button-primary"
-          disabled={readOnly || !value.trim()}
-          onClick={() =>
-            (onGenerate || onInstruction)(
-              `请根据以下「${doc.title}」工作草稿及原始依据更新此节点，保留未确认项：\n\n${value}`,
-            )
-          }
+          disabled={readOnly || !value.trim() || value === doc.text || !onSave}
+          onClick={() => onSave?.(value)}
         >
-          <Send size={13} />
-          交给助手更新版本
+          <Save size={13} />
+          保存修改
         </button>
       </div>
     </div>

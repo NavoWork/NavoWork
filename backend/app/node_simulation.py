@@ -31,6 +31,12 @@ def active_context(db, item_id, generation):
 def save_simulated_node(db, case, run, job):
     node = decode(job.payload)["simulationNode"]
     data = decode(case.payload)
+    if "editedText" in decode(job.payload):
+        from .node_simulation_edits import save_edited_node
+        return save_edited_node(db, case, run, job, node, LABELS[node])
+    if data.get("demoDataScope") == "incomplete":
+        from .node_simulation_incomplete import save_incomplete_node
+        return save_incomplete_node(db, case, run, job, node, LABELS[node])
     scenario_id = data.get("demoScenarioId")
     s = scenario_inputs(scenario_id or "de-backpack")
     current = latest_artifacts(db, case)

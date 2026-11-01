@@ -134,7 +134,19 @@ describe('progressive inquiry canvas', () => {
     current.nodeArtifacts.concept_image = artifact('concept_image', { downloadUrl: '/api/v1/workspaces/ws_demo/exports/image/download', prompt: 'Navy backpack' });
     const visible = progressiveCanvasDocuments(documents(current));
     expect(visible.find(doc => doc.kind === 'design')?.imageUrl).toContain('/exports/image/download');
+    expect(visible.find(doc => doc.kind === 'design')?.imagePrompt).toBe('Navy backpack');
     expect(visible.map(doc => doc.kind)).toEqual(['original', 'requirements', 'competitor', 'design', 'quote']);
+  });
+
+  it('uses saved document edits for tabs and canvas previews', () => {
+    const current = revision();
+    current.nodeArtifacts = Object.fromEntries(['spec', 'quotation', 'risk_review', 'sample', 'competitor_analysis', 'order', 'production'].map(kind => [kind, {
+      itemId: kind, kind, title: kind, version: 2, status: 'draft', content: { documentText: `已修改 ${kind}` },
+    }]));
+    for (const doc of documents(current).filter(doc => ['requirements', 'quote', 'risks', 'sample', 'competitor', 'order', 'production'].includes(doc.kind))) {
+      expect(doc.text).toMatch(/^已修改 /);
+      expect(doc.hasContent).toBe(true);
+    }
   });
 
   it('ignores empty fields, waiting labels and legacy placeholder prose', () => {

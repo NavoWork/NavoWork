@@ -340,6 +340,8 @@ def execute_agent_work(item_id: str, generation: int, *, model=None) -> None:
         )
         if decode(case.payload).get("demoScenarioId"):
             system += "\n本项目为路演模拟询盘。内置资料均为文本，原件与 projectKnowledge 已提供业务依据。按本节点业务工具保存真实成果；业务工具已执行字段校验，不要对普通 JSON 业务成果调用 Office 文件校验。仅实际编辑 Office 工作副本时才调用 file_validate_artifact。客户、付款和生产确认只用于模拟业务，回复须保留这一语境。"
+        if payload.get("skipMissing"):
+            system += "\n本轮要求先完成可用草稿并保留缺项提醒。先用业务工具保存已知信息，未知字段保持 null；调用 request_info 记录缺项后继续收尾。不要推测未提供的规格、工厂报价或交期，不要把草稿当作已确认成果。"
 
     live_model = model is None
     model = model or configured_model()
@@ -421,6 +423,9 @@ def execute_agent_work(item_id: str, generation: int, *, model=None) -> None:
         elif changed and (node or before.get("spec") != after.get("spec")):
             from .inquiry_warnings import clear_checked_warnings
             clear_checked_warnings(case, job, run)
+        if changed and (node == "requirements" or before.get("spec") != after.get("spec")):
+            from .inquiry_warnings import record_spec_gaps
+            record_spec_gaps(db, case, job, run)
         finalize_agent_run(db, case, run, job, summary, node=node, artifacts_changed=changed)
         work.status = "done"
         db.commit()

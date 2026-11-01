@@ -52,6 +52,7 @@ export interface WorkspaceDocument {
   warnings?: string[];
   skippedMissing?: boolean;
   imageUrl?: string;
+  imagePrompt?: string;
   comparisons?: { name: string; price: string; material: string; features: string }[];
 }
 
@@ -364,6 +365,12 @@ export function revisionDocuments(
   for (const doc of docs) {
     if (!workflowKinds.includes(doc.kind)) continue;
     doc.hasContent = revisionNodeHasContent(r, doc.kind, replyText);
+    const artifactKind = ({ requirements: 'spec', quote: 'quotation', risks: 'risk_review' } as Record<string, string>)[doc.kind];
+    const editedText = artifactKind ? r?.nodeArtifacts?.[artifactKind]?.content.documentText : undefined;
+    if (typeof editedText === 'string') {
+      doc.text = editedText;
+      doc.hasContent = true;
+    }
     if (!doc.hasContent) {
       doc.text = '';
       doc.caption = '等待生成';

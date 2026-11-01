@@ -20,8 +20,9 @@ SCENARIOS = [
 
 
 def catalog():
-    themes = ["完整资料 · 六阶段演示", "品牌定制 · 产品设计", "功能设计 · 客户回复", "材料分析 · 设计方案", "通勤设计 · 报价建议"]
-    return {"items": [{**{key: row[key] for key in ("id", "title", "customer", "quantity")}, "theme": theme}
+    themes = ["完整资料 · 六阶段演示", "信息不全 · 本地模拟缺项提醒", "功能设计 · 客户回复", "材料分析 · 设计方案", "通勤设计 · 报价建议"]
+    return {"items": [{**{key: row[key] for key in ("id", "title", "customer", "quantity")}, "theme": theme,
+                       **({"dataScope": "incomplete"} if row["id"] == "us-tote" else {})}
                       for row, theme in zip(SCENARIOS, themes)]}
 
 
@@ -93,15 +94,26 @@ def scenario_inputs(scenario_id: str):
     return s
 
 
-def creation_body(scenario_id: str):
+def creation_body(scenario_id: str, *, incomplete: bool = False):
     s = scenario_inputs(scenario_id)
+    if incomplete:
+        s["title"] = "美国 · 品牌帆布袋（信息待补充）"
+        s["originalText"] = (
+            "[SIMULATED INQUIRY / 路演模拟资料]\nFrom: Emma Carter, Maple Studio\n"
+            "Hi, we are looking for 5,000 canvas tote bags for our brand launch in Los Angeles. "
+            "We would like something simple, natural-looking and reusable, with our brand on it. "
+            "We haven't decided the size, fabric weight, bag construction or printing details yet. "
+            "Our artwork and reference photos are not ready. Could you help us work out the details "
+            "and let us know what you need before quoting? Packaging, delivery date and shipping terms "
+            "are still open.\nBest, Emma"
+        )
     return dict(title=s["title"], customer=s["customer"], originalText=s["originalText"], destination=s["destination"],
                 requestedLocales=["en-US", "es-MX"], customerContext=dict(channel="email", company=s["customer"],
                     country=s["country"], email=f"buyer@{s['id']}.example", website=f"https://{s['id']}.example",
                     business="Bags and lifestyle goods retailer (synthetic roadshow company)", simulation=True))
 
 
-def seed_demo(db, case, scenario_id: str, *, full: bool = False, supplement: bool = False):
+def seed_demo(db, case, scenario_id: str, *, full: bool = False, supplement: bool = False, incomplete: bool = False):
     s = scenario_inputs(scenario_id)
     refs = dict(decode(case.payload).get("demoEvidence", {})) if supplement else {}
 
@@ -115,6 +127,13 @@ def seed_demo(db, case, scenario_id: str, *, full: bool = False, supplement: boo
         db.flush()
         refs[key] = row.id
 
+    if incomplete:
+        # Deliberately exclude complete specs, prices, samples and hidden defaults.
+        evidence("original", "customer_request", "客户原始邮件（信息不全）", decode(case.payload)["originalText"])
+        evidence("brief", "customer_request", "品牌方向说明", "Maple Studio 品牌活动用帆布手提袋，5000 件，目的地 Los Angeles。偏好简洁、自然、可重复使用。尚未提供产品图、尺寸表、面料克重、结构和印花图稿。")
+        case.payload = encode({**decode(case.payload), "demoScenarioId": scenario_id,
+                              "demoDataScope": "incomplete", "demoEvidence": refs})
+        return
     evidence("original", "customer_request", "客户原始邮件", s["originalText"])
     evidence("spec", "customer_approval" if full else "customer_request", "客户规格确认" if full else "客户参考规格", s["fields"])
     if scenario_id == "de-backpack":
@@ -195,7 +214,7 @@ def demo_guide(db, case):
     payload = decode(case.payload)
     if not payload.get("demoScenarioId"):
         fail("NOT_FOUND", "该询盘不是演示询盘", 404)
-    if payload.get("demoDataScope") == "reference":
+    if payload.get("demoDataScope") in ("reference", "incomplete"):
         return {"kind": "chat", "node": None, "title": "选择你想展示的 AI 能力"}
     artifacts = latest_artifacts(db, case)
     stages = {s["key"]: s for s in stage_state(db, case)}

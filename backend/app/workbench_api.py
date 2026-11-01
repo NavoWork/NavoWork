@@ -314,11 +314,17 @@ def workbench_routes(request: Request, db: Session, user: User, case: Case, tail
             # Explicit workflow suggestions keep their stage. Free conversation
             # can choose any relevant capability, including image generation.
             node = next((key for key, prompt in PROMPTS.items() if instruction.startswith(prompt)), None)
+        # Canvas actions are local simulations; only chat uses the Agent endpoint.
         simulation = tail == ["simulations"]
         if simulation and node not in {*NODE_KINDS, "risks", "reply", "competitor", "design"}:
             fail("INVALID_INPUT", "未知模拟节点", 400)
         if not simulation and node is not None and node not in NODE_KINDS:
             fail("INVALID_INPUT", "未知的业务节点", 400)
+        for field, limit in (("editedText", 50000), ("imagePrompt", 6000)):
+            if field in body and (not simulation or not isinstance(body[field], str) or not body[field].strip() or len(body[field]) > limit):
+                fail("INVALID_INPUT", "请填写有效的节点内容或图片 prompt", 400)
+        if "imagePrompt" in body and node != "design" or "editedText" in body and node == "design":
+            fail("INVALID_INPUT", "图片节点请通过 prompt 重新生成", 400)
         kind = NODE_KINDS.get(node or "", "confirm_requirements")
         return create_run(
             request,

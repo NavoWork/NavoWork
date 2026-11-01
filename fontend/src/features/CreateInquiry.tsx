@@ -28,7 +28,7 @@ export function CreateInquiry({
   const [scenarioId, setScenarioId] = useState('de-backpack');
   const scenarios = useQuery({
     queryKey: ['demo-scenarios', session.workspace.id],
-    queryFn: () => api.get<{ items: { id: string; title: string; customer: string; quantity: number; theme: string }[] }>(`/workspaces/${session.workspace.id}/inquiries/demo-scenarios`),
+    queryFn: () => api.get<{ items: { id: string; title: string; customer: string; quantity: number; theme: string; dataScope?: Inquiry['demoDataScope'] }[] }>(`/workspaces/${session.workspace.id}/inquiries/demo-scenarios`),
     enabled: mode === 'real',
     staleTime: 300000,
   });
@@ -49,7 +49,8 @@ export function CreateInquiry({
       setError('请先粘贴客户原文或描述工作目标');
       return;
     }
-    const body = demo ? { demoScenarioId: scenarioId } : manualBody;
+    const body = demo ? { demoScenarioId: scenarioId,
+      demoDataScope: scenarios.data?.items.find((item) => item.id === scenarioId)?.dataScope } : manualBody;
     const encoded = JSON.stringify(body);
     if (request.current.body !== encoded)
       request.current = { key: crypto.randomUUID(), body: encoded };
@@ -87,6 +88,7 @@ export function CreateInquiry({
         {demo ? <>
           <p className="preferences-note">带入模拟询盘与参考资料。AI 现场完成分析、报价和回复，产品生图展示预置演示图。</p>
           {scenarioId === 'de-backpack' && <p className="preferences-note">德国背包已备齐规格、样品、订单与付款模拟资料，适合完整流程演示。</p>}
+          {scenarioId === 'us-tote' && <p className="preferences-note">客户仅提供产品方向和数量，缺少尺寸、面料和印花要求。使用本地 mock 模拟 Agent 执行，完成后显示缺项提醒，无需 API Key。</p>}
           <div className="demo-scenarios" role="radiogroup" aria-label="演示数据集">
             {scenarios.data?.items.map((item, index) => <label key={item.id} className={`demo-scenario ${scenarioId === item.id ? 'selected' : ''}`}>
               <input type="radio" name="scenario" value={item.id} checked={scenarioId === item.id} disabled={pending} onChange={() => setScenarioId(item.id)} />
@@ -96,7 +98,7 @@ export function CreateInquiry({
           </div>
           {scenarios.isPending && <p role="status">正在加载演示资料…</p>}
           <ErrorNotice error={scenarios.error} onRetry={() => void scenarios.refetch()} />
-          <p className="demo-includes">包含客户原文、参考规格和两家工厂报价。每次创建都是独立询盘。</p>
+          <p className="demo-includes">{scenarioId === 'us-tote' ? '仅带入客户邮件和品牌方向说明，商品规格及报价依据待补充。' : '包含客户原文、参考规格和两家工厂报价。'}每次创建都是独立询盘。</p>
         </> : <>
         <p className="preferences-note">
           从客户原文或工作目标开始。客户与工作名称可以稍后整理，原始内容会独立保留。

@@ -164,10 +164,10 @@ def case_routes(request: Request, db: Session, user: User, parts: list[str], bod
             demo_id = body.get("demoScenarioId")
             demo_scope = body.get("demoDataScope", "full" if demo_id == "de-backpack" else "reference")
             if demo_id:
-                if demo_scope not in ("reference", "full"):
+                if demo_scope not in ("reference", "full", "incomplete") or (demo_scope == "incomplete" and demo_id != "us-tote"):
                     fail("INVALID_INPUT", "未知的演示资料范围", 400)
                 from .demo_scenarios import creation_body
-                body = creation_body(demo_id)
+                body = creation_body(demo_id, incomplete=demo_scope == "incomplete")
             for key, size in (("title", 80), ("customer", 120), ("originalText", 20000)):
                 body_value(body, key, size)
             case = Case(id=uid("inq"), workspace_id=WORKSPACE_ID, owner_id=user.id, payload=encode({"title": body["title"].strip(), "customer": body["customer"].strip(), "originalText": body["originalText"].strip(), "requestedLocales": body.get("requestedLocales") or ["en-US", "es-MX"], "destination": body.get("destination"), "nextAction": "读懂客户原文，确认需求与缺项"}), status="todo")
@@ -180,7 +180,7 @@ def case_routes(request: Request, db: Session, user: User, parts: list[str], bod
             create_item(db, "message", {"id": uid("msg"), "inquiryId": case.id, "role": "user", "text": body["originalText"].strip(), "createdAt": now()}, case_id=case.id)
             if demo_id:
                 from .demo_scenarios import seed_demo
-                seed_demo(db, case, demo_id, full=demo_scope == "full")
+                seed_demo(db, case, demo_id, full=demo_scope == "full", incomplete=demo_scope == "incomplete")
             from .inquiry_assets import archive_original
             archive_original(db, case)
             result = case_view(case)
@@ -219,9 +219,13 @@ def case_routes(request: Request, db: Session, user: User, parts: list[str], bod
                 from .customer_context import validate_customer_context
                 payload["customerContext"] = validate_customer_context(body["customerContext"])
             if "originalText" in body:
-                if case.current_revision:
-                    fail("INVALID_INPUT", "首次处理后原文不能覆盖，请追加证据")
-                payload["originalText"] = body["originalText"]
+                if case.active_run_id or case.status in ("waiting", "done"):
+                    fail("RUN_IN_PROGRESS", "请恢复处理并等待当前任务完成后再编辑", 409)
+                value = body_value(body, "originalText", 20000)
+                if case.current_revision and value != payload.get("originalText"):
+                    create_item(db, "evidence", {"title": "客户询盘修订", "sourceRole": "customer_change",
+                        "text": value, "parseStatus": "parsed", "createdAt": now()}, case_id=case.id)
+                payload["originalText"] = value
             case.payload = encode(payload)
             touch(case)
             if "originalText" in body:
@@ -429,6 +433,8 @@ def create_run(request: Request, db: Session, user: User, case: Case, body: dict
                        chatHistory=[{"role": message["role"], "text": str(message.get("text") or "")[:4000]}
                                     for message in history[-20:] if message.get("role") in ("user", "assistant")])
         case.payload = encode({**decode(case.payload), "agentFacts": facts})
+        if body.get("skipMissing") is True:
+            context["skipMissing"] = True
     if file_tools:
         # Freeze actual case attachments at dispatch, including explicitly selected user-owned canvas files.
         evidence_rows = items(db, "evidence", case_id=case.id) if not body.get("inputRefs") else [db.get(Item, ref) for ref in body["inputRefs"]]
@@ -454,7 +460,8 @@ def create_run(request: Request, db: Session, user: User, case: Case, body: dict
     job = Job(id=uid("job"), case_id=case.id, kind=kind, goal=instruction, graph_version="workbench-v2" if agent_mode else "sop-v2", payload=encode({**context, "inputRefs": body.get("inputRefs", []), "costInputs": cost_inputs, "selectedSupplierOfferId": selected_offer_id, "changeSetId": body.get("changeSetId"), "interactive": interactive, "generationTarget": generation_target, "agentMode": agent_mode, "agentNode": body.get("agentNode")}))
     if body.get("simulationNode"):
         job.graph_version = "simulation-v1"
-        job.payload = encode({**decode(job.payload), "simulationNode": body["simulationNode"]})
+        job.payload = encode({**decode(job.payload), "simulationNode": body["simulationNode"],
+                              **{key: body[key] for key in ("editedText", "imagePrompt") if key in body}})
     run = Run(id=uid("run"), job_id=job.id, case_id=case.id, base_revision=base_revision, action=action, instruction=instruction, payload=encode({"assetVersionIds": body.get("assetVersionIds", []), "agentNode": body.get("agentNode"), "executionMode": "simulation" if body.get("simulationNode") else "live"}))
     db.add(job)
     db.flush()

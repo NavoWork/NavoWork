@@ -41,3 +41,30 @@ def clear_checked_warnings(case, job, run):
     warnings.pop(warning_node(job), None)
     data["nodeWarnings"] = warnings
     case.payload = encode(data)
+
+
+def record_spec_gaps(db, case, job, run):
+    """A completed draft can still lack required fields even without request_info."""
+    from .domain import SPEC_FIELDS, missing_spec_fields
+    from .workbench import latest_artifact
+    spec = latest_artifact(db, case, "spec")
+    if not spec:
+        return
+    fields = spec.get("content", {}).get("fields", {})
+    missing = set(missing_spec_fields(fields))
+    data = decode(case.payload)
+    warnings = data.get("nodeWarnings", {})
+    # Validation warnings are recalculated; unanswered Agent questions stay intact.
+    current = [w for w in warnings.get("requirements", []) if w.get("source") != "validation"]
+    existing = {w["question"] for w in current}
+    for field in SPEC_FIELDS:
+        question = f"请补充{field['label']}。"
+        if field["key"] in missing and question not in existing:
+            current.append({"question": question, "runId": run.id, "skipped": False,
+                            "source": "validation", "field": field["key"]})
+    if current:
+        warnings["requirements"] = current
+    else:
+        warnings.pop("requirements", None)
+    data["nodeWarnings"] = warnings
+    case.payload = encode(data)

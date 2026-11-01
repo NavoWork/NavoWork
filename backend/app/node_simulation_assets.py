@@ -69,10 +69,12 @@ def save_competitors(db, case, run, current, scenario_id):
 
 def save_design_image(db, case, run, job, spec, scenario_id):
     data, _ = demo_node_data(scenario_id)
+    default_prompt = ("品牌活动用帆布手提袋，简洁自然、可重复使用的风格方向。仅作概念示意，尺寸、面料克重、结构及 Logo 均待确认。"
+                      if decode(case.payload).get("demoDataScope") == "incomplete" else data["designDirection"])
     raw = preset_path(scenario_id).read_bytes()  # No provider path or network fallback.
     blob = store_blob(db, raw, f"{scenario_id}-concept.png", "image/png", case.id)
     export_id = uid("export")
-    content = {"prompt": data["designDirection"], "specVersionId": spec["itemId"],
+    content = {"prompt": decode(job.payload).get("imagePrompt") or default_prompt, "specVersionId": spec["itemId"],
         "specHash": hashlib.sha256(encode(spec["content"]).encode()).hexdigest(),
         "simulation": True, "generationMode": "preset", "presetId": scenario_id, "imageApiCalled": False,
         "model": f"demo-preset:{scenario_id}", "imageFileId": blob.id, "sha256": blob.sha256,

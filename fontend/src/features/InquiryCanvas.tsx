@@ -50,7 +50,7 @@ import { FilePreview, NodeReferenceDocument, OriginalDocument, WorkingDocument }
 import { filterNodeFolders, nodeDirectoryFolders, nodeReferenceDocuments } from './inquiry-node-directory';
 import { ConversationResults } from './ConversationResults';
 import { InquiryStageDocument } from './InquiryStageDocument';
-import type { GenerationNode } from './inquiry-generation';
+import type { GenerationNode, NodeSimulationInput } from './inquiry-generation';
 import {
   canvasKey,
   canvasKindOrder,
@@ -237,7 +237,7 @@ interface Props {
   onInstruction: (text: string) => void;
   onOpenChat: () => void;
   onRevision: (number: number) => void;
-  onGenerate?: (node: GenerationNode, text?: string) => void;
+  onGenerate?: (node: GenerationNode, text?: string, input?: NodeSimulationInput) => void;
   onRestore?: (number: number, target: string) => Promise<number | undefined>;
   canRestore?: boolean;
 }
@@ -1097,12 +1097,12 @@ function CanvasWorkspace({
                     <WorkingDocument
                       doc={original!}
                       value={doc.text}
-                      readOnly={readOnly}
+                      readOnly={readOnly || !!generationDisabled}
                       onChange={(value) => draft(id, value)}
-                      onInstruction={onInstruction}
+                      onSave={onGenerate ? (text) => onGenerate(doc.kind as GenerationNode, undefined, { editedText: text }) : undefined}
                       onGenerate={
                         onGenerate
-                          ? (text) => onGenerate(doc.kind as GenerationNode, text)
+                          ? (text) => onGenerate(doc.kind as GenerationNode, text, {})
                           : undefined
                       }
                       onRestore={
@@ -1114,8 +1114,12 @@ function CanvasWorkspace({
                       }
                     />
                   ) : ['competitor', 'design', 'sample', 'order', 'production'].includes(doc.kind) ? (
-                    <InquiryStageDocument doc={doc} disabled={readOnly || !!generationDisabled}
-                      onGenerate={onGenerate ? () => onGenerate(doc.kind as GenerationNode) : undefined} />
+                    <InquiryStageDocument doc={doc} originalText={original?.text || ''} disabled={readOnly || !!generationDisabled}
+                      prompt={state.drafts[`prompt:${id}`] ?? doc.imagePrompt ?? ''}
+                      onPromptChange={(text) => draft(`prompt:${id}`, text)}
+                      onChange={(text) => draft(id, text)}
+                      onSave={onGenerate ? (text) => onGenerate(doc.kind as GenerationNode, undefined, { editedText: text }) : undefined}
+                      onGenerate={onGenerate ? (prompt) => onGenerate(doc.kind as GenerationNode, undefined, prompt === undefined ? {} : { imagePrompt: prompt }) : undefined} />
                   ) : doc.evidenceId || doc.reference ? (
                     <NodeReferenceDocument doc={doc} path={path} base={base} />
                   ) : doc.kind === 'note' ? (

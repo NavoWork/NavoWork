@@ -1133,6 +1133,15 @@
 .ic-card-image { width: 100%; height: 140px; min-height: 0; flex: 1; object-fit: contain; border-radius: 6px; background: #f3f4f6; margin: 4px 0 12px; }
 .ic-stage-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .ic-stage-heading h2 { margin: 0; }
+.ic-prompt-label { display: block; font-weight: 600; margin: 20px 0 10px; }
+.ic-image-prompt { min-height: 150px; }
+.ic-image-current-prompt { margin: 16px 0; font-size: 13px; color: var(--navo-color-text-muted); }
+.ic-image-current-prompt p { white-space: pre-wrap; line-height: 1.7; }
+.ic-design-editor { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 24px; align-items: start; }
+.ic-design-editor .ic-design-image { margin: 16px 0; }
+.ic-design-editor .ic-design-image img { max-height: 420px; }
+.ic-design-controls { min-width: 0; }
+.ic-design-controls .ic-document-actions { flex-wrap: wrap; gap: 10px; }
 .ic-stage-text { white-space: pre-wrap; font-size: 14px; line-height: 1.8; margin-top: 24px; overflow-wrap: anywhere; }
 .ic-stage-empty { color: var(--navo-color-text-muted); margin: 32px 0; }
 .ic-design-image { margin: 24px 0; }

@@ -56,7 +56,7 @@ import {
   runContext,
   type ComposerContext,
 } from './inquiry-context';
-import { generateInquiryNode, type GenerationNode } from './inquiry-generation';
+import { generateInquiryNode, type GenerationNode, type NodeSimulationInput } from './inquiry-generation';
 import { CustomerContextCard, channelLabels } from './CustomerContextCard';
 import { ResizeHandle } from '../components/ResizeHandle';
 import './inquiry.css';
@@ -285,13 +285,13 @@ export function InquiryWorkspace({
       setBusy(false);
     }
   }
-  async function generateNode(node: GenerationNode, instruction?: string) {
+  async function generateNode(node: GenerationNode, instruction?: string, simulationInput?: NodeSimulationInput) {
     if (!inquiry || generationPending.current || busy || readOnly || replyEditsPending) return;
     generationPending.current = true;
-    showAIChat();
+    if (!simulationInput) showAIChat();
     try {
       await operate(async () => {
-        const next = await generateInquiryNode(path, inquiry, node, instruction);
+        const next = await generateInquiryNode(path, inquiry, node, instruction, simulationInput);
         setLastRunId(next.id);
         setRevisionNumber(null);
         queryClient.setQueryData(['run', scope, next.id], next);
@@ -643,7 +643,7 @@ export function InquiryWorkspace({
             generationDisabled={busy || replyEditsPending}
             onGenerate={
               mode === 'real'
-                ? (node, instruction) => void generateNode(node, instruction)
+                ? (node, instruction, input) => void generateNode(node, instruction, input)
                 : undefined
             }
             onRestore={mode === 'real' ? restoreRevision : undefined}

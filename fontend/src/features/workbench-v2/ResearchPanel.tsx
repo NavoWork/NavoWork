@@ -48,11 +48,13 @@ export function ResearchPanel({
   data,
   disabled,
   onChanged,
+  onGenerateImage,
 }: {
   path: string;
   data: WorkbenchData;
   disabled: boolean;
   onChanged: () => void;
+  onGenerateImage: (prompt: string) => Promise<boolean>;
 }) {
   const endpoint = `${path}/workbench/research`;
   const research = useQuery({
@@ -339,21 +341,10 @@ export function ResearchPanel({
           className="button"
           disabled={locked || !spec || !prompt.trim()}
           onClick={() =>
-            void operate(() =>
-              api.request(`${endpoint}/concepts`, {
-                method: 'POST',
-                timeoutMs: 150000,
-                body: {
-                  baseRevision: data.case.currentRevision,
-                  spec_version_id: spec.itemId,
-                  prompt,
-                  base_version: image?.version || 0,
-                },
-              }),
-            )
+            void onGenerateImage(prompt)
           }
         >
-          生成概念图草稿
+          生成概念图草稿（Mock）
         </button>
         {!spec && <p>先保存规格草稿，概念图将绑定具体规格版本。</p>}
         {image && (
@@ -384,16 +375,10 @@ export function ResearchPanel({
                 className="button"
                 disabled={locked || !attempt.retryable}
                 onClick={() =>
-                  void operate(() =>
-                    api.request(`${endpoint}/image-attempts/${attempt.id}/retry`, {
-                      method: 'POST',
-                      timeoutMs: 150000,
-                      body: { baseRevision: data.case.currentRevision },
-                    }),
-                  )
+                  void onGenerateImage(attempt.prompt)
                 }
               >
-                重试图像分支
+                使用 Mock 重新生成
               </button>
             </p>
           ))}

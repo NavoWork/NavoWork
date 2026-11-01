@@ -55,11 +55,12 @@ export function additionalStageDocuments(revision?: Revision): WorkspaceDocument
     const primary = revision?.nodeArtifacts?.[artifacts[0]];
     return {
       id: `${kind}:${revision?.number || 0}`, kind, title, folder: 'analysis', revision,
-      text: artifacts.map((key) => artifactText(revision?.nodeArtifacts?.[key])).filter(Boolean).join('\n\n'),
+      text: primary?.content.documentText ?? artifacts.map((key) => artifactText(revision?.nodeArtifacts?.[key])).filter(Boolean).join('\n\n'),
       caption: primary ? `V${primary.version} · ${kind === 'design' ? '预置演示图' : '待核对'}` : '等待生成',
       hasContent: stageHasContent(revision, kind),
       imageUrl: kind === 'design' ? primary?.content.downloadUrl : undefined,
-      comparisons: kind === 'competitor' ? primary?.content.comparisons : undefined,
+      imagePrompt: kind === 'design' ? primary?.content.prompt || '' : undefined,
+      comparisons: kind === 'competitor' && !primary?.content.documentText ? primary?.content.comparisons : undefined,
     };
   });
 }
