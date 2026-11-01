@@ -164,7 +164,7 @@ def case_routes(request: Request, db: Session, user: User, parts: list[str], bod
                 case.payload = encode({**decode(case.payload), "customerContext": validate_customer_context(body["customerContext"])})
             db.flush()
             db.add(CaseAccess(case_id=case.id, user_id=user.id))
-            create_item(db, "message", {"id": uid("msg"), "inquiryId": case.id, "role": "user", "text": body["originalText"].strip(), "createdAt": now()}, case_id=case.id)
+            create_item(db, "message", {"id": uid("msg"), "inquiryId": case.id, "role": "user", "text": body["originalText"].strip(), "isOriginal": True, "createdAt": now()}, case_id=case.id)
             result = case_view(case)
             idem_store(db, marker, result)
             db.commit()
@@ -232,6 +232,36 @@ def case_routes(request: Request, db: Session, user: User, parts: list[str], bod
     if tail and tail[0] == "messages":
         if method == "GET":
             return {"items": [item_view(i) for i in items(db, "message", case_id=case.id)]}
+        if len(tail) == 2 and method == "DELETE":
+            if case.active_run_id:
+                fail("RUN_IN_PROGRESS", "当前询盘正在运行，请稍后再删除消息", 409, {"runId": case.active_run_id})
+            message = scoped_item(db, user, case, tail[1], "message")
+            if decode(message.payload).get("isOriginal") or decode(message.payload).get("text") == decode(case.payload).get("originalText"):
+                fail("ORIGINAL_MESSAGE_PROTECTED", "客户原始询盘不能删除", 409)
+            db.delete(message)
+            touch(case)
+            db.commit()
+            return {"id": tail[1], "deleted": True}
+        if method == "DELETE":
+            if case.active_run_id:
+                fail("RUN_IN_PROGRESS", "当前询盘正在运行，请稍后再清空会话", 409, {"runId": case.active_run_id})
+            original_text = decode(case.payload).get("originalText")
+            messages = items(db, "message", case_id=case.id)
+            for message in messages:
+                payload = decode(message.payload)
+                if payload.get("isOriginal") or payload.get("text") == original_text:
+                    continue
+                db.delete(message)
+            # The legacy business graph stores its prompt history on each run.
+            # Clear that durable context together with the visible transcript.
+            for run in db.scalars(select(Run).where(Run.case_id == case.id)):
+                payload = decode(run.payload)
+                if "businessMessages" in payload:
+                    payload.pop("businessMessages", None)
+                    run.payload = encode(payload)
+            touch(case)
+            db.commit()
+            return {"items": [item_view(message) for message in messages if decode(message.payload).get("isOriginal") or decode(message.payload).get("text") == original_text], "cleared": len(messages) - sum(1 for message in messages if decode(message.payload).get("isOriginal") or decode(message.payload).get("text") == original_text)}
         if method == "POST":
             value = body_value(body, "text", 20000)
             message = {"id": uid("msg"), "inquiryId": case.id, "role": "user", "text": value, "createdAt": now()}

@@ -492,7 +492,7 @@ function route(
       s.inquiries.push(i);
       s.revisions[i.id] = [];
       s.messages[i.id] = [
-        { id: uid('msg'), inquiryId: i.id, role: 'user', text: i.originalText, createdAt: now() },
+        { id: uid('msg'), inquiryId: i.id, role: 'user', text: i.originalText, isOriginal: true, createdAt: now() },
       ];
       return i;
     }
@@ -549,6 +549,23 @@ function route(
     }
     if (action === 'messages') {
       if (method === 'GET') return { items: s.messages[id] || [] };
+      if (method === 'DELETE') {
+        if (p.length > 5) {
+          const messageId = p[5];
+          const index = (s.messages[id] || []).findIndex((message) => message.id === messageId);
+          if (index < 0) fail('NOT_FOUND', '消息不存在', 404);
+          if (s.messages[id][index].isOriginal || s.messages[id][index].text === i!.originalText)
+            fail('ORIGINAL_MESSAGE_PROTECTED', '客户原始询盘不能删除', 409);
+          s.messages[id].splice(index, 1);
+          change(i!);
+          return { id: messageId, deleted: true };
+        }
+        const original = (s.messages[id] || []).filter((message) => message.isOriginal || message.text === i!.originalText);
+        const count = (s.messages[id]?.length || 0) - original.length;
+        s.messages[id] = original;
+        change(i!);
+        return { items: [], cleared: count };
+      }
       readOnly(i!);
       if (!b.text?.trim()) fail('INVALID_INPUT', '消息不能为空', 400);
       const message = {

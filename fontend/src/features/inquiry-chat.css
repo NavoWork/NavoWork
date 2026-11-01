@@ -39,6 +39,20 @@
   color: var(--navo-color-text-muted);
   font-size: 9px;
 }
+.iw-chat-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 2px;
+  padding: 4px;
+  border: 0;
+  color: var(--navo-color-text-muted);
+  background: transparent;
+  opacity: .45;
+  cursor: pointer;
+}
+.iw-chat-clear:hover,
+.iw-chat-clear:focus-visible { opacity: 1; color: var(--navo-color-danger, #b42318); }
 .iw-ai-chat {
   display: flex;
   flex-direction: column;
@@ -69,19 +83,45 @@
   line-height: 1.7;
 }
 .iw-assistant .iw-message {
+  position: relative;
   margin: 30px 0;
   font-size: 13px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
+.iw-message-delete {
+  position: absolute;
+  top: 5px;
+  right: 7px;
+  display: inline-flex;
+  padding: 4px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--navo-color-text-muted);
+  background: var(--navo-color-surface);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity .15s ease;
+}
+.iw-message:hover .iw-message-delete,
+.iw-message:focus-within .iw-message-delete { opacity: .6; }
+.iw-message-delete:hover,
+.iw-message-delete:focus-visible { opacity: 1 !important; color: var(--navo-color-danger, #b42318); }
 .iw-assistant .iw-message-meta {
   font-size: 10px;
   margin-bottom: 8px;
 }
 .iw-assistant .iw-message p {
-  padding: 0;
-  border-radius: 0;
-  background: transparent;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 14px 42px 14px 16px;
+  border-radius: 0 10px 10px 10px;
+  background: var(--navo-color-surface-muted);
+  border: 1px solid var(--navo-color-border-subtle);
   font-size: 13px;
   line-height: 1.9;
+  margin: 8px 0;
 }
 .iw-assistant .iw-message.user {
   margin-left: auto;
@@ -94,6 +134,8 @@
   padding: 14px 18px;
   border-radius: 16px;
   background: var(--navo-color-surface-muted);
+  border: 1px solid color-mix(in srgb, var(--navo-color-action) 24%, var(--navo-color-border-subtle));
+  border-left: 1px solid color-mix(in srgb, var(--navo-color-action) 24%, var(--navo-color-border-subtle));
 }
 .iw-assistant .iw-assistant-intro {
   padding: 38px 0;

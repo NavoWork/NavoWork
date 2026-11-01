@@ -242,6 +242,15 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
     }
   };
 
+  const deleteMessage = async (message: Message) => {
+    if (!window.confirm('删除这条消息？')) return;
+    await operate(async () => { await api.delete(`${path}/messages/${message.id}`); }, '消息已删除。');
+  };
+  const clearMessages = async () => {
+    if (!window.confirm('清空当前会话？此操作不可撤销。')) return;
+    await operate(async () => { await api.delete(`${path}/messages`); }, '会话已清空。');
+  };
+
   const cancelAgent = () => {
     if (!run.data) return;
     void operate(async () => {
@@ -400,6 +409,8 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
           onAnswer={answerAgent}
           onOpenSources={() => setSourcesOpen(true)}
           onCancel={cancelAgent}
+          onClearMessages={clearMessages}
+          onDeleteMessage={deleteMessage}
           error={error || run.data?.error?.message || messages.error || run.error}
         />
       </div>

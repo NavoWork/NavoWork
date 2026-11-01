@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ChevronRight, FileText, MessageSquare, Sparkles } from 'lucide-react';
+import { ChevronRight, FileText, MessageSquare, Sparkles, Trash2 } from 'lucide-react';
 import type { Inquiry, Message } from '../api/types';
 import { channelLabels } from './CustomerContextCard';
 import { InvocationContext } from './InvocationContext';
@@ -14,7 +14,7 @@ const messageDate = (value: string) =>
     timeZone: 'Asia/Shanghai',
   }).format(new Date(value));
 
-export function InquiryChatHeading() {
+export function InquiryChatHeading({ onClear }: { onClear?: () => void }) {
   return (
     <div className="iw-assistant-heading">
       <h2>
@@ -22,6 +22,7 @@ export function InquiryChatHeading() {
         AI 对话
       </h2>
       <span>仅当前询盘</span>
+      {onClear && <button className="iw-chat-clear" type="button" onClick={onClear} title="清空当前会话" aria-label="清空当前会话"><Trash2 size={12} /></button>}
     </div>
   );
 }
@@ -30,12 +31,14 @@ export function InquiryChatTranscript({
   inquiry,
   messages,
   onOriginal,
+  onDelete,
   resultMessageId,
   resultPreview,
 }: {
   inquiry: Inquiry;
   messages: Message[];
   onOriginal: () => void;
+  onDelete?: (message: Message) => void;
   resultMessageId?: string;
   resultPreview?: ReactNode;
 }) {
@@ -74,6 +77,7 @@ export function InquiryChatTranscript({
             </div>
             <p>{message.text}</p>
             <InvocationContext context={message.context} />
+            {onDelete && !message.isOriginal && message.text !== inquiry.originalText && <button className="iw-message-delete" type="button" onClick={() => onDelete(message)} title="删除这条消息" aria-label="删除这条消息"><Trash2 size={12} /></button>}
           </article>
           {message.id === resultMessageId && resultPreview}
         </div>

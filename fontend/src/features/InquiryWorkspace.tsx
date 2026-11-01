@@ -283,6 +283,20 @@ export function InquiryWorkspace({
       setBusy(false);
     }
   }
+  const deleteMessage = async (message: Message) => {
+    if (!window.confirm('删除这条消息？')) return;
+    await operate(async () => {
+      await api.delete(`${path}/messages/${message.id}`);
+      await refresh();
+    });
+  };
+  const clearMessages = async () => {
+    if (!window.confirm('清空当前会话？此操作不可撤销。')) return;
+    await operate(async () => {
+      await api.delete(`${path}/messages`);
+      await refresh();
+    });
+  };
   async function startRun(
     action = inquiry?.currentRevision ? 'revise' : 'analyze',
     evidence?: string,
@@ -731,13 +745,14 @@ export function InquiryWorkspace({
           id={`results-${inquiryId}`}
           aria-label="AI 助手"
         >
-          <InquiryChatHeading />
+          <InquiryChatHeading onClear={clearMessages} />
           <div className="iw-ai-chat">
             <div className="iw-messages" ref={messagesRef}>
               <InquiryChatTranscript
                 inquiry={inquiry}
                 messages={detail.data?.messages || []}
                 onOriginal={() => openDocument('original')}
+                onDelete={deleteMessage}
                 resultMessageId={resultMessage?.id}
                 resultPreview={resultPreview}
               />

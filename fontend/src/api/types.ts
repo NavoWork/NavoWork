@@ -44,6 +44,7 @@ export interface Message {
   runId?: string;
   createdAt: string;
   context?: RunContext;
+  isOriginal?: boolean;
 }
 export interface KnowledgeContext {
   sourceVersionId?: string;

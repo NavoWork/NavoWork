@@ -25,6 +25,8 @@ export function AgentPanel({
   onAnswer,
   onOpenSources,
   onCancel,
+  onClearMessages,
+  onDeleteMessage,
   error,
 }: {
   inquiry: Inquiry;
@@ -39,6 +41,8 @@ export function AgentPanel({
   onAnswer: (answers: { questionId: string; value: string }[]) => Promise<boolean>;
   onOpenSources: () => void;
   onCancel: () => void;
+  onClearMessages: () => void;
+  onDeleteMessage: (message: Message) => void;
   error: unknown;
 }) {
   const draftKey = `easywork:business-chat:${session.user.id}:${session.workspace.id}:${inquiry.id}`;
@@ -114,13 +118,14 @@ export function AgentPanel({
 
   return (
     <aside className="wbv2-agent iw-assistant" aria-label="AI 助手">
-      <InquiryChatHeading />
+      <InquiryChatHeading onClear={onClearMessages} />
       <div className="iw-ai-chat">
         <div className="iw-messages" ref={messagesRef}>
           <InquiryChatTranscript
             inquiry={inquiry}
             messages={messages}
             onOriginal={() => setOriginalOpen(true)}
+            onDelete={onDeleteMessage}
           />
 
           {toolEvents.length > 0 && (
