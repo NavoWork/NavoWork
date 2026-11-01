@@ -66,6 +66,10 @@ test('选择按询盘保存，发送后消息、运行和版本保留快照，�
   await page.reload();
   await expect(input(page)).toHaveValue('核对600件报价和交期');
   await expect(composer(page).getByLabel('移除知识 交付与承诺规则', { exact: true })).toBeVisible();
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await composer(page).getByRole('button', { name: '选择技能', exact: true }).click();
+  await page.screenshot({ path: '../tmp/inquiry-context-desktop.png' });
+  await composer(page).getByLabel('关闭选择器', { exact: true }).click();
   await open(page, 'inq_de014');
   await expect(composer(page).locator('.iw-context-chip')).toHaveCount(0);
   await expect(input(page)).toHaveValue('');
@@ -74,8 +78,13 @@ test('选择按询盘保存，发送后消息、运行和版本保留快照，�
   await expect(work(page).locator('.iw-message.user').last()).toContainText('回复质量检查');
   await expect(composer(page).locator('.iw-context-chip')).toHaveCount(0);
   await expect(input(page)).toHaveValue('');
-  await expect(work(page).getByRole('region', { name: 'V3 本轮成果', exact: true })).toBeVisible({ timeout: 15000 });
-  const messages = await get<{ items: Message[] }>(page, '/workspaces/ws_demo/inquiries/inq_mx026/messages');
+  await expect(work(page).getByRole('region', { name: 'V3 本轮成果', exact: true })).toBeVisible({
+    timeout: 15000,
+  });
+  const messages = await get<{ items: Message[] }>(
+    page,
+    '/workspaces/ws_demo/inquiries/inq_mx026/messages',
+  );
   const message = messages.items.find((message) => message.text === '核对600件报价和交期')!;
   expect(message.context?.skills[0].id).toBe('reply-review');
   expect(message.context?.knowledge[0].content).toContain('出库时间不等于到货时间');
@@ -91,23 +100,67 @@ test('选择按询盘保存，发送后消息、运行和版本保留快照，�
   await expect(work(page).locator('.iw-run-details')).toContainText('回复质量检查');
 });
 
+test('本机存储失败时保留输入与选择并提示，恢复后可以重新暂存', async ({ page }) => {
+  await open(page);
+  await selectContext(page);
+  await page.evaluate(() => {
+    const original = Storage.prototype.setItem;
+    Object.assign(window, {
+      restoreContextStorage: () => {
+        Storage.prototype.setItem = original;
+      },
+    });
+    Storage.prototype.setItem = function (key, value) {
+      if (key.startsWith('easywork:view:'))
+        throw new DOMException('Storage full', 'QuotaExceededError');
+      original.call(this, key, value);
+    };
+  });
+  await input(page).fill('需要保留的草稿');
+  await expect(composer(page).getByRole('alert')).toContainText('草稿暂存失败');
+  await expect(input(page)).toHaveValue('需要保留的草稿');
+  await expect(composer(page).locator('.iw-context-chip')).toHaveCount(2);
+  await expect(composer(page).getByText('草稿已暂存', { exact: true })).toHaveCount(0);
+  await page.evaluate(() =>
+    (window as unknown as { restoreContextStorage: () => void }).restoreContextStorage(),
+  );
+  await input(page).fill('需要保留的草稿，存储已恢复');
+  await expect(composer(page).getByText('草稿已暂存', { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(input(page)).toHaveValue('需要保留的草稿，存储已恢复');
+  await expect(composer(page).locator('.iw-context-chip')).toHaveCount(2);
+});
+
 test('新建与导入知识可以立即引用，移动端深色选择器保持在视口内', async ({ page }) => {
   await open(page, 'inq_de014');
   await page.getByRole('button', { name: '知识库', exact: true }).click();
   await page.getByRole('button', { name: '新建文档', exact: true }).click();
   await page.getByRole('dialog').getByLabel('文档名称').fill('陶瓷杯验收标准');
-  await page.getByRole('dialog').getByLabel('Markdown 正文').fill('# 陶瓷杯验收标准\n\n每批抽检20件，检查杯口和釉面。');
+  await page
+    .getByRole('dialog')
+    .getByLabel('Markdown 正文')
+    .fill('# 陶瓷杯验收标准\n\n每批抽检20件，检查杯口和釉面。');
   await page.getByRole('dialog').getByRole('button', { name: '创建文档', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.getByRole('button', { name: '导入 Markdown', exact: true }).click();
-  await page.getByRole('dialog').getByLabel('Markdown 文件').setInputFiles({
-    name: '包装规则.md', mimeType: 'text/markdown', buffer: Buffer.from('# 包装规则\n\n杯子需独立防震包装。'),
-  });
-  await page.getByRole('dialog').getByRole('button', { name: '添加 1 个文件', exact: true }).click();
+  await page
+    .getByRole('dialog')
+    .getByLabel('Markdown 文件')
+    .setInputFiles({
+      name: '包装规则.md',
+      mimeType: 'text/markdown',
+      buffer: Buffer.from('# 包装规则\n\n杯子需独立防震包装。'),
+    });
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: '添加 1 个文件', exact: true })
+    .click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await open(page, 'inq_de014');
   await input(page).fill('@釉面');
-  await expect(composer(page).getByRole('option', { name: '陶瓷杯验收标准', exact: true })).toBeVisible();
+  await expect(
+    composer(page).getByRole('option', { name: '陶瓷杯验收标准', exact: true }),
+  ).toBeVisible();
   await input(page).press('Enter');
   await expect(composer(page).getByLabel('移除知识 陶瓷杯验收标准', { exact: true })).toBeVisible();
   await input(page).fill('@防震');
@@ -118,7 +171,9 @@ test('新建与导入知识可以立即引用，移动端深色选择器保持�
   await work(page).getByRole('button', { name: 'AI 助手', exact: true }).click();
   await composer(page).getByRole('button', { name: '引用知识库', exact: true }).click();
   await composer(page).getByRole('textbox', { name: '搜索知识库', exact: true }).fill('包装规则');
-  await expect(composer(page).getByRole('option', { name: '包装规则', exact: true })).toBeInViewport();
+  await expect(
+    composer(page).getByRole('option', { name: '包装规则', exact: true }),
+  ).toBeInViewport();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   const box = await composer(page).getByRole('dialog').boundingBox();
   expect(box!.y).toBeGreaterThanOrEqual(0);
@@ -146,10 +201,14 @@ test('提交失败保留选择，运行失败可以恢复同一份上下文重�
     setMockFault('run-failure');
   });
   await work(page).getByRole('button', { name: '处理反馈', exact: true }).click();
-  await expect(work(page).getByRole('button', { name: '恢复指令并重试', exact: true })).toBeEnabled({ timeout: 15000 });
+  await expect(work(page).getByRole('button', { name: '恢复指令并重试', exact: true })).toBeEnabled(
+    { timeout: 15000 },
+  );
   await work(page).getByRole('button', { name: '恢复指令并重试', exact: true }).click();
   await expect(input(page)).toHaveValue('核对600件报价');
   await expect(composer(page).locator('.iw-context-chip')).toHaveCount(2);
   await work(page).getByRole('button', { name: '处理反馈', exact: true }).click();
-  await expect(work(page).getByRole('region', { name: 'V3 本轮成果', exact: true })).toBeVisible({ timeout: 15000 });
+  await expect(work(page).getByRole('region', { name: 'V3 本轮成果', exact: true })).toBeVisible({
+    timeout: 15000,
+  });
 });

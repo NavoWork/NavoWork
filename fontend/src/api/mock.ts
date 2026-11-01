@@ -224,19 +224,28 @@ function validateRunContext(value: unknown): RunContext | undefined {
     !record(value) ||
     !Array.isArray(value.skills) ||
     !Array.isArray(value.knowledge) ||
-    value.skills.some((skill) =>
-      !record(skill) || !text(skill.id) || !text(skill.name) ||
-      !Array.isArray(skill.instructions) || !skill.instructions.length || !skill.instructions.every(text),
+    value.skills.some(
+      (skill) =>
+        !record(skill) ||
+        !text(skill.id) ||
+        !text(skill.name) ||
+        !Array.isArray(skill.instructions) ||
+        !skill.instructions.length ||
+        !skill.instructions.every(text),
     ) ||
-    value.knowledge.some((doc) =>
-      !record(doc) || !['id', 'title', 'folder', 'content', 'updated'].every((key) => text(doc[key])),
+    value.knowledge.some(
+      (doc) =>
+        !record(doc) ||
+        !['id', 'title', 'folder', 'content', 'updated'].every((key) => text(doc[key])),
     )
-  ) fail('INVALID_INPUT', '技能或知识库引用不完整，请重新选择后提交', 400);
+  )
+    fail('INVALID_INPUT', '技能或知识库引用不完整，请重新选择后提交', 400);
   const context = value as RunContext;
   if (
     new Set(context.skills.map((skill) => skill.id)).size !== context.skills.length ||
     new Set(context.knowledge.map((doc) => doc.id)).size !== context.knowledge.length
-  ) fail('INVALID_INPUT', '同一技能或知识文档不能重复引用', 400);
+  )
+    fail('INVALID_INPUT', '同一技能或知识文档不能重复引用', 400);
   return clone(context);
 }
 function validateAssets(s: State, refs: unknown, sku: string | null): string[] {

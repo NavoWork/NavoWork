@@ -45,7 +45,12 @@ import {
 import { InquiryCanvas } from './InquiryCanvas';
 import { InquiryComposer } from './InquiryComposer';
 import { InvocationContext } from './InvocationContext';
-import { emptyComposerContext, restoreContext, runContext, type ComposerContext } from './inquiry-context';
+import {
+  emptyComposerContext,
+  restoreContext,
+  runContext,
+  type ComposerContext,
+} from './inquiry-context';
 import { ResizeHandle } from '../components/ResizeHandle';
 import './inquiry.css';
 
@@ -72,8 +77,9 @@ function readPref<T>(key: string, fallback: T): T {
 function writePref(key: string, value: unknown) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
+    return true;
   } catch {
-    /* Storage is optional for view preferences. */
+    return false;
   }
 }
 
@@ -102,7 +108,10 @@ export function InquiryWorkspace({
     }),
   );
   const [input, setInput] = useState(initial.current.input);
-  const [composerContext, setComposerContext] = useState<ComposerContext>(initial.current.composerContext || emptyComposerContext());
+  const [composerContext, setComposerContext] = useState<ComposerContext>(
+    initial.current.composerContext || emptyComposerContext(),
+  );
+  const [draftStored, setDraftStored] = useState(true);
   const [deferredResults, setDeferredResults] = useState<number[]>(
     initial.current.deferredResults || [],
   );
@@ -200,16 +209,27 @@ export function InquiryWorkspace({
     changedRef.current();
   }, [queryClient, scope]);
   useEffect(() => {
-    writePref(prefKey, {
-      input,
-      composerContext,
-      deferredResults,
-      revision: revisionNumber,
-      lastRunId,
-      selectedAssets,
-      assistantWidth,
-    });
-  }, [input, composerContext, deferredResults, revisionNumber, lastRunId, selectedAssets, assistantWidth, prefKey]);
+    setDraftStored(
+      writePref(prefKey, {
+        input,
+        composerContext,
+        deferredResults,
+        revision: revisionNumber,
+        lastRunId,
+        selectedAssets,
+        assistantWidth,
+      }),
+    );
+  }, [
+    input,
+    composerContext,
+    deferredResults,
+    revisionNumber,
+    lastRunId,
+    selectedAssets,
+    assistantWidth,
+    prefKey,
+  ]);
   useEffect(() => {
     if (
       run &&
@@ -740,6 +760,7 @@ export function InquiryWorkspace({
               canSend={canSend}
               readOnly={readOnly}
               draftsPending={!!revision && draftsPending}
+              draftStored={draftStored}
               sendLabel={inquiry.currentRevision ? '处理反馈' : '开始处理'}
               onSend={() => void startRun()}
               onOriginal={() => openDocument('original')}
