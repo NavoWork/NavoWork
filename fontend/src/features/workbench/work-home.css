@@ -182,7 +182,7 @@
   width: 17%;
 }
 .wh-work-table th:last-child {
-  width: 4%;
+  width: 88px;
   border-top-right-radius: 7px;
   border-bottom-right-radius: 7px;
 }
@@ -229,6 +229,13 @@
   padding-right: 6px;
   color: var(--navo-color-text-muted);
 }
+.wh-row-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.wh-row-actions .icon-button { width: 32px; height: 32px; flex-shrink: 0; }
+.wh-delete-button:not(:disabled):hover { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+.wh-delete-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+.wh-confirm-delete { background: #dc2626; color: white; border-color: #dc2626; }
+.wh-confirm-delete:hover { background: #b91c1c; }
+.wh-action-notice { margin: 0; color: var(--navo-color-text-secondary); font-size: 13px; }
 .wh-searching .wh-work-table {
   opacity: 0.5;
 }

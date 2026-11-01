@@ -592,6 +592,7 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
               session={session}
               active={!id && !isTrade && page === 'home'}
               onOpen={open}
+              onDeleted={(deletedId) => setTabs((old) => old.filter((tab) => tab.id !== deletedId))}
               onCreate={() => setCreate(true)}
             />
           </div>

@@ -29,6 +29,24 @@ beforeEach(async () => {
 });
 afterEach(() => vi.useRealTimers());
 describe('Mock contract boundaries', () => {
+  it('deletes and restores inquiries without losing revisions or leaving them in summary counts', async () => {
+    const before = await get<Record<string, number>>(`${w}/inquiries/summary`);
+    const inquiry = await get<Inquiry>(i);
+    const revisions = await get(`${i}/revisions`);
+    await mockRequest(i, { method: 'DELETE' });
+    await expect(get(i)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect((await get<Page<Inquiry>>(`${w}/inquiries`)).items.some(row => row.id === inquiry.id)).toBe(false);
+    expect((await get<Page<Inquiry>>(`${w}/inquiries?deleted=true`)).items.map(row => row.id)).toContain(inquiry.id);
+    expect((await get<Record<string, number>>(`${w}/inquiries/summary`))[inquiry.businessStatus]).toBe(before[inquiry.businessStatus] - 1);
+    await post(`${i}/restore`, {});
+    expect(await get(`${i}/revisions`)).toEqual(revisions);
+    expect(await get(`${w}/inquiries/summary`)).toEqual(before);
+  });
+
+  it('blocks deletion while a mock inquiry is running', async () => {
+    await post(`${i}/runs`, { baseRevision: 2, action: 'analyze' });
+    await expect(mockRequest(i, { method: 'DELETE' })).rejects.toMatchObject({ code: 'RUN_IN_PROGRESS' });
+  });
   it('keeps one inquiry history and removes conversation management without cancelling a run', async () => {
     const before = (await get<{ items: Message[] }>(`${i}/messages`)).items;
     const run = await post<Run>(`${i}/runs`, {

@@ -82,10 +82,12 @@ def require_workspace(workspace_id: str):
         fail("NOT_FOUND", "工作空间不存在", 404)
 
 
-def require_case(db: Session, user: User, case_id: str) -> Case:
+def require_case(db: Session, user: User, case_id: str, *, include_deleted: bool = False) -> Case:
     case = db.get(Case, case_id)
     if not case or case.workspace_id != WORKSPACE_ID or not db.get(CaseAccess, (case_id, user.id)):
         fail("NOT_FOUND", "询盘不存在或无权查看", 404)
+    if not include_deleted and decode(case.payload).get("deletedAt"):
+        fail("NOT_FOUND", "询盘已删除，可从已删除列表恢复", 404)
     return case
 
 
@@ -115,7 +117,7 @@ def items(db: Session, kind: str, *, case_id: str | None = None, parent_id: str 
 
 def case_view(case: Case) -> dict:
     value = decode(case.payload)
-    return {"id": case.id, "workspaceId": case.workspace_id, **value, "businessStatus": case.status, "metadataVersion": case.metadata_version, "currentRevision": case.current_revision, "activeRunId": case.active_run_id, "updatedAt": case.updated_at}
+    return {"id": case.id, "workspaceId": case.workspace_id, **value, "ownerId": case.owner_id, "businessStatus": case.status, "metadataVersion": case.metadata_version, "currentRevision": case.current_revision, "activeRunId": case.active_run_id, "updatedAt": case.updated_at}
 
 
 def touch(case: Case):

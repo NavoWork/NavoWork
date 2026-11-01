@@ -439,7 +439,7 @@ function route(
     action = p[4];
   if (group === 'inquiries') {
     if (id === 'summary')
-      return s.inquiries.reduce(
+      return s.inquiries.filter((i) => !i.deletedAt).reduce(
         (a, i) => {
           a[i.businessStatus]++;
           return a;
@@ -454,6 +454,7 @@ function route(
       const all = s.inquiries
         .filter(
           (i) =>
+            Boolean(i.deletedAt) === (query.get('deleted') === 'true') &&
             (!status || status === 'all' || i.businessStatus === status) &&
             `${i.title} ${i.customer} ${i.id}`.toLowerCase().includes(q),
         )
@@ -477,6 +478,7 @@ function route(
       const i: Inquiry = {
         id: uid('inq'),
         workspaceId: s.session!.workspace.id,
+        ownerId: s.session!.user.id,
         title: b.title.trim(),
         customer: b.customer.trim(),
         originalText: b.originalText.trim(),
@@ -498,6 +500,21 @@ function route(
     }
     const i = s.inquiries.find((v) => v.id === id);
     if (!i) fail('NOT_FOUND', '询盘不存在或无权查看', 404);
+    if ((!action && method === 'DELETE') || (action === 'restore' && method === 'POST')) {
+      if (i!.ownerId && i!.ownerId !== s.session!.user.id && s.session!.user.role !== 'admin')
+        fail('FORBIDDEN', '只有询盘创建者或管理员可以删除或恢复询盘', 403);
+      if (i!.activeRunId || i!.pendingRunId) fail('RUN_IN_PROGRESS', '请先完成或取消当前任务，再删除询盘', 409);
+      if (method === 'DELETE') {
+        i!.deletedAt ||= now();
+        i!.deletedBy = s.session!.user.id;
+      } else {
+        delete i!.deletedAt;
+        delete i!.deletedBy;
+      }
+      change(i!);
+      return i;
+    }
+    if (i!.deletedAt) fail('NOT_FOUND', '询盘已删除，可从已删除列表恢复', 404);
     if (!action && method === 'GET') return { ...i!, latestRunId: i!.latestRunId || Object.values(s.runs).filter(run => run.inquiryId === id).at(-1)?.id || null };
     if (!action && method === 'PATCH') {
       readOnly(i!);

@@ -1,0 +1,82 @@
+{
+  "hash": "bed821ff",
+  "configHash": "efb98ca3",
+  "lockfileHash": "78cff21a",
+  "browserHash": "f1250a99",
+  "optimized": {
+    "react/jsx-dev-runtime": {
+      "src": "../../../node_modules/react/jsx-dev-runtime.js",
+      "file": "react_jsx-dev-runtime.js",
+      "fileHash": "bcc38503",
+      "needsInterop": true
+    },
+    "react": {
+      "src": "../../../node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "3e8f2646",
+      "needsInterop": true
+    },
+    "react-dom/client": {
+      "src": "../../../node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "dda33f26",
+      "needsInterop": true
+    },
+    "react-router-dom": {
+      "src": "../../../node_modules/react-router-dom/dist/index.mjs",
+      "file": "react-router-dom.js",
+      "fileHash": "f8206996",
+      "needsInterop": false
+    },
+    "@tanstack/react-query": {
+      "src": "../../../node_modules/@tanstack/react-query/build/modern/index.js",
+      "file": "@tanstack_react-query.js",
+      "fileHash": "3cf93cfe",
+      "needsInterop": false
+    },
+    "lucide-react": {
+      "src": "../../../node_modules/lucide-react/dist/esm/lucide-react.js",
+      "file": "lucide-react.js",
+      "fileHash": "d79a7e31",
+      "needsInterop": false
+    },
+    "@radix-ui/react-dialog": {
+      "src": "../../../node_modules/@radix-ui/react-dialog/dist/index.mjs",
+      "file": "@radix-ui_react-dialog.js",
+      "fileHash": "00cebc97",
+      "needsInterop": false
+    },
+    "idb": {
+      "src": "../../../node_modules/idb/build/index.js",
+      "file": "idb.js",
+      "fileHash": "02cf867d",
+      "needsInterop": false
+    },
+    "papaparse": {
+      "src": "../../../node_modules/papaparse/papaparse.min.js",
+      "file": "papaparse.js",
+      "fileHash": "4dfe997e",
+      "needsInterop": true
+    },
+    "@xyflow/react": {
+      "src": "../../../node_modules/@xyflow/react/dist/esm/index.js",
+      "file": "@xyflow_react.js",
+      "fileHash": "05815810",
+      "needsInterop": false
+    }
+  },
+  "chunks": {
+    "chunk-BK6OY2GP": {
+      "file": "chunk-BK6OY2GP.js"
+    },
+    "chunk-XNXQDIFL": {
+      "file": "chunk-XNXQDIFL.js"
+    },
+    "chunk-6AWVIXBX": {
+      "file": "chunk-6AWVIXBX.js"
+    },
+    "chunk-PX6F3LHL": {
+      "file": "chunk-PX6F3LHL.js"
+    }
+  }
+}

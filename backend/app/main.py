@@ -150,6 +150,8 @@ def case_routes(request: Request, db: Session, user: User, parts: list[str], bod
     if not parts:
         if method == "GET":
             values = [case_view(c) for c in db.scalars(select(Case).join(CaseAccess, CaseAccess.case_id == Case.id).where(CaseAccess.user_id == user.id, Case.workspace_id == WORKSPACE_ID))]
+            deleted = request.query_params.get("deleted") == "true"
+            values = [v for v in values if bool(v.get("deletedAt")) == deleted]
             status = request.query_params.get("status")
             q = request.query_params.get("q", "").lower()
             values = [v for v in values if (not status or status == "all" or v["businessStatus"] == status) and q in f"{v['title']} {v['customer']} {v['id']}".lower()]
@@ -191,10 +193,31 @@ def case_routes(request: Request, db: Session, user: User, parts: list[str], bod
         from .demo_scenarios import catalog
         return catalog()
     if parts == ["summary"]:
-        values = [c.status for c in db.scalars(select(Case).join(CaseAccess, CaseAccess.case_id == Case.id).where(CaseAccess.user_id == user.id))]
+        values = [c.status for c in db.scalars(select(Case).join(CaseAccess, CaseAccess.case_id == Case.id).where(CaseAccess.user_id == user.id, Case.workspace_id == WORKSPACE_ID)) if not decode(c.payload).get("deletedAt")]
         return {key: values.count(key) for key in ("todo", "active", "waiting", "done")}
-    case = require_case(db, user, parts[0])
     tail = parts[1:]
+    deleting = not tail and method == "DELETE"
+    restoring = tail == ["restore"] and method == "POST"
+    case = require_case(db, user, parts[0], include_deleted=deleting or restoring)
+    if deleting or restoring:
+        db.execute(text("BEGIN IMMEDIATE"))
+        db.refresh(case)
+        if case.owner_id != user.id and user.role != "admin":
+            fail("FORBIDDEN", "只有询盘创建者或管理员可以删除或恢复询盘", 403)
+        if case.active_run_id or decode(case.payload).get("pendingRunId"):
+            fail("RUN_IN_PROGRESS", "请先完成或取消当前任务，再删除询盘", 409)
+        value = decode(case.payload)
+        if deleting and not value.get("deletedAt"):
+            value.update(deletedAt=now(), deletedBy=user.id)
+            case.payload = encode(value)
+            touch(case)
+        elif restoring and value.get("deletedAt"):
+            value.pop("deletedAt", None)
+            value.pop("deletedBy", None)
+            case.payload = encode(value)
+            touch(case)
+        db.commit()
+        return case_view(case)
     if tail == ["demo-guide"] and method == "GET":
         from .demo_scenarios import demo_guide
         return demo_guide(db, case)
@@ -363,6 +386,8 @@ def case_routes(request: Request, db: Session, user: User, parts: list[str], bod
 def create_run(request: Request, db: Session, user: User, case: Case, body: dict, kind: str | None = None):
     db.execute(text("BEGIN IMMEDIATE"))
     db.refresh(case)
+    if decode(case.payload).get("deletedAt"):
+        fail("NOT_FOUND", "询盘已删除，可从已删除列表恢复", 404)
     previous, marker = idem_lookup(db, request, body)
     if previous:
         return previous

@@ -5,6 +5,9 @@ export interface Session {
   workspace: { id: string; name: string };
 }
 export interface Inquiry {
+  ownerId?: string;
+  deletedAt?: string;
+  deletedBy?: string;
   nodeWarnings?: Record<string, { question: string; runId: string; skipped: boolean }[]>;
   demoScenarioId?: string;
   demoDataScope?: 'reference' | 'full' | 'incomplete';
