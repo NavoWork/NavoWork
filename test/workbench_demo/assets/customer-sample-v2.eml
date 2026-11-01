@@ -1,0 +1,14 @@
+From: buyer@nordlicht.example.invalid
+To: sales@navowork.example.invalid
+Date: Sun, 01 Nov 2026 09:00:00 +0800
+Message-ID: <customer-sample-v2-20261101@demo.example.invalid>
+Subject: SIMULATED Scope: SMP-NL-002 only
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+MIME-Version: 1.0
+
+SIMULATED / fictional business source
+
+SIMULATED physical sample event. We reviewed sample SMP-NL-002 against TP-NL-=
+V2 and CB-02-DEMO and approve this sample without further changes. This does =
+not verify payment, contract acceptance or internal production release.

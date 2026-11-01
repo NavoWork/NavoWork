@@ -1,0 +1,82 @@
+[
+  {
+    "key": "bom_V1",
+    "expected": 50,
+    "actual": 50
+  },
+  {
+    "key": "packaging_2_to_5",
+    "actual": 53,
+    "expected": 53
+  },
+  {
+    "key": "bom_V2",
+    "expected": 53,
+    "actual": 53
+  },
+  {
+    "key": "bom_missing_price",
+    "expected": "INPUT REQUIRED",
+    "actual": "INPUT REQUIRED"
+  },
+  {
+    "key": "costing_B8_5",
+    "expected": 9.21,
+    "actual": 9.21
+  },
+  {
+    "key": "costing_B8_null",
+    "expected": "INPUT REQUIRED",
+    "actual": "INPUT REQUIRED"
+  },
+  {
+    "key": "costing_B8_0",
+    "expected": 8.34,
+    "actual": 8.34
+  },
+  {
+    "key": "costing_B10_0",
+    "expected": "INPUT REQUIRED",
+    "actual": "INPUT REQUIRED"
+  },
+  {
+    "key": "costing_B11_1",
+    "expected": "INPUT REQUIRED",
+    "actual": "INPUT REQUIRED"
+  },
+  {
+    "key": "costing_B12_0",
+    "expected": "INPUT REQUIRED",
+    "actual": "INPUT REQUIRED"
+  },
+  {
+    "key": "costing_B8_5",
+    "expected": 9.21,
+    "actual": 9.21
+  },
+  {
+    "key": "costing_B8_null",
+    "expected": "INPUT REQUIRED",
+    "actual": "INPUT REQUIRED"
+  },
+  {
+    "key": "costing_B8_0",
+    "expected": 8.34,
+    "actual": 8.34
+  },
+  {
+    "key": "costing_B10_0",
+    "expected": "INPUT REQUIRED",
+    "actual": "INPUT REQUIRED"
+  },
+  {
+    "key": "costing_B11_1",
+    "expected": "INPUT REQUIRED",
+    "actual": "INPUT REQUIRED"
+  },
+  {
+    "key": "costing_B12_0",
+    "expected": "INPUT REQUIRED",
+    "actual": "INPUT REQUIRED"
+  }
+]

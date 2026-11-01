@@ -1,0 +1,211 @@
+{
+  "fixture": {
+    "assetHashes": 83,
+    "coreCategories": 15,
+    "scenarios": 7,
+    "formats": {
+      ".pdf": 41,
+      ".eml": 22,
+      ".xlsx": 11,
+      ".png": 6,
+      ".svg": 1,
+      ".txt": 1,
+      ".md": 1
+    },
+    "defaultAssets": 65,
+    "artifactEngineRecalculationCases": 16,
+    "result": "passed"
+  },
+  "localDatabases": [
+    {
+      "path": "backend/data/agent-checkpoints.sqlite3",
+      "tables": {},
+      "missingBlobs": 0,
+      "corruptBlobs": 0
+    },
+    {
+      "path": "backend/data/file-tools-e2e-1793458500993/app.sqlite3",
+      "tables": {
+        "cases": 1,
+        "items": 10,
+        "blobs": 1,
+        "jobs": 1,
+        "runs": 1
+      },
+      "missingBlobs": 0,
+      "corruptBlobs": 0,
+      "itemKinds": {
+        "canvas": 1,
+        "canvas_file": 1,
+        "capability": 4,
+        "message": 3,
+        "run_event": 1
+      }
+    },
+    {
+      "path": "backend/data/file-tools-e2e-1793458500993/graph.sqlite3",
+      "tables": {},
+      "missingBlobs": 0,
+      "corruptBlobs": 0
+    },
+    {
+      "path": "backend/data/file-tools-e2e-1793458647239/app.sqlite3",
+      "tables": {
+        "cases": 1,
+        "items": 10,
+        "blobs": 1,
+        "jobs": 1,
+        "runs": 1
+      },
+      "missingBlobs": 0,
+      "corruptBlobs": 0,
+      "itemKinds": {
+        "canvas": 1,
+        "canvas_file": 1,
+        "capability": 4,
+        "message": 3,
+        "run_event": 1
+      }
+    },
+    {
+      "path": "backend/data/file-tools-e2e-1793458647239/graph.sqlite3",
+      "tables": {},
+      "missingBlobs": 0,
+      "corruptBlobs": 0
+    },
+    {
+      "path": "backend/data/navowork.sqlite3",
+      "tables": {
+        "cases": 8,
+        "items": 129,
+        "blobs": 128,
+        "jobs": 0,
+        "runs": 0
+      },
+      "missingBlobs": 0,
+      "corruptBlobs": 0,
+      "itemKinds": {
+        "asset": 86,
+        "capability": 4,
+        "evidence": 30,
+        "message": 1,
+        "resource": 8
+      }
+    }
+  ],
+  "backendApi": {
+    "seed": {
+      "assetsCreated": 65,
+      "assetsReused": 0,
+      "casesCreated": 7,
+      "evidenceCreated": 30,
+      "evidenceReused": 0,
+      "knowledgeCreated": 8,
+      "artifactsCreated": 0,
+      "approvalsCreated": 0,
+      "sourceVersionsCreated": 0
+    },
+    "repeatSeed": {
+      "assetsCreated": 0,
+      "assetsReused": 65,
+      "casesCreated": 0,
+      "evidenceCreated": 0,
+      "evidenceReused": 30,
+      "knowledgeCreated": 0,
+      "artifactsCreated": 0,
+      "approvalsCreated": 0,
+      "sourceVersionsCreated": 0
+    },
+    "downloads": 65,
+    "initialCases": 7,
+    "office": [
+      {
+        "key": "bom_V1",
+        "status": 200,
+        "supported": true
+      },
+      {
+        "key": "bom_V2",
+        "status": 200,
+        "supported": true
+      },
+      {
+        "key": "bom_missing_price",
+        "status": 422,
+        "supported": false
+      },
+      {
+        "key": "supplier_A_V1",
+        "status": 200,
+        "supported": true
+      },
+      {
+        "key": "supplier_A_V2",
+        "status": 200,
+        "supported": true
+      },
+      {
+        "key": "supplier_B_V1",
+        "status": 200,
+        "supported": true
+      },
+      {
+        "key": "09_costing",
+        "status": 422,
+        "supported": false
+      },
+      {
+        "key": "09_costing_editable",
+        "status": 200,
+        "supported": true
+      },
+      {
+        "key": "legacy_08_supplier_quotation_V3",
+        "status": 200,
+        "supported": true
+      },
+      {
+        "key": "legacy_09_costing",
+        "status": 422,
+        "supported": false
+      }
+    ],
+    "costs": [
+      {
+        "version": 1,
+        "unitPriceUsd": "8.69",
+        "totalUsd": "26070.00"
+      },
+      {
+        "version": 2,
+        "unitPriceUsd": "9.21",
+        "totalUsd": "27630.00"
+      }
+    ],
+    "researchSources": 2,
+    "exports": [
+      {
+        "format": "pdf",
+        "byteSize": 3129,
+        "sha256": "2fa816588d56b0da3a26cc748b10164500983df9aed069baf8043a6ed247a337"
+      },
+      {
+        "format": "xlsx",
+        "byteSize": 5341,
+        "sha256": "e6697b88fe1936cebc753bdeda50d85291bd6d4b02030f0d4bdc074205e236dc"
+      },
+      {
+        "format": "docx",
+        "byteSize": 37120,
+        "sha256": "953780980d942ca91b7e99009e3523a7b1b0b13cacab8341900d2842292708c8"
+      }
+    ],
+    "modelCallsExecuted": false,
+    "limitations": [
+      "Live language-model runs, external image generation and VLM recognition were not executed.",
+      "Guarded IF/AND/COUNT workbooks are valid Excel sources but unsupported by the current basic app formula editor."
+    ],
+    "consumedSourcesRefreshRejected": true,
+    "result": "passed"
+  }
+}
