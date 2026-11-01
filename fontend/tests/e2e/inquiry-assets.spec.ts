@@ -53,7 +53,7 @@ test('笔记、分类、草稿和附件自动归档，修改与刷新不重复�
   let work = current(page);
   await work
     .locator('.ic-directory')
-    .getByRole('button', { name: '客户需求与规格', exact: true })
+    .getByRole('button', { name: '需求数据', exact: true })
     .press('Enter');
   await work.getByLabel('需求规格', { exact: true }).fill('客户确认需要牛皮纸包装。');
   await work.getByLabel('新建资料', { exact: true }).click();
@@ -80,7 +80,7 @@ test('笔记、分类、草稿和附件自动归档，修改与刷新不重复�
       ),
     },
   ]);
-  await expect(work.locator('.ic-directory')).toContainText('资料与附件5');
+  await expect(work.locator('.ic-directory').getByRole('button', { name: '客户要求.txt文件夹', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '资产库', exact: true }).click();
   await inquiryFolder(page).click();
   let categories = page.getByLabel('墨西哥帆布袋试单资料分类');
@@ -92,7 +92,7 @@ test('笔记、分类、草稿和附件自动归档，修改与刷新不重复�
   work = current(page);
   const packagingFolder = work
     .locator('.ic-directory')
-    .getByRole('button', { name: '客户包装', exact: false });
+    .getByRole('button', { name: '包装跟进文件夹', exact: true });
   if ((await packagingFolder.getAttribute('aria-expanded')) === 'false')
     await packagingFolder.click();
   await work
@@ -143,7 +143,7 @@ test('保存后的双语回复及时同步，手机上询盘分类和文档预�
   const work = current(page);
   await work
     .locator('.ic-directory')
-    .getByRole('button', { name: '双语回复草稿', exact: true })
+    .getByRole('button', { name: '回复内容', exact: true })
     .press('Enter');
   await work
     .getByLabel('English 回复草稿')

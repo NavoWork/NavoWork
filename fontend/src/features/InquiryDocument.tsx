@@ -10,7 +10,7 @@ import { RequirementsTable } from './RequirementsTable';
 
 export function NodeReferenceDocument({ doc, path, base }: { doc: WorkspaceDocument; path: string; base: string }) {
   const [downloadError, setDownloadError] = useState<unknown>();
-  const source = useQuery({
+  const source = useQuery<WorkbenchEvidence | Source>({
     queryKey: ['node-reference', path, doc.id],
     queryFn: ({ signal }) => doc.evidenceId
       ? api.get<WorkbenchEvidence>(`${path}/evidence/${encodeURIComponent(doc.evidenceId)}`, signal)
