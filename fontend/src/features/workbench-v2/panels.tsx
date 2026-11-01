@@ -52,6 +52,7 @@ export function InquiryPanel({ data, onAgent }: { data: WorkbenchData; onAgent: 
   return (
     <div className="wbv2-stack">
       <Section
+        className="wbv2-inquiry-card"
         eyebrow="01 · QUALIFY"
         title="客户与询盘"
         description="先确认客户背景、采购条件和缺项，再进入规格与报价。"
@@ -70,17 +71,17 @@ export function InquiryPanel({ data, onAgent }: { data: WorkbenchData; onAgent: 
             </div>
           </div>
           <div className="wbv2-kv">
-            <div><span>来源</span><strong>{profile.channel || data.customerContext.channel || '待补充'}</strong></div>
+            <div><span>来源</span><strong>{(profile.channel || data.customerContext.channel) === 'unknown' ? '待补充' : profile.channel || data.customerContext.channel || '待补充'}</strong></div>
             <div><span>邮箱</span><strong>{profile.email || data.customerContext.email || '待补充'}</strong></div>
             <div><span>目的地</span><strong>{data.case.destination || '待确认'}</strong></div>
             <div><span>当前版本</span><strong>V{data.case.currentRevision}</strong></div>
           </div>
         </div>
-        {(assessment.summary || data.customerContext.summary) && <p className="wbv2-note">{assessment.summary || data.customerContext.summary}</p>}
+        <p className="wbv2-note wbv2-inquiry-summary">{assessment.summary || data.customerContext.summary || '尚未形成客户与询盘摘要，可让 Agent 根据现有资料分析。'}</p>
         <div className="wbv2-split">
           <div>
             <h4 className="wbv2-label">客户原文</h4>
-            <pre className="wbv2-original">{data.case.originalText}</pre>
+            <pre className="wbv2-original" tabIndex={0} aria-label="客户原文">{data.case.originalText}</pre>
           </div>
           <div>
             <h4 className="wbv2-label">待确认</h4>
@@ -93,15 +94,15 @@ export function InquiryPanel({ data, onAgent }: { data: WorkbenchData; onAgent: 
                 {data.customerContext.checks.filter((check) => check.status !== 'matched').map((check) => <li key={check.label}><CircleAlert size={13} />{check.label}：{check.detail}</li>)}
               </ul>
             ) : (
-              <EmptyHint>当前没有阻断项；可继续推进规格。</EmptyHint>
+              <p className="wbv2-inquiry-empty">{data.artifacts.inquiry_assessment ? '当前评估未列出待确认项。' : '尚未完成询盘评估，待确认项将显示在这里。'}</p>
             )}
-            {assessment.risks?.length > 0 && (
-              <>
-                <h4 className="wbv2-label wbv2-label-gap">风险</h4>
-                <ul className="wbv2-check-list is-warn">
-                  {assessment.risks.map((item: string) => <li key={item}><CircleAlert size={13} />{item}</li>)}
-                </ul>
-              </>
+            <h4 className="wbv2-label wbv2-label-gap">风险</h4>
+            {assessment.risks?.length > 0 ? (
+              <ul className="wbv2-check-list is-warn">
+                {assessment.risks.map((item: string) => <li key={item}><CircleAlert size={13} />{item}</li>)}
+              </ul>
+            ) : (
+              <p className="wbv2-inquiry-empty">{data.artifacts.inquiry_assessment ? '当前评估未列出风险项。' : '风险尚待评估。'}</p>
             )}
           </div>
         </div>

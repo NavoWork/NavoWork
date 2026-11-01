@@ -44,6 +44,7 @@ import {
   type SavedResult,
 } from './inquiry-canvas-model';
 import { InquiryCanvas } from './InquiryCanvas';
+import { InquiryChatHeading, InquiryChatTranscript } from './InquiryChatTranscript';
 import { InquiryComposer } from './InquiryComposer';
 import { useAvailableSkills } from './skill-catalog';
 import { InvocationContext } from './InvocationContext';
@@ -753,55 +754,16 @@ export function InquiryWorkspace({
           id={`results-${inquiryId}`}
           aria-label="AI 助手"
         >
-          <div className="iw-assistant-heading">
-            <h2>
-              <MessageSquare size={14} />
-              AI 对话
-            </h2>
-            <span>仅当前询盘</span>
-          </div>
+          <InquiryChatHeading />
           <div className="iw-ai-chat">
             <div className="iw-messages" ref={messagesRef}>
-              <button className="iw-original" onClick={() => openDocument('original')}>
-                <FileText size={16} />
-                <div>
-                  <strong>客户原始询盘</strong>
-                  <small>
-                    {channelLabels[inquiry.customerContext?.channel || 'unknown']}
-                    {inquiry.customerContext?.email ? ` · ${inquiry.customerContext.email}` : ''}
-                  </small>
-                  <p>
-                    {inquiry.originalText.slice(0, 110)}
-                    {inquiry.originalText.length > 110 ? '…' : ''}
-                  </p>
-                </div>
-                <ChevronRight size={14} />
-              </button>
-              {!detail.data?.messages.length && (
-                <div className="iw-assistant-intro">
-                  <span className="iw-ai-mark">
-                    <Sparkles size={16} />
-                  </span>
-                  <h3>先把需求读清楚。</h3>
-                  <p>
-                    从客户原文开始，梳理产品、数量、目的地与时间要求。资料不足的地方，会保留为待确认。
-                  </p>
-                </div>
-              )}
-              {detail.data?.messages.map((message) => (
-                <div key={message.id}>
-                  <article className={`iw-message ${message.role}`}>
-                    <div className="iw-message-meta">
-                      <span>{message.role === 'user' ? '你' : 'Navowork'}</span>
-                      <time>{date(message.createdAt)}</time>
-                    </div>
-                    <p>{message.text}</p>
-                    <InvocationContext context={message.context} />
-                  </article>
-                  {message.id === resultMessage?.id && resultPreview}
-                </div>
-              ))}
-              {!resultMessage && resultPreview}
+              <InquiryChatTranscript
+                inquiry={inquiry}
+                messages={detail.data?.messages || []}
+                onOriginal={() => openDocument('original')}
+                resultMessageId={resultMessage?.id}
+                resultPreview={resultPreview}
+              />
               {run && (
                 <div
                   className={`iw-run ${['queued', 'running'].includes(run.status) ? 'iw-run-active' : ''}`}

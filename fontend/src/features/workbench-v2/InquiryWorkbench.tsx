@@ -28,6 +28,8 @@ import type {
   WorkbenchStage,
 } from '../../api/types';
 import { ErrorNotice, Loading, Modal } from '../../components/ui';
+import { runContext, type ComposerContext } from '../inquiry-context';
+import { useAvailableSkills } from '../skill-catalog';
 import { AgentPanel } from './AgentPanel';
 import { ResearchPanel, PropagationPanel } from './ResearchPanel';
 import { OfficeFiles } from './OfficeFiles';
@@ -82,6 +84,7 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
   const location = useLocation();
   const active = location.pathname === `/inquiries/${encodeURIComponent(inquiryId)}`;
   const qc = useQueryClient();
+  const catalog = useAvailableSkills(session);
   const stagePrefKey = `easywork:wb-stage:${scope}`;
   const [stage, setStage] = useState(() => {
     try { return localStorage.getItem(stagePrefKey) || 'inquiry'; } catch { return 'inquiry'; }
@@ -181,20 +184,38 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
     }
   };
 
-  const sendAgent = (instruction: string, node?: string) => {
-    if (!data) return;
-    void operate(async () => {
+  const sendAgent = async (instruction: string, node?: string, selection?: ComposerContext) => {
+    if (!data || busy || data.case.activeRunId || data.case.pendingRunId) return false;
+    setBusy(true);
+    setError(undefined);
+    setNotice('');
+    try {
+      const context = selection ? runContext(selection, catalog.skills) : undefined;
+      if (selection?.knowledge.some((doc) => !doc.sourceVersionId)) {
+        throw new Error('引用中包含本机旧资料，请移除后从团队知识库重新选择。');
+      }
       const result = await api.post<Run>(`${path}/workbench/agent`, {
         node,
-        instruction,
+        instruction: context?.skills.length
+          ? `${instruction}\n\n本次技能要求：\n${context.skills.map((skill) => `${skill.name}：${skill.instructions.join('；')}`).join('\n')}`
+          : instruction,
+        context,
         baseRevision: data.case.currentRevision,
         inputRefs: selectedEvidence,
-        sourceVersionIds: selectedKnowledge,
+        sourceVersionIds: [...new Set([...selectedKnowledge, ...(selection?.knowledge.flatMap((doc) => doc.sourceVersionId ? [doc.sourceVersionId] : []) || [])])],
         assetVersionIds: selectedAssets,
       });
+      qc.setQueryData(['workbench-run', scope, result.id], result);
       setRunId(result.id);
       setNotice('任务已提交，Agent 正在处理。');
-    });
+      void invalidate();
+      return true;
+    } catch (e) {
+      setError(e);
+      return false;
+    } finally {
+      setBusy(false);
+    }
   };
 
   const answerAgent = async (answers: { questionId: string; value: string }[]) => {
@@ -301,24 +322,8 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
     <div className="wbv2">
       <header className="wbv2-head">
         <div className="wbv2-head-title">
-          <span className="wbv2-eyebrow">CASE / {data.case.customer}</span>
           <h1>{data.case.title}</h1>
-          <p>{[data.customerContext?.company || data.case.customer, data.customerContext?.country, data.case.destination].filter(Boolean).join(' · ')}</p>
-        </div>
-        <div className="wbv2-head-progress">
-          {CORE_STAGES.map((key) => {
-            const item = data.stages.find((entry) => entry.key === key);
-            return (
-              <button key={key} className={`wbv2-progress-step is-${item?.status || 'empty'}`} onClick={() => setStage(key)} title={item?.title}>
-                <span>{stageIndex[key]}</span>
-                <i />
-              </button>
-            );
-          })}
-          <div className="wbv2-progress-meta">
-            <span>V{data.case.currentRevision}</span>
-            <strong>{data.nextAction}</strong>
-          </div>
+          <p>{[data.case.customer, data.case.destination].filter(Boolean).join(' · ')}</p>
         </div>
       </header>
 
@@ -347,12 +352,9 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
             <span>原件、知识库与资产</span>
             <strong>{data.evidence.length + data.knowledge.length + data.assets.length}</strong>
           </button>
-          <div className="wbv2-rail-note">
-            <ShieldCheck size={13} /> 所有确认绑定成果版本和证据。
-          </div>
         </aside>
 
-        <main className="wbv2-main">
+        <main className={`wbv2-main ${stage === 'inquiry' ? 'wbv2-inquiry-main' : ''}`}>
           <div className="wbv2-main-head">
             <div>
               <span className="wbv2-eyebrow">STAGE {stageIndex[stage]}</span>
@@ -367,10 +369,6 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
 
           {notice && <div className="wbv2-notice"><Check size={14} />{notice}</div>}
           <ErrorNotice error={error} onRetry={() => setError(undefined)} />
-          <OfficeFiles revision={data.case.currentRevision} path={path} disabled={busy || !!data.case.activeRunId || !!data.case.pendingRunId} onChanged={() => void invalidate()} />
-          {stage === 'requirements' && <ResearchPanel path={path} data={data} disabled={busy || !!data.case.activeRunId || !!data.case.pendingRunId} onChanged={() => void invalidate()} />}
-          <PropagationPanel path={path} revision={data.case.currentRevision} disabled={busy || !!data.case.activeRunId || !!data.case.pendingRunId} onChanged={() => void invalidate()} />
-
           {stage === 'inquiry' && <InquiryPanel data={data} onAgent={sendAgent} />}
           {stage === 'requirements' && <RequirementsPanel data={data} onAgent={sendAgent} onSave={saveArtifact} onConfirm={openConfirm} busy={busy} />}
           {stage === 'costing' && <CostingPanel data={data} onAgent={sendAgent} onSave={saveArtifact} onConfirm={openConfirm} onExport={exportArtifact} busy={busy} />}
@@ -379,6 +377,12 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
           {stage === 'production' && (
             <ProductionPanel data={data} onAgent={sendAgent} onConfirm={openConfirm} onRelease={release} onStage={setStage} busy={busy} />
           )}
+
+          <div className="wbv2-file-tools">
+            <OfficeFiles revision={data.case.currentRevision} path={path} disabled={busy || !!data.case.activeRunId || !!data.case.pendingRunId} onChanged={() => void invalidate()} />
+            {stage === 'requirements' && <ResearchPanel path={path} data={data} disabled={busy || !!data.case.activeRunId || !!data.case.pendingRunId} onChanged={() => void invalidate()} />}
+            <PropagationPanel path={path} revision={data.case.currentRevision} disabled={busy || !!data.case.activeRunId || !!data.case.pendingRunId} onChanged={() => void invalidate()} />
+          </div>
 
           {data.approvals.length > 0 && (
             <details className="wbv2-card wbv2-audit">
@@ -397,18 +401,20 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
         </main>
 
         <AgentPanel
-          messages={(messages.data?.items || []).filter((message) => !(message.role === 'user' && message.text.trim() === data.case.originalText.trim()))}
+          key={scope}
+          inquiry={data.case}
+          session={session}
+          messages={messages.data?.items || []}
           run={run.data || null}
           events={events.data?.items || []}
           running={!!run.data && ['queued', 'running'].includes(run.data.status)}
           busy={busy}
-          stage={stage}
           selectedRefs={selectedRefCount}
-          onSend={(text) => sendAgent(text, stage)}
+          onSend={(text, selection) => sendAgent(text, stage, selection)}
           onAnswer={answerAgent}
           onOpenSources={() => setSourcesOpen(true)}
           onCancel={cancelAgent}
-          error={run.data?.error?.message || messages.error || run.error}
+          error={error || run.data?.error?.message || messages.error || run.error}
         />
       </div>
 
