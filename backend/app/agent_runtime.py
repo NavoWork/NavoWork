@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from typing import Annotated, Any, TypedDict
 
-from langchain_core.messages import AnyMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, SystemMessage, ToolMessage
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
@@ -107,6 +107,28 @@ def _assistant_text(message) -> str:
     return str(content or "").strip()
 
 
+def compact_agent_context(messages: list[AnyMessage]) -> list[AnyMessage]:
+    """Keep user-visible turn results while removing old tool payloads."""
+    if sum(isinstance(message, HumanMessage) for message in messages) <= 2:
+        return messages
+
+    pending_start = len(messages)
+    if messages and (isinstance(messages[-1], ToolMessage) or
+                     (isinstance(messages[-1], AIMessage) and messages[-1].tool_calls)):
+        pending_start = next(
+            (index for index in range(len(messages) - 1, -1, -1)
+             if isinstance(messages[index], HumanMessage)),
+            len(messages),
+        )
+
+    return [
+        message for index, message in enumerate(messages)
+        if index >= pending_start
+        or not isinstance(message, ToolMessage)
+        and not (isinstance(message, AIMessage) and message.tool_calls)
+    ]
+
+
 def build_graph(toolbox: WorkbenchToolbox, model, saver, *, system: str, max_tools: int = 36):
     bound = model.bind_tools(tool_schemas(toolbox.node))
 
@@ -117,7 +139,8 @@ def build_graph(toolbox: WorkbenchToolbox, model, saver, *, system: str, max_too
         # context to a model, as well as at each tool and finalization boundary.
         with toolbox._tx():
             pass
-        response = bound.invoke([SystemMessage(content=system)] + state["messages"])
+        context = compact_agent_context(state["messages"])
+        response = bound.invoke([SystemMessage(content=system)] + context)
         if not getattr(response, "tool_calls", None):
             pending = _unresolved_failures(state.get("results") or [])
             if pending and all(item.get("status") == "needs_info" for item in pending):

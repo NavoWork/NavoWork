@@ -604,6 +604,40 @@ class ConversationState(TypedDict):
     waiting: bool
 
 
+def compact_business_history(history):
+    """Drop old tool traces once the conversation has more than two turns.
+
+    The final assistant message is the user-facing explanation of a turn and
+    remains useful context. Tool-call and ToolMessage payloads are execution
+    details, so keeping them indefinitely only grows the model prompt. An
+    unfinished trailing tool batch is retained so a worker retry can replay it.
+    """
+    human_turns = sum(isinstance(message, HumanMessage) for message in history)
+    if human_turns <= 2:
+        return history
+
+    pending_start = len(history)
+    if history and (isinstance(history[-1], ToolMessage) or
+                    (isinstance(history[-1], AIMessage) and history[-1].tool_calls)):
+        pending_start = next(
+            (index for index in range(len(history) - 1, -1, -1)
+             if isinstance(history[index], HumanMessage)),
+            len(history),
+        )
+
+    compacted = []
+    for index, message in enumerate(history):
+        if index >= pending_start:
+            compacted.append(message)
+        elif isinstance(message, ToolMessage):
+            continue
+        elif isinstance(message, AIMessage) and message.tool_calls:
+            continue
+        else:
+            compacted.append(message)
+    return compacted
+
+
 def execute_business_work(work_id, generation, model=None):
     host = BusinessHost(work_id, generation)
     with SessionLocal() as db:
@@ -628,6 +662,12 @@ def execute_business_work(work_id, generation, model=None):
             run.payload = encode(payload)
             job_data.pop("resume", None)
             job.payload = encode(job_data)
+            db.commit()
+        compacted_history = compact_business_history(history)
+        if len(compacted_history) != len(history):
+            history = compacted_history
+            payload["businessMessages"] = messages_to_dict(history)
+            run.payload = encode(payload)
             db.commit()
     if model is None:
         from langchain_openai import ChatOpenAI
