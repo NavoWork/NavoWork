@@ -72,7 +72,7 @@ class OpenAICompatibleAdapter:
         if not model or not key:
             raise AdapterError("vision_model_not_configured")
         return cls(model=model, api_key=key,
-                   base_url=os.environ.get("OPENAI_API_BASE") or os.environ.get("OPENAI_BASE_URL")
+                   base_url=os.environ.get("MODEL_BASE_URL") or os.environ.get("OPENAI_API_BASE") or os.environ.get("OPENAI_BASE_URL")
                    or "https://api.openai.com/v1")
 
     def extract(self, image: bytes, mime_type: str) -> str:

@@ -2,16 +2,19 @@ from langchain_core.messages import AIMessage
 from navowork_agent.tools.service import ToolService
 from navowork_agent.runtime.agent import agent_session
 from navowork_agent.adapters.local import LocalAdapter
-from support import make_adapter, base_snapshot, change_snapshot, baselines
+from support import make_adapter, base_snapshot, change_snapshot, baselines, publish, invoke
 
 
 class ScriptedModel:
     """Explicitly offline tool-calling test double. Never used by CLI or live tests."""
-    def __init__(self, responses): self.responses = iter(responses)
+    def __init__(self, responses): self.responses = iter(responses); self.calls = 0
     def bind_tools(self, schemas):
         assert any(s["function"]["name"] == "read_document" for s in schemas)
+        assert any(s["function"]["name"] == "create_working_copy" for s in schemas)
         return self
-    def invoke(self, messages): return next(self.responses)
+    def invoke(self, messages):
+        self.calls += 1
+        return next(self.responses)
 
 
 def call(name, args=None, id="tc"):
@@ -106,3 +109,29 @@ def test_graph_can_retry_only_failed_pdf_branch(tmp_path):
         result = run(goal="Prepare quote and retry failed export")
     assert result["status"] == "needs_review", result
     assert len(result["outputs"]) == 4 and {a["version"] for a in result["artifacts"]} == {1}
+
+
+def test_agent_runtime_can_edit_and_validate_a_real_docx_copy(tmp_path):
+    a = make_adapter(tmp_path)
+    generated = publish(ToolService(a), base_snapshot(a))
+    spec = next(artifact for artifact in generated.artifacts if artifact.kind == "spec")
+    source = spec.files[0]
+    created = invoke(ToolService(a), "create_working_copy", {"file_id": source.file_id}, "setup-working-docx")
+    working = created.artifacts[0]
+    model = ScriptedModel([
+        call("list_context"),
+        call("load_skill", {"name": "edit-documents"}, "edit-skill"),
+        call("create_working_copy", {"file_id": source.file_id}, "copy-docx"),
+        call("edit_file", {"artifact_id": working.artifact_id, "baseline": 1,
+            "file_id": working.files[0].file_id, "operations": [{"op": "append_paragraph", "text": "Agent edited the working copy"}]}, "edit-docx"),
+        call("validate_artifact", {"artifact_id": working.artifact_id, "version": 2}, "validate-docx"),
+        AIMessage(content="The edited DOCX copy is ready for review.")])
+    with agent_session(ToolService(a), model) as run:
+        result = run(goal="Revise the specification DOCX and preserve its source version")
+    details = [(v["status"], v.get("code")) for v in a._load()["results"].values()]
+    assert result["status"] == "needs_review" and len(result["outputs"]) == 2, (
+        result.get("code"), result.get("summary"), result.get("tool_steps"), model.calls, details)
+    from docx import Document
+    from io import BytesIO
+    latest = Document(BytesIO(a.read_bytes(result["outputs"][-1]["file_id"])))
+    assert "Agent edited the working copy" in " ".join(p.text for p in latest.paragraphs)

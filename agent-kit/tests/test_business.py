@@ -139,6 +139,137 @@ def test_partial_failure_retry_and_manual_notes(tmp_path):
     assert conflicting.code == "FIELD_RECONCILIATION_REQUIRED"
 
 
+def test_pi_is_versioned_from_reconciled_quote_and_exports_native_files(tmp_path):
+    a = make_adapter(tmp_path)
+    quote = publish(ToolService(a), base_snapshot(a))
+    quotation = next(item for item in quote.artifacts if item.kind == "quotation")
+    args = {"quotation_artifact_id": quotation.artifact_id, "quotation_version": quotation.version}
+    pi = invoke(ToolService(a), "prepare_pi", args, "prepare-pi-v1")
+    assert pi.status == "needs_review", pi
+    assert {f.name.rsplit(".", 1)[-1] for f in pi.outputs} == {"docx", "pdf"}
+    assert invoke(ToolService(a), "prepare_pi", args, "prepare-pi-v1") == pi
+    docx_ref = next(f for f in pi.outputs if f.name.endswith(".docx"))
+    doc = Document(BytesIO(a.read_bytes(docx_ref.file_id)))
+    text = " ".join(p.text for p in doc.paragraphs) + " " + " ".join(c.text for t in doc.tables for row in t.rows for c in row.cells)
+    assert "Proforma invoice draft" in text and "Not accepted, signed, paid" in text
+    assert "8.69" in text and "INTERNAL_COST_MARGIN_DO_NOT_EXPORT" not in text
+    pdf_ref = next(f for f in pi.outputs if f.name.endswith(".pdf"))
+    pdf_text = "\n".join(p.extract_text() or "" for p in PdfReader(BytesIO(a.read_bytes(pdf_ref.file_id))).pages)
+    assert "Proforma invoice draft" in pdf_text and "Payment terms" in pdf_text and "Unknown" in pdf_text
+    broken = invoke(ToolService(a, fail_formats=["pdf"]), "prepare_pi", args, "prepare-pi-v2")
+    assert broken.status == "error" and [f.name for f in broken.outputs] == ["pi-v2.docx"]
+    retry = invoke(ToolService(a), "export_artifact", {"artifact_id": broken.artifacts[0].artifact_id,
+        "version": broken.artifacts[0].version, "format": "pdf"}, "retry-pi-pdf")
+    assert retry.status == "needs_review" and retry.outputs[0].name == "pi-v2.pdf"
+
+
+def test_pi_rejects_stale_or_manual_quotation_versions(tmp_path):
+    a = make_adapter(tmp_path)
+    quote = publish(ToolService(a), base_snapshot(a))
+    quotation = next(item for item in quote.artifacts if item.kind == "quotation")
+    denied = invoke(ToolService(a), "prepare_pi", {"quotation_artifact_id": quotation.artifact_id, "quotation_version": 99})
+    assert denied.code == "ARTIFACT_UNAVAILABLE"
+
+
+def test_uploaded_docx_gets_versioned_working_copy_with_text_and_picture_edits(tmp_path):
+    from PIL import Image
+    a = make_adapter(tmp_path)
+    image_path = INPUTS / "BAG-2026-DE-001" / "backpack-reference.png"
+    image = Image.open(image_path).convert("RGB")
+    image.putpixel((0, 0), (255, 0, 0))
+    replacement_path = tmp_path / "alternate-reference.png"
+    image.save(replacement_path)
+    image_ref = a.import_source(replacement_path)
+    replacement_bytes = a.read_bytes(image_ref.file_id)
+    source_path = tmp_path / "customer-tech-pack.docx"
+    source_doc = Document()
+    source_doc.add_paragraph("Customer draft")
+    table = source_doc.add_table(rows=1, cols=2)
+    table.cell(0, 0).text = "Material"
+    table.cell(0, 1).text = "Unknown"
+    source_doc.add_picture(str(image_path))
+    source_doc.save(source_path)
+    source_ref = a.import_source(source_path)
+    original = a.read_bytes(source_ref.file_id)
+
+    created = invoke(ToolService(a), "create_working_copy", {"file_id": source_ref.file_id}, "copy-docx")
+    assert created.status == "needs_review" and created.artifacts[0].version == 1
+    artifact = created.artifacts[0]
+    edited = invoke(ToolService(a), "edit_file", {"artifact_id": artifact.artifact_id, "baseline": 1,
+        "file_id": artifact.files[0].file_id, "operations": [
+            {"op": "set_paragraph", "index": 0, "text": "Revised customer tech pack", "bold": True},
+            {"op": "set_table_cell", "table": 0, "row": 0, "column": 1, "text": "Recycled polyester", "italic": True},
+            {"op": "replace_picture", "index": 0, "file_id": image_ref.file_id},
+        ]}, "edit-docx")
+    assert edited.status == "needs_review" and edited.artifacts[0].version == 2
+    revised = Document(BytesIO(a.read_bytes(edited.outputs[0].file_id)))
+    assert revised.paragraphs[0].text == "Revised customer tech pack"
+    assert revised.paragraphs[0].runs[0].bold is True
+    assert revised.tables[0].cell(0, 1).text == "Recycled polyester"
+    assert revised.tables[0].cell(0, 1).paragraphs[0].runs[0].italic is True
+    assert len(revised.inline_shapes) == 1
+    from docx.oxml.ns import qn
+    embed = revised.inline_shapes[0]._inline.xpath(".//a:blip")[0].get(qn("r:embed"))
+    assert revised.part.related_parts[embed].blob == replacement_bytes
+    assert a.read_bytes(source_ref.file_id) == original
+    check = invoke(ToolService(a), "validate_artifact", {"artifact_id": artifact.artifact_id, "version": 2})
+    assert check.status == "needs_review" and check.data["checks"][0]["readable"]
+    conflict = invoke(ToolService(a), "edit_file", {"artifact_id": artifact.artifact_id, "baseline": 1,
+        "file_id": edited.outputs[0].file_id, "operations": [{"op": "append_paragraph", "text": "stale"}]})
+    assert conflict.code == "BASELINE_CONFLICT"
+
+
+def test_uploaded_xlsx_edits_values_and_formula_free_rows_only(tmp_path):
+    a = make_adapter(tmp_path)
+    source = a.import_source(INPUTS / "BAG-2026-DE-001" / "factory-A-quote.xlsx")
+    original = a.read_bytes(source.file_id)
+    created = invoke(ToolService(a), "create_working_copy", {"file_id": source.file_id}, "copy-xlsx")
+    assert created.status == "needs_review", created
+    artifact = created.artifacts[0]
+    sheet_name = next(section["locator"]["sheet"] for section in a.read_document(source.file_id)["sections"]
+                      if section["locator"].get("cell") == "B10")
+    edited = invoke(ToolService(a), "edit_file", {"artifact_id": artifact.artifact_id, "baseline": 1,
+        "file_id": artifact.files[0].file_id, "operations": [
+            {"op": "set_cell", "sheet": sheet_name, "cell": "B10", "value": 48, "number_format": "0.00", "bold": True},
+            {"op": "copy_range", "sheet": sheet_name, "source_range": "B10:B12", "cell": "E10"},
+        ]}, "edit-xlsx")
+    assert edited.status == "needs_review", edited
+    wb = load_workbook(BytesIO(a.read_bytes(edited.outputs[0].file_id)), data_only=True)
+    assert wb[sheet_name]["B10"].value == 48
+    assert wb[sheet_name]["E10"].value == 48 and wb[sheet_name]["E11"].value == wb[sheet_name]["B11"].value
+    wb.close()
+    assert a.read_bytes(source.file_id) == original
+
+
+def test_xlsx_range_paste_translates_supported_formulas_and_blocks_unsafe_structure(tmp_path):
+    from openpyxl import Workbook
+    a = make_adapter(tmp_path)
+    source_path = tmp_path / "simple-cost.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Costs"
+    ws["A1"], ws["B1"], ws["C1"] = 2, 3, "=SUM(A1:B1)"
+    wb.save(source_path)
+    source = a.import_source(source_path)
+    original = a.read_bytes(source.file_id)
+    created = invoke(ToolService(a), "create_working_copy", {"file_id": source.file_id}, "copy-formula-xlsx")
+    artifact = created.artifacts[0]
+    pasted = invoke(ToolService(a), "edit_file", {"artifact_id": artifact.artifact_id, "baseline": 1,
+        "file_id": artifact.files[0].file_id, "operations": [
+            {"op": "copy_range", "sheet": "Costs", "source_range": "A1:C1", "cell": "A2"}]}, "paste-formula")
+    formulas = load_workbook(BytesIO(a.read_bytes(pasted.outputs[0].file_id)), data_only=False)
+    assert formulas["Costs"]["C2"].value == "=SUM(A2:B2)"
+    formulas.close()
+    values = load_workbook(BytesIO(a.read_bytes(pasted.outputs[0].file_id)), data_only=True)
+    assert values["Costs"]["C2"].value == 5
+    values.close()
+    blocked = invoke(ToolService(a), "edit_file", {"artifact_id": artifact.artifact_id, "baseline": 2,
+        "file_id": pasted.outputs[0].file_id, "operations": [
+            {"op": "insert_blank_rows", "sheet": "Costs", "index": 2}]}, "unsafe-structure")
+    assert blocked.status == "error" and blocked.code == "INVALID_OR_UNSUPPORTED"
+    assert a.read_bytes(source.file_id) == original
+
+
 def test_unknown_moq_missing_cost_and_invalid_numbers(tmp_path):
     a = make_adapter(tmp_path)
     snap = base_snapshot(a)

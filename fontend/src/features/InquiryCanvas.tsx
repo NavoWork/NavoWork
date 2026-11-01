@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode, type CSSProperties } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode, type CSSProperties } from 'react';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import {
   Background,
@@ -20,6 +20,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  CircleHelp,
   FileText,
   Folder,
   FolderOpen,
@@ -46,7 +47,6 @@ import { CanvasPersistence } from './canvas-persistence';
 import { ResizeHandle } from '../components/ResizeHandle';
 import { FilePreview, OriginalDocument, WorkingDocument } from './InquiryDocument';
 import { ConversationResults } from './ConversationResults';
-import { BusinessArtifactDocument, artifactNames, artifactPreview, type BusinessArtifact } from './BusinessArtifact';
 import type { GenerationNode } from './GenerateNodeDialog';
 import {
   canvasKey,
@@ -54,6 +54,8 @@ import {
   initialCanvas,
   readCanvas,
   revisionDocuments,
+  workspaceDocuments,
+  inquiryAssetsChangedEvent,
   saveCanvasFile,
   type CanvasState,
   type SavedResult,
@@ -65,7 +67,6 @@ import '@xyflow/react/dist/style.css';
 import './inquiry-canvas.css';
 
 const icons = {
-  artifact: FileText,
   original: Mail,
   conversation: MessageSquare,
   requirements: ListTree,
@@ -79,7 +80,6 @@ const icons = {
   revision: History,
 };
 const kindLabels: Record<DocumentKind, string> = {
-  artifact: '业务成果',
   original: '客户原文',
   conversation: '沟通记录',
   requirements: '需求规格',
@@ -142,7 +142,18 @@ function PreviewCard({ data, selected }: NodeProps<PreviewNode>) {
         <span>{data.modified ? (mode === 'real' ? '工作草稿' : '本机工作草稿') : doc.caption}</span>
         <span>双击打开</span>
       </footer>
-      {data.generate && <button className="button ic-node-generate nodrag nopan" disabled={data.generating} onClick={e => { e.stopPropagation(); data.generate?.(); }}>依据现有资料生成</button>}
+      {data.generate && (
+        <button
+          className="button ic-node-generate nodrag nopan"
+          disabled={data.generating}
+          onClick={(e) => {
+            e.stopPropagation();
+            data.generate?.();
+          }}
+        >
+          依据现有资料生成
+        </button>
+      )}
       <Handle type="source" position={Position.Right} isConnectable={false} />
     </article>
   );
@@ -154,6 +165,39 @@ const edgeOptions = {
   selectable: false,
   deletable: false,
 };
+
+function CanvasHelp() {
+  const [open, setOpen] = useState(false);
+  const tooltipId = useId();
+  return (
+    <div
+      className="ic-canvas-help"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onFocus={() => setOpen(true)}
+      onBlur={() => setOpen(false)}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') setOpen(false);
+      }}
+    >
+      <button
+        type="button"
+        className="ic-icon"
+        aria-label="画板操作说明"
+        aria-describedby={open ? tooltipId : undefined}
+        onClick={() => setOpen(true)}
+      >
+        <CircleHelp size={16} />
+      </button>
+      {open && (
+        <div className="ic-canvas-tooltip" id={tooltipId} role="tooltip">
+          单击预览 · 双击打开 · 各轮成果统一查看
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface Props {
   serverState?: CanvasState;
   persist?: (state: CanvasState) => void;
@@ -182,7 +226,11 @@ interface Props {
 export function InquiryCanvas(props: Props) {
   return (
     <ReactFlowProvider>
-      {mode === 'real' ? <ServerCanvas key={props.scope} {...props} /> : <CanvasWorkspace key={props.scope} {...props} />}
+      {mode === 'real' ? (
+        <ServerCanvas key={props.scope} {...props} />
+      ) : (
+        <CanvasWorkspace key={props.scope} {...props} />
+      )}
     </ReactFlowProvider>
   );
 }
@@ -196,19 +244,35 @@ function ServerCanvas(props: Props) {
   savedCallback.current = props.onSavedResultsChange;
   useEffect(() => {
     let live = true;
-    writer.onStatus = (value) => { if (live) setStatus(value); };
-    writer.onSaved = (state) => { if (live) savedCallback.current((state.results || []).map(r => r.revision)); };
+    writer.onStatus = (value) => {
+      if (live) setStatus(value);
+    };
+    writer.onSaved = (state) => {
+      window.dispatchEvent(new CustomEvent(inquiryAssetsChangedEvent, { detail: props.scope }));
+      if (live) savedCallback.current((state.results || []).map((r) => r.revision));
+    };
     setError(undefined);
-    api.get<{ editVersion: number; state: CanvasState | null }>(writer.path).then(result => {
-      if (!live) return;
-      const state = result.state || { ...initialCanvas(), initialRevision: props.inquiry.currentRevision };
-      writer.initialize(result.editVersion, state);
-      setLoaded(state);
-      writer.onSaved(state);
-      setStatus('已保存');
-    }).catch(e => { if (live) setError(e); });
+    api
+      .get<{ editVersion: number; state: CanvasState | null }>(writer.path)
+      .then((result) => {
+        if (!live) return;
+        const state = result.state || {
+          ...initialCanvas(),
+          initialRevision: props.inquiry.currentRevision,
+        };
+        writer.initialize(result.editVersion, state);
+        setLoaded(state);
+        writer.onSaved(state);
+        setStatus('已与服务端同步');
+      })
+      .catch((e) => {
+        if (live) setError(e);
+      });
     const leaving = (event: BeforeUnloadEvent) => {
-      if (writer.pending || writer.saving) { event.preventDefault(); event.returnValue = ''; }
+      if (writer.pending || writer.saving) {
+        event.preventDefault();
+        event.returnValue = '';
+      }
     };
     window.addEventListener('beforeunload', leaving);
     return () => {
@@ -217,22 +281,38 @@ function ServerCanvas(props: Props) {
       void writer.flush();
     };
   }, [writer, retry]);
-  if (error) return <ErrorNotice error={error} onRetry={() => setRetry(v => v + 1)} />;
-  if (!loaded) return <Loading label="正在打开工作画布" />;
-  return <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, minWidth: 0 }}>
-    <div role="status" style={{ padding: '4px 12px', fontSize: 12 }}>
-      {status}
-      {writer.error != null && <>
-        <button className="button button-ghost" onClick={() => writer.retry()}>重试保存</button>
-        <button className="button button-ghost" onClick={() => {
-          const url = URL.createObjectURL(new Blob([JSON.stringify(writer.pending, null, 2)], { type: 'application/json' }));
-          const link = document.createElement('a'); link.href = url; link.download = 'canvas-recovery.json'; link.click();
-          setTimeout(() => URL.revokeObjectURL(url), 1000);
-        }}>下载当前草稿</button>
-      </>}
+  if (error) return <ErrorNotice error={error} onRetry={() => setRetry((v) => v + 1)} />;
+  if (!loaded) return <Loading label="正在恢复服务端画板" />;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, minWidth: 0 }}>
+      <div role="status" style={{ padding: '4px 12px', fontSize: 12 }}>
+        {status}
+        {writer.error != null && (
+          <>
+            <button className="button button-ghost" onClick={() => writer.retry()}>
+              重试保存
+            </button>
+            <button
+              className="button button-ghost"
+              onClick={() => {
+                const url = URL.createObjectURL(
+                  new Blob([JSON.stringify(writer.pending, null, 2)], { type: 'application/json' }),
+                );
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'canvas-recovery.json';
+                link.click();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+              }}
+            >
+              下载当前草稿
+            </button>
+          </>
+        )}
+      </div>
+      <CanvasWorkspace {...props} serverState={loaded} persist={(state) => writer.enqueue(state)} />
     </div>
-    <CanvasWorkspace {...props} serverState={loaded} persist={state => writer.enqueue(state)} />
-  </div>;
+  );
 }
 function CanvasWorkspace({
   serverState,
@@ -262,9 +342,14 @@ function CanvasWorkspace({
   const [initial] = useState(() => {
     try {
       const saved = serverState || readCanvas(scope);
-      const alias = (id: string) => id.startsWith('result:') ? 'result:hub' : id;
+      const alias = (id: string) => (id.startsWith('result:') ? 'result:hub' : id);
       return {
-        state: { ...saved, tabs: [...new Set(saved.tabs.map(alias))], active: alias(saved.active), initialRevision: saved.initialRevision ?? inquiry.currentRevision },
+        state: {
+          ...saved,
+          tabs: [...new Set(saved.tabs.map(alias))],
+          active: alias(saved.active),
+          initialRevision: saved.initialRevision ?? inquiry.currentRevision,
+        },
         error: '',
       };
     } catch {
@@ -306,7 +391,6 @@ function CanvasWorkspace({
         ),
     })),
   });
-  const businessArtifacts = useQuery({ queryKey: ['business-artifacts', scope], enabled: mode === 'real', queryFn: ({ signal }) => api.get<{ items: BusinessArtifact[] }>(`${path}/artifacts`, signal) });
   const assetIds = revision?.assetRefs ?? [];
   const assets = useQuery({
     queryKey: ['assets-for-inquiry', scope],
@@ -319,7 +403,10 @@ function CanvasWorkspace({
       api.get<{ items: MaterialBundle[] }>(`${path}/material-bundles`, signal),
   });
   useEffect(() => {
-    if (persist) { persist(state); return; }
+    if (persist) {
+      persist(state);
+      return;
+    }
     if (initial.error) return;
     try {
       localStorage.setItem(canvasKey(scope), JSON.stringify(state));
@@ -328,77 +415,46 @@ function CanvasWorkspace({
       setStorageError('本机空间不足或存储不可用，当前修改尚未保存。请保留此页并导出笔记。');
     }
   }, [state, scope, initial.error]);
-  const docs = revisionDocuments(inquiry, revision, messages, revisions, replyText);
-  const latestArtifacts = new Map<string, BusinessArtifact>();
-  const historical = !!revision && revision.number !== inquiry.currentRevision;
-  const historicalIds = new Set(Object.values(revision?.artifactVersionIds || {}));
-  for (const artifact of businessArtifacts.data?.items || []) {
-    if (historical && !historicalIds.has(artifact.id)) continue;
-    if (!latestArtifacts.has(artifact.kind) || latestArtifacts.get(artifact.kind)!.version < artifact.version) latestArtifacts.set(artifact.kind, artifact);
-  }
-  for (const artifact of latestArtifacts.values()) docs.push({ id: `artifact:${artifact.kind}`, kind: 'artifact', title: artifact.title || artifactNames[artifact.kind] || '业务成果', folder: 'business', text: artifactPreview(artifact.content), caption: `V${artifact.version} · ${artifact.status === 'approved' ? '已批准' : '待审核'}`, artifact });
-  docs.push({ id: 'result:hub', title: '对话成果汇总', kind: 'result', folder: 'analysis', text: `已保存 ${revisions.length} 个业务版本。统一查看每轮需求、报价、回复与来源；历史恢复请到版本记录。`, caption: '历次业务成果' });
+  const docs = workspaceDocuments({
+    inquiry,
+    revision,
+    revisions,
+    messages,
+    state,
+    replyText,
+    sources: Object.fromEntries(
+      sourceRefs.flatMap((ref, index) =>
+        sources[index]?.data ? [[ref.sourceVersionId, sources[index].data!]] : [],
+      ),
+    ),
+    assets: assets.data?.items,
+    bundles: bundles.data?.items,
+  });
+  docs.push({
+    id: 'result:hub',
+    title: '对话成果汇总',
+    kind: 'result',
+    folder: 'analysis',
+    text: `已保存 ${revisions.length} 个业务版本。统一查看每轮需求、报价、回复与来源；历史恢复请到版本记录。`,
+    caption: '统一成果入口',
+  });
   useEffect(() => {
-    const remap = (id: string) => /^(requirements|risks|quote|reply):\d+$/.test(id) ? `${id.split(':')[0]}:${revision?.number || 0}` : id;
-    setState(s => ({ ...s, tabs: [...new Set(s.tabs.map(remap))], active: remap(s.active) }));
+    if (mode !== 'real') return;
+    const remap = (id: string) =>
+      /^(requirements|risks|quote|reply):\d+$/.test(id)
+        ? `${id.split(':')[0]}:${revision?.number || 0}`
+        : id;
+    setState((s) => ({ ...s, tabs: [...new Set(s.tabs.map(remap))], active: remap(s.active) }));
   }, [revision?.number]);
-  sourceRefs.forEach((ref, index) => {
-    const doc = docs.find((d) => d.id === `source:${ref.sourceVersionId}`);
-    if (doc && sources[index]?.data) {
-      doc.source = sources[index].data;
-      doc.text = sources[index].data!.content;
-    }
+  const assetSyncSignature = JSON.stringify({
+    title: inquiry.title,
+    updatedAt: inquiry.updatedAt,
+    documents: docs.map(({ id, title, text, file, folder }) => ({ id, title, text, file, folder })),
+    folders: state.folders,
   });
-  assetIds.forEach((id) => {
-    const asset = assets.data?.items.find((a) => `${a.id}:v${a.version}` === id);
-    const version = Number(id.match(/:v(\d+)$/)?.[1] || 1);
-    const file: WorkspaceFile = {
-      id: `asset:${id}`,
-      title: asset?.title || id,
-      name: asset?.name || id,
-      size: asset?.size || 0,
-      mediaType: asset?.mediaType || 'application/octet-stream',
-      folder: 'materials',
-      assetId: asset?.id || id.replace(/:v\d+$/, ''),
-      version,
-    };
-    docs.push({
-      id: file.id,
-      kind: 'file',
-      title: file.title,
-      folder: file.folder,
-      text: '',
-      caption: `已引用 · V${version}`,
-      file,
-    });
-  });
-  docs.push(
-    ...state.notes.map((n) => ({ ...n, kind: 'note' as const, caption: mode === 'real' ? '工作笔记' : '本机笔记' })),
-    ...state.files.map((file) => ({
-      id: file.id,
-      title: file.title,
-      kind: 'file' as const,
-      folder: file.folder,
-      text: '',
-      caption: mode === 'real' ? '询盘附件' : '本机附件',
-      file,
-    })),
-  );
-  docs.push(
-    ...(bundles.data?.items || []).map((b) => ({
-      id: `bundle:${b.id}`,
-      title: `V${b.revision} · 材料草稿`,
-      kind: 'source' as const,
-      folder: 'materials',
-      caption: '已整理 · 未发送',
-      text: `业务版本 V${b.revision}\n英语草稿 V${b.draftVersions['en-US'] ?? '—'}\n西语草稿 V${b.draftVersions['es-MX'] ?? '—'}\n\n素材：\n${b.assetVersionIds.join('\n') || '无'}\n\n资料来源：\n${b.sourceVersionIds.join('\n') || '无'}`,
-    })),
-  );
-  for (const doc of docs) {
-    if (doc.kind !== 'original' && state.drafts[doc.id] !== undefined)
-      doc.text = state.drafts[doc.id];
-    if (state.drafts[`title:${doc.id}`]) doc.title = state.drafts[`title:${doc.id}`];
-  }
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent(inquiryAssetsChangedEvent, { detail: scope }));
+  }, [scope, assetSyncSignature]);
   const folders = [...defaultFolders, ...state.folders];
   const tabs = state.tabs.filter((id) => docs.some((d) => d.id === id));
   const active = state.active === 'canvas' || tabs.includes(state.active) ? state.active : 'canvas';
@@ -413,7 +469,7 @@ function CanvasWorkspace({
   async function restore(number: number, target: string) {
     const nextNumber = await onRestore?.(number, target);
     if (!nextNumber) return;
-    setState(s => {
+    setState((s) => {
       const drafts = { ...s.drafts };
       const kinds = target === 'all' ? ['requirements', 'risks', 'quote'] : [target];
       for (const kind of kinds) {
@@ -421,7 +477,12 @@ function CanvasWorkspace({
         if (drafts[oldId] !== undefined) drafts[`${kind}:${nextNumber}`] = drafts[oldId];
       }
       const id = target === 'all' ? 'canvas' : `${target}:${nextNumber}`;
-      return { ...s, drafts, active: id, tabs: id === 'canvas' ? s.tabs : [...new Set([...s.tabs, id])] };
+      return {
+        ...s,
+        drafts,
+        active: id,
+        tabs: id === 'canvas' ? s.tabs : [...new Set([...s.tabs, id])],
+      };
     });
   }
   useEffect(() => {
@@ -479,7 +540,8 @@ function CanvasWorkspace({
           folder: 'materials',
         };
         if (mode === 'real') {
-          const form = new FormData(); form.set('file', file);
+          const form = new FormData();
+          form.set('file', file);
           const uploaded = await api.post<WorkspaceFile>(`${path}/canvas/files`, form);
           setState((s) => ({ ...s, files: [...s.files, uploaded] }));
         } else {
@@ -496,12 +558,30 @@ function CanvasWorkspace({
     }
   }
   // Put the main working documents first; supporting files continue below them.
+  const initialIds = new Set(
+    revisionDocuments(
+      inquiry,
+      revisions.find((item) => item.number === state.initialRevision),
+      messages,
+      revisions.filter((item) => item.number <= (state.initialRevision || 0)),
+    ).map((doc) => doc.id),
+  );
   const ordered = docs
-    .filter((doc, index) => doc.kind !== 'revision' && docs.findIndex(d => d.id === doc.id) === index)
+    .filter((doc, index) =>
+      mode === 'real'
+        ? doc.kind !== 'revision' &&
+          docs.findIndex((d) => d.id === doc.id) === index &&
+          (!['requirements', 'risks', 'quote', 'reply'].includes(doc.kind) ||
+            doc.id.endsWith(`:${revision?.number || 0}`)) &&
+          (doc.kind !== 'result' || doc.id === 'result:hub')
+        : initialIds.has(doc.id) ||
+          ['file', 'note', 'result'].includes(doc.kind) ||
+          doc.id.startsWith('bundle:') ||
+          state.positions[doc.id] !== undefined,
+    )
     .sort((a, b) => {
       const rank = (kind: DocumentKind) =>
         ({
-          artifact: 2,
           original: 0,
           requirements: 1,
           quote: 2,
@@ -516,12 +596,17 @@ function CanvasWorkspace({
         })[kind];
       return rank(a.kind) - rank(b.kind);
     });
-  const occupied = ordered.flatMap(doc => state.positions[doc.id] ? [state.positions[doc.id]] : []);
+  const occupied = ordered.flatMap((doc) =>
+    state.positions[doc.id] ? [state.positions[doc.id]] : [],
+  );
   function defaultPosition() {
     let index = 0;
     let position = { x: 0, y: 68 };
-    while (occupied.some(p => Math.abs(p.x - position.x) < 320 && Math.abs(p.y - position.y) < 290)) {
-      index += 1; position = { x: (index % 3) * 350, y: Math.floor(index / 3) * 320 + 68 };
+    while (
+      occupied.some((p) => Math.abs(p.x - position.x) < 320 && Math.abs(p.y - position.y) < 290)
+    ) {
+      index += 1;
+      position = { x: (index % 3) * 350, y: Math.floor(index / 3) * 320 + 68 };
     }
     occupied.push(position);
     return position;
@@ -534,8 +619,18 @@ function CanvasWorkspace({
     measured: measurements.current[doc.id],
     position: state.positions[doc.id] || defaultPosition(),
     selected: selected === doc.id,
-    data: { doc, base, scope, open, modified: state.drafts[doc.id] !== undefined, generating: readOnly,
-      generate: onGenerate && ['requirements', 'risks', 'quote', 'reply'].includes(doc.kind) ? () => onGenerate(doc.kind as GenerationNode) : undefined },
+    data: {
+      doc,
+      base,
+      scope,
+      open,
+      modified: state.drafts[doc.id] !== undefined,
+      generating: readOnly,
+      generate:
+        onGenerate && ['requirements', 'risks', 'quote', 'reply'].includes(doc.kind)
+          ? () => onGenerate(doc.kind as GenerationNode)
+          : undefined,
+    },
     ariaLabel: `${doc.title}，预览节点，双击打开`,
   }));
   const edges: Edge[] = [];
@@ -618,7 +713,6 @@ function CanvasWorkspace({
       : undefined;
   return (
     <div className="ic-workspace">
-      <ErrorNotice error={businessArtifacts.error} onRetry={() => void businessArtifacts.refetch()} />
       <div className="ic-toolbar">
         <button
           ref={directoryToggleRef}
@@ -902,11 +996,7 @@ function CanvasWorkspace({
                 size={1}
                 color="var(--ic-dot)"
               />
-              <Panel position="top-left" className="ic-board-label">
-                <span>INQUIRY CANVAS</span>
-                <small>双击打开文档 · 拖动整理工作画布</small>
-              </Panel>
-              <Panel position="top-right">
+              <Panel position="top-right" className="ic-board-tools">
                 <button
                   className="ic-arrange"
                   onClick={() => {
@@ -919,6 +1009,7 @@ function CanvasWorkspace({
                   <LayoutGrid size={12} />
                   整理画板
                 </button>
+                <CanvasHelp />
               </Panel>
               <Controls showInteractive={false} aria-label="画板缩放工具" />
               <MiniMap
@@ -949,8 +1040,20 @@ function CanvasWorkspace({
             hidden={active !== `reply:${revision?.number || 0}`}
           >
             <div className="ic-document-actions">
-              {onGenerate && <button className="button button-primary" disabled={readOnly} onClick={() => onGenerate('reply')}>依据现有资料生成</button>}
-              {canRestore && revision && revision.number !== inquiry.currentRevision && <button className="button" onClick={() => void restore(revision.number, 'reply')}>恢复此节点为新版本</button>}
+              {onGenerate && (
+                <button
+                  className="button button-primary"
+                  disabled={readOnly}
+                  onClick={() => onGenerate('reply')}
+                >
+                  依据现有资料生成
+                </button>
+              )}
+              {canRestore && revision && revision.number !== inquiry.currentRevision && (
+                <button className="button" onClick={() => void restore(revision.number, 'reply')}>
+                  恢复此节点为新版本
+                </button>
+              )}
             </div>
             {replyEditor}
           </div>
@@ -983,8 +1086,6 @@ function CanvasWorkspace({
                       onChange={(value) => draft(id, value)}
                       onSaved={onOriginalSaved}
                     />
-                  ) : doc.kind === 'artifact' && doc.artifact ? (
-                    <BusinessArtifactDocument key={doc.artifact.id} artifact={doc.artifact} path={path} readOnly={readOnly} onInstruction={onInstruction} />
                   ) : ['requirements', 'risks', 'quote'].includes(doc.kind) ? (
                     <WorkingDocument
                       doc={original!}
@@ -992,8 +1093,18 @@ function CanvasWorkspace({
                       readOnly={readOnly}
                       onChange={(value) => draft(id, value)}
                       onInstruction={onInstruction}
-                      onGenerate={onGenerate ? text => onGenerate(doc.kind as GenerationNode, text) : undefined}
-                      onRestore={canRestore && doc.revision && doc.revision.number !== inquiry.currentRevision ? () => void restore(doc.revision!.number, doc.kind) : undefined}
+                      onGenerate={
+                        onGenerate
+                          ? (text) => onGenerate(doc.kind as GenerationNode, text)
+                          : undefined
+                      }
+                      onRestore={
+                        canRestore &&
+                        doc.revision &&
+                        doc.revision.number !== inquiry.currentRevision
+                          ? () => void restore(doc.revision!.number, doc.kind)
+                          : undefined
+                      }
                     />
                   ) : doc.kind === 'note' ? (
                     <div className="ic-document-sheet">
@@ -1014,7 +1125,11 @@ function CanvasWorkspace({
                       />
                       <div className="ic-document-status">
                         <Check size={13} />
-                        {storageError ? '本机保存不可用' : mode === 'real' ? '工作笔记 · 自动保存' : '本机笔记 · 自动保存'}
+                        {storageError
+                          ? '本机保存不可用'
+                          : mode === 'real'
+                            ? '工作笔记 · 自动保存'
+                            : '本机笔记 · 自动保存'}
                       </div>
                       <label className="ic-folder-select">
                         所在文件夹
@@ -1066,7 +1181,11 @@ function CanvasWorkspace({
                       <h2>{doc.title}</h2>
                       <p className="ic-document-subtitle">
                         {doc.file.name} · {Math.ceil(doc.file.size / 1024)} KB ·{' '}
-                        {doc.file.assetId ? `引用 V${doc.file.version}` : mode === 'real' ? '询盘附件' : '本机附件'}
+                        {doc.file.assetId
+                          ? `引用 V${doc.file.version}`
+                          : mode === 'real'
+                            ? '询盘附件'
+                            : '本机附件'}
                       </p>
                       <label className="ic-file-alias">
                         显示名称
@@ -1080,12 +1199,15 @@ function CanvasWorkspace({
                       <FilePreview file={doc.file} base={base} scope={scope} />
                     </div>
                   ) : doc.kind === 'result' ? (
-                    <ConversationResults path={path} revisions={revisions} saved={state.results || []} onRevision={onRevision} />
+                    <ConversationResults
+                      path={path}
+                      revisions={revisions}
+                      saved={state.results || []}
+                      onRevision={onRevision}
+                    />
                   ) : doc.kind === 'revision' ? (
                     <div className="ic-document-sheet">
-                      <div className="ic-document-eyebrow">
-                        VERSION HISTORY
-                      </div>
+                      <div className="ic-document-eyebrow">VERSION HISTORY</div>
                       <h2>{doc.title}</h2>
                       <p className="ic-document-subtitle">{doc.caption} · 版本快照只读</p>
                       <pre className="ic-source-content">{doc.text}</pre>
@@ -1095,11 +1217,39 @@ function CanvasWorkspace({
                           在对话中查看此版本
                         </button>
                       )}
-                      {canRestore && doc.revision && <div className="ic-history-restore">
-                        <p>复制旧内容为新的当前草稿，保留全部历史。恢复的业务成果需要重新审核。</p>
-                        <button className="button button-primary" onClick={() => void restore(doc.revision!.number, 'all')}>从此版本继续编辑</button>
-                        <div className="ic-document-actions">{(['requirements', 'risks', 'quote', 'reply'] as const).map(kind => <button className="button" key={kind} onClick={() => void restore(doc.revision!.number, kind)}>仅恢复{({ requirements: '需求', risks: '风险', quote: '报价', reply: '回复' })[kind]}节点</button>)}</div>
-                      </div>}
+                      {canRestore && doc.revision && (
+                        <div className="ic-history-restore">
+                          <p>
+                            复制旧内容为新的当前草稿，保留全部历史。恢复的业务成果需要重新审核。
+                          </p>
+                          <button
+                            className="button button-primary"
+                            onClick={() => void restore(doc.revision!.number, 'all')}
+                          >
+                            从此版本继续编辑
+                          </button>
+                          <div className="ic-document-actions">
+                            {(['requirements', 'risks', 'quote', 'reply'] as const).map((kind) => (
+                              <button
+                                className="button"
+                                key={kind}
+                                onClick={() => void restore(doc.revision!.number, kind)}
+                              >
+                                仅恢复
+                                {
+                                  {
+                                    requirements: '需求',
+                                    risks: '风险',
+                                    quote: '报价',
+                                    reply: '回复',
+                                  }[kind]
+                                }
+                                节点
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="ic-document-sheet">

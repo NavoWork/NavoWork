@@ -1,10 +1,18 @@
 import { openDB } from 'idb';
-import type { Inquiry, Locale, Message, Revision, Source } from '../api/types';
 import { channelLabels } from './CustomerContextCard';
-import { artifactPreview, type BusinessArtifact } from './BusinessArtifact';
+import type {
+  Asset,
+  Inquiry,
+  Locale,
+  MaterialBundle,
+  Message,
+  Revision,
+  Source,
+} from '../api/types';
+
+export const inquiryAssetsChangedEvent = 'navowork:inquiry-assets-changed';
 
 export type DocumentKind =
-  | 'artifact'
   | 'original'
   | 'conversation'
   | 'requirements'
@@ -28,7 +36,6 @@ export interface WorkspaceDocument {
   folder: string;
   text: string;
   caption: string;
-  artifact?: BusinessArtifact;
   source?: Source;
   file?: WorkspaceFile;
   revision?: Revision;
@@ -62,7 +69,6 @@ export interface CanvasState {
 export const defaultFolders = [
   { id: 'inquiry', title: '客户询盘' },
   { id: 'analysis', title: '需求与方案' },
-  { id: 'business', title: '业务成果' },
   { id: 'replies', title: '客户回复' },
   { id: 'materials', title: '资料与附件' },
   { id: 'notes', title: '工作笔记' },
@@ -152,7 +158,7 @@ export function revisionDocuments(
       kind: 'original',
       folder: 'inquiry',
       text: `${inquiry.customerContext ? `来源：${channelLabels[inquiry.customerContext.channel]}\n邮箱：${inquiry.customerContext.email || '待补充'}\n\n` : ''}${inquiry.originalText}`,
-      caption: inquiry.customer,
+      caption: `${inquiry.customer}`,
     },
     {
       id: 'conversation',
@@ -177,15 +183,15 @@ export function revisionDocuments(
         folder: 'analysis',
         caption: `V${r.number} · 需求分析`,
         revision: r,
-        text: ([
+        text: [
           ['产品', r.requirements.requestedProduct],
           ['数量', r.requirements.quantity == null ? null : `${r.requirements.quantity} 件`],
           ['规格', r.requirements.specification],
           ['目的地', r.requirements.destination],
           ['到货要求', r.requirements.requestedArrival],
           ['定制', r.requirements.customization],
-        ] as [string, unknown][])
-          .map(([k, v]) => `${k}：${artifactPreview(v)}`)
+        ]
+          .map(([k, v]) => `${k}：${v || '待确认'}`)
           .join('\n'),
       },
       {
@@ -245,12 +251,136 @@ export function revisionDocuments(
         hour: '2-digit',
         minute: '2-digit',
       }).format(new Date(r.createdAt)),
-      text: [r.changeSummary.join('\n') || '保存了需求、报价和回复。', r.restoredFromRevision ? `从 V${r.restoredFromRevision} 恢复${r.restoredNode === 'all' ? '全部节点' : ` ${r.restoredNode} 节点`}；上一个当前版本 V${r.parentRevision}` : r.generatedNode ? `生成节点：${r.generatedNode}` : ''].filter(Boolean).join('\n'),
+      text: [
+        r.changeSummary.join('\n') || '保存了需求、报价和回复。',
+        r.restoredFromRevision
+          ? `从 V${r.restoredFromRevision} 恢复${r.restoredNode === 'all' ? '全部节点' : ` ${r.restoredNode} 节点`}；上一个当前版本 V${r.parentRevision}`
+          : r.generatedNode
+            ? `生成节点：${r.generatedNode}`
+            : '',
+      ]
+        .filter(Boolean)
+        .join('\n'),
     })),
   );
   if (!r) {
-    for (const [kind, title, folder] of [['requirements', '客户需求与规格', 'analysis'], ['risks', '风险与待确认项', 'analysis'], ['quote', '方案与报价草稿', 'analysis'], ['reply', '双语回复草稿', 'replies']] as const)
-      docs.push({ id: `${kind}:0`, kind, title, folder, text: '尚未生成。选择现有原件和知识库依据，生成此节点的第一份草稿。', caption: '等待生成' });
+    for (const [kind, title, folder] of [
+      ['requirements', '客户需求与规格', 'analysis'],
+      ['risks', '风险与待确认项', 'analysis'],
+      ['quote', '方案与报价草稿', 'analysis'],
+      ['reply', '双语回复草稿', 'replies'],
+    ] as const)
+      docs.push({
+        id: `${kind}:0`,
+        kind,
+        title,
+        folder,
+        text: '尚未生成。选择现有原件和知识库依据，生成此节点的第一份草稿。',
+        caption: '等待生成',
+      });
+  }
+  return docs;
+}
+
+export function workspaceDocuments({
+  inquiry,
+  revision,
+  revisions,
+  messages,
+  state,
+  replyText,
+  sources = {},
+  assets = [],
+  bundles = [],
+}: {
+  inquiry: Inquiry;
+  revision?: Revision;
+  revisions: Revision[];
+  messages: Message[];
+  state: CanvasState;
+  replyText?: string;
+  sources?: Record<string, Source>;
+  assets?: Asset[];
+  bundles?: MaterialBundle[];
+}): WorkspaceDocument[] {
+  const docs = revisionDocuments(inquiry, revision, messages, revisions, replyText);
+  const firstRevision = state.initialRevision ?? inquiry.currentRevision;
+  for (const document of revisionDocuments(
+    inquiry,
+    revisions.find((item) => item.number === firstRevision),
+    messages,
+    revisions.filter((item) => item.number <= firstRevision),
+  )) {
+    if (!docs.some((doc) => doc.id === document.id)) docs.push(document);
+  }
+  docs.push(
+    ...(state.results || []).map((result) => ({
+      id: `result:${result.revision}`,
+      title: result.title,
+      kind: 'result' as const,
+      folder: 'notes',
+      text: result.text,
+      caption: `V${result.revision} · 已确认保留`,
+      revision: revisions.find((item) => item.number === result.revision),
+    })),
+  );
+  for (const doc of docs) {
+    const source =
+      doc.kind === 'source' && doc.id.startsWith('source:')
+        ? sources[doc.id.slice('source:'.length)]
+        : undefined;
+    if (source) {
+      doc.source = source;
+      doc.text = source.content;
+    }
+  }
+  for (const id of revision?.assetRefs || []) {
+    const asset = assets.find((item) => `${item.id}:v${item.version}` === id);
+    const version = Number(id.match(/:v(\d+)$/)?.[1] || 1);
+    const file: WorkspaceFile = {
+      id: `asset:${id}`,
+      title: asset?.title || id,
+      name: asset?.name || id,
+      size: asset?.size || 0,
+      mediaType: asset?.mediaType || 'application/octet-stream',
+      folder: 'materials',
+      assetId: asset?.id || id.replace(/:v\d+$/, ''),
+      version,
+    };
+    docs.push({
+      id: file.id,
+      kind: 'file',
+      title: file.title,
+      folder: file.folder,
+      text: '',
+      caption: `已引用 · V${version}`,
+      file,
+    });
+  }
+  docs.push(
+    ...state.notes.map((note) => ({ ...note, kind: 'note' as const, caption: '工作笔记' })),
+    ...state.files.map((file) => ({
+      id: file.id,
+      title: file.title,
+      kind: 'file' as const,
+      folder: file.folder,
+      text: '',
+      caption: '询盘附件',
+      file,
+    })),
+    ...bundles.map((bundle) => ({
+      id: `bundle:${bundle.id}`,
+      title: `V${bundle.revision} · 材料草稿`,
+      kind: 'source' as const,
+      folder: 'materials',
+      caption: '已整理 · 未发送',
+      text: `业务版本 V${bundle.revision}\n英语草稿 V${bundle.draftVersions['en-US'] ?? '—'}\n西语草稿 V${bundle.draftVersions['es-MX'] ?? '—'}\n\n素材：\n${bundle.assetVersionIds.join('\n') || '无'}\n\n资料来源：\n${bundle.sourceVersionIds.join('\n') || '无'}`,
+    })),
+  );
+  for (const doc of docs) {
+    if (doc.kind !== 'original' && state.drafts[doc.id] !== undefined)
+      doc.text = state.drafts[doc.id];
+    if (state.drafts[`title:${doc.id}`]) doc.title = state.drafts[`title:${doc.id}`];
   }
   return docs;
 }

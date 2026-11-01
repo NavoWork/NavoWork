@@ -65,6 +65,9 @@ class HostTransaction:
         snap = record["snapshot"]
         # Existing UI consumes content; complete controlled record stays attached to this immutable version.
         content = {k: v.get("value") for k, v in snap.get("fields", {}).items()}
+        if record.get("working_copy"):
+            content = {"source": record["working_copy"], "files": ref["files"],
+                       "changes": record.get("manual_operations", []), "impactCoverageComplete": False}
         if ref["kind"] == "cost": content = {"input": snap.get("pricing"), "result": record.get("pricing", {}).get("quote")}
         if ref["kind"] == "quotation":
             q = record.get("pricing", {}).get("quote")
@@ -72,10 +75,15 @@ class HostTransaction:
         export_refs = []
         for file in ref["files"]:
             export_refs.append(self._export(ref, FileRef.model_validate(file), row_id))
-        create_item(self.db, "artifact", {"caseId": c.case_id, "kind": ref["kind"], "title": ref["kind"],
+        row = create_item(self.db, "artifact", {"caseId": c.case_id, "kind": ref["kind"], "title": ref["kind"],
             "version": ref["version"], "content": content, "agentRecord": record, "exports": export_refs,
             "basedOnId": latest.id if latest else None, "status": "draft", "runId": c.run_id, "jobId": c.job_id,
             "createdAt": now()}, case_id=c.case_id, parent_id=ref["kind"], version=ref["version"], item_id=row_id)
+        self.db.flush()
+        from .core import item_view
+        from .propagation import artifact_changed
+        previous = {**item_view(latest), "itemId": latest.id} if latest else None
+        artifact_changed(self.db, self.db.get(Case, c.case_id), previous, {**item_view(row), "itemId": row.id})
     def _export(self, artifact, file, row_id):
         c = self.adapter.context()
         export_id = uid("export")
@@ -177,6 +185,16 @@ class HostAdapter:
         for row in items(db, "agent_file", case_id=c.case_id):
             ref = FileRef.model_validate(decode(row.payload)["ref"])
             result[ref.file_id] = ref
+        # Human edits and native business exports are immutable Case files too.
+        # Use their version row IDs so the model can select exact bytes rather
+        # than accidentally falling back to the uploaded original.
+        for kind in ("office_file", "export"):
+            for row in items(db, kind, case_id=c.case_id):
+                value = decode(row.payload)
+                blob = db.get(Blob, value.get("blobId"))
+                if blob and blob.case_id == c.case_id:
+                    result[row.id] = FileRef(file_id=row.id, case_id=c.case_id, role="working", sha256=blob.sha256,
+                        media_type=blob.media_type, name=blob.filename, byte_size=blob.byte_size)
         return result
 
     def _asset_blob(self, db, entry):
@@ -218,7 +236,11 @@ class HostAdapter:
         entry = next((v for v in decode(db.get(Job, self._context.job_id).payload).get("assetManifest", []) if v["id"] == file_id), None)
         if entry:
             return ref, self._asset_blob(db, entry)
-        row = db.get(Item, file_id) if ref.role == "source" else db.get(Item, "af_" + file_id)
+        row = db.get(Item, file_id)
+        if not row or row.kind not in ("evidence", "canvas_file", "office_file", "export") or row.case_id != self._context.case_id:
+            row = db.get(Item, "af_" + file_id)
+        if not row:
+            raise AgentError("FILE_UNAVAILABLE", "File version is unavailable")
         blob = db.get(Blob, decode(row.payload)["blobId"])
         if not blob or blob.case_id != self._context.case_id or blob.sha256 != ref.sha256:
             raise AgentError("SOURCE_VERSION", "File reference no longer matches the host")

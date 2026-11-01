@@ -1,4 +1,6 @@
 export type WikiDocument = {
+  sourceVersionId?: string;
+  version?: number;
   id: string;
   title: string;
   folder: string;
@@ -103,6 +105,15 @@ export type LibraryAsset = {
   url?: string;
   mime?: string;
   file?: File;
+  content?: string;
+  unavailable?: string;
+  inquiry?: {
+    id: string;
+    title: string;
+    documentId: string;
+    folderId: string;
+    folderTitle: string;
+  };
 };
 export const assetKinds: { id: AssetKind | 'all'; label: string }[] = [
   { id: 'all', label: '全部' },

@@ -279,12 +279,24 @@ def canvas_file(db, user, case, file_id):
 
 
 def skill_market(db):
-    from .settings_api import settings_values
-    config = settings_values(db)
-    catalog = [{"id": skill["id"], "tab": "skills", "name": skill["name"],
-                "description": skill["description"], "category": "外贸", "tags": ["按需执行", "版本留档"],
-                "includes": [skill["description"]], "tools": skill["tools"],
-                "status": "available" if config["agent"]["enabled"] and skill["enabled"] else "disabled"}
-               for skill in config["skills"]]
-    catalog.append({"id": "bags", "tab": "suites", "name": "包袋外贸工作流", "description": "从询盘出发，逐步完成规格、核价、样品、订单与交付准备。", "category": "业务套件", "tags": ["七个业务阶段"], "includes": ["客户询盘", "产品规格", "成本与报价", "打样确认", "订单合同", "生产准备", "验货与交付"], "status": "available" if config["agent"]["enabled"] else "disabled"})
-    return {"items": catalog}
+    enabled = {item_view(r)["id"]: item_view(r)["enabled"] for r in items(db, "capability")}
+    agent_ok = enabled.get("agent", True)
+    skills = [
+        ("inquiry-assessment", "客户与询盘评估", "核验客户背景、渠道、采购条件，输出待确认项与跟进建议。", ["客户档案", "风险核验"], ["客户背景", "询盘缺项", "跟进建议"]),
+        ("requirements-techpack", "箱包 Tech Pack", "把客户要求整理成可询价、可打样、可生产的规格与 BOM。", ["Tech Pack", "BOM"], ["款式结构", "材料辅料", "包装与验货"]),
+        ("costing-quotation", "核价与报价", "归一化多家供应商报价，用确定性工具核价并生成客户报价。", ["多供应商", "确定性计算"], ["成本行", "供应商比较", "报价条款"]),
+        ("sample-management", "打样与样品确认", "记录样品轮次、费用、寄样、检查、反馈和客户批准。", ["样品台账", "批准证据"], ["开发样", "确认样", "产前样"]),
+        ("order-confirmation", "PO 与 PI", "核对 PO 差异，形成 PI 草稿、双方确认与付款计划。", ["PO 差异", "付款计划"], ["PI", "合同条款", "付款保障"]),
+        ("production-release", "生产资料与验货", "生成生产资料、T&A、QC 检查表并检查放行缺口。", ["生产包", "放行门禁"], ["BOM", "T&A", "QC"]),
+        ("change-impact", "变更影响", "客户/供应商变更后的影响分析与联动修订。", ["版本追踪", "联动"], ["影响清单", "新草稿", "重审提示"]),
+    ]
+    items_out = [
+        {"id": key, "tab": "skills", "name": name, "description": description, "category": "外贸业务流程", "tags": tags, "includes": includes, "status": "available" if agent_ok and (key != "costing-quotation" or enabled.get("costing", True)) else "disabled"}
+        for key, name, description, tags, includes in skills
+    ]
+    items_out += [
+        {"id": "mail-connector", "tab": "plugins", "name": "邮件连接器", "description": "将客户往来邮件带入项目；当前以原件上传为主。", "category": "连接器", "tags": ["邮件"], "includes": ["导入邮件", "关联询盘"], "status": "planned"},
+        {"id": "excel-connector", "tab": "plugins", "name": "Excel 读取", "description": "读取供应商报价与订单明细。", "category": "连接器", "tags": ["XLSX"], "includes": ["报价表", "订单明细"], "status": "available"},
+        {"id": "bag-export", "tab": "suites", "name": "包袋出口全流程", "description": "询盘、规格、报价、打样、订单、生产准备的连续工作台。", "category": "业务套件", "tags": ["LangGraph", "证据链"], "includes": ["Agent 工具", "版本与门禁", "知识/资产库"], "status": "available" if agent_ok else "disabled"},
+    ]
+    return {"items": items_out}

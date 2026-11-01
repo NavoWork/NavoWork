@@ -381,22 +381,37 @@
 .ic-board .react-flow__attribution a {
   color: var(--navo-color-text-muted);
 }
-.ic-board-label {
-  pointer-events: none !important;
+.ic-board-tools {
   display: flex;
-  flex-direction: column;
-  gap: 5px;
-  margin: 17px 20px !important;
+  align-items: center;
+  gap: 6px;
 }
-.ic-board-label > span {
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.13em;
-  color: var(--navo-color-text-muted);
+.ic-canvas-help {
+  position: relative;
 }
-.ic-board-label > small {
-  font-size: 10px;
-  color: var(--navo-color-text-muted);
+.ic-canvas-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 10;
+  width: 232px;
+  max-width: calc(100vw - 48px);
+  padding: 10px 12px;
+  border: 1px solid var(--navo-color-border-subtle);
+  border-radius: 7px;
+  background: var(--navo-color-surface);
+  box-shadow: 0 6px 20px #0002;
+  color: var(--navo-color-text-secondary);
+  font-size: 11px;
+  line-height: 1.7;
+}
+.ic-canvas-tooltip::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  height: 8px;
 }
 .ic-arrange {
   display: flex;
@@ -914,9 +929,6 @@
 .iw-canvas-page.iw-focus-chat .iw-panel-resizer {
   display: none;
 }
-.iw-canvas-page.iw-focus-results .iw-panel-resizer {
-  display: none;
-}
 .iw-canvas-page .iw-assistant {
   display: flex;
   flex-direction: column;
@@ -1055,33 +1067,17 @@
 .iw-canvas-page.iw-focus-chat .iw-assistant {
   display: none;
 }
-.iw-canvas-page.iw-focus-results .iw-conversation {
-  display: none;
-}
-.iw-canvas-page.iw-focus-results .iw-ai-chat > .iw-composer {
-  width: calc(100% - 64px);
-  max-width: 860px;
-  margin: 10px auto 7px;
-}
-.iw-canvas-page.iw-focus-results .iw-messages {
-  width: calc(100% - 64px);
-  max-width: 860px;
-  margin-left: auto;
-  margin-right: auto;
-  padding-left: 0;
-  padding-right: 0;
-}
-.iw-canvas-page .iw-ai-chat > .iw-composer {
+:is(.iw-canvas-page, .wbv2) .iw-ai-chat > .iw-composer {
   margin: 10px 16px 7px;
   padding: 9px 11px;
   border-radius: 12px;
   box-shadow: none;
 }
-.iw-canvas-page .iw-composer textarea {
+:is(.iw-canvas-page, .wbv2) .iw-composer textarea {
   min-height: 40px;
   max-height: 100px;
 }
-.iw-canvas-page .iw-case-actions {
+:is(.iw-canvas-page, .wbv2) .iw-case-actions {
   padding-bottom: 9px;
   gap: 15px;
 }
@@ -1134,9 +1130,6 @@
   }
   .ic-directory-resizer {
     display: none;
-  }
-  .ic-board-label {
-    margin-left: 12px !important;
   }
   .ic-statusbar > span:last-child,
   .ic-arrange {

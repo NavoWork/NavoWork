@@ -1,180 +1,289 @@
-"""Add a reproducible demo batch without resetting existing work.
+"""Seed the Workbench v2 demo: sources, knowledge and assets only.
 
-Run from repository root: backend/.venv/Scripts/python.exe demo/seed.py
-Use --batch rehearsal2 for a fresh set of cases, never an in-place reset.
+This script deliberately does NOT create revisions, specs, quotations,
+approvals, samples, orders or production packs. The user advances each node
+through the Agent. Run from the repository root:
+
+    python demo/seed.py
 """
 from __future__ import annotations
+
 import argparse
 import hashlib
-import json
 import mimetypes
 import os
-from pathlib import Path
-import re
 import sys
+from pathlib import Path
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from dev import local_env
+from dev import local_env  # noqa: E402
+
 os.environ.update(local_env())
 os.chdir(ROOT / "backend")
 sys.path.insert(0, str(ROOT / "backend"))
 
-from sqlalchemy import select
-from app.core import WORKSPACE_ID, bootstrap, create_item, decode, encode, item_view, store_blob
-from app.db import Base, SessionLocal, engine
-from app.models import Case, CaseAccess, Item, User, now
-from customer_profiles import customer_context
+from sqlalchemy import select  # noqa: E402
 
-PACK_ROOT = ROOT / "demo/competition_v1"
+from app.core import WORKSPACE_ID, bootstrap, create_item, decode, encode, item_view, store_blob  # noqa: E402
+from app.db import Base, SessionLocal, engine  # noqa: E402
+from app.models import Case, CaseAccess, Item, User, now  # noqa: E402
+from app.sop_api import _extract_file  # noqa: E402
+from app.workbench import next_stage_action, stage_state  # noqa: E402
 
-
-DEFAULT_BATCH = "intake"
-RESOURCE_VERSION = 2
-INITIAL_FILES = {"de_a": "inquiry", "de_b": "inquiry", "de_c": "inquiry", "mx": "mx_inquiry", "uk": "uk_inquiry"}
+PACK = ROOT / "demo/workbench_v2"
 
 
-def asset(db, user, file, *, root=PACK_ROOT, namespace="competition_v1"):
-    """Keep source bytes immutable; a changed source becomes a new asset version."""
-    from app.sop_api import _extract_file
-    identifier = f"demoasset_{namespace}_{file['key']}"
-    path = root / file["file"]
-    data = path.read_bytes()
-    digest = hashlib.sha256(data).hexdigest()
-    rows = list(db.scalars(select(Item).where(Item.kind == "asset", Item.parent_id == identifier).order_by(Item.version.desc())))
-    if rows and item_view(rows[0]).get("sha256") == digest:
-        return item_view(rows[0])
-    version = (rows[0].version + 1) if rows else 1
+def ensure_resource(db, user, slug: str, title: str, folder: str, path: Path, *, case_id: str | None = None, facts: dict | None = None):
+    source_id = f"kb_workbench_{slug}"
+    content = path.read_text(encoding="utf-8")
+    row = db.get(Item, f"{source_id}:v1")
+    value = {
+        "id": source_id,
+        "sourceId": source_id,
+        "kind": "knowledge",
+        "title": title,
+        "folder": folder,
+        "content": content,
+        "status": "published",
+        "version": 1,
+        "editVersion": 1,
+        "ownerId": user.id,
+        "updatedAt": now(),
+        "caseId": case_id,
+        "facts": facts or {},
+    }
+    if row:
+        row.payload = encode(value)
+        row.status = "published"
+    else:
+        create_item(db, "resource", value, item_id=f"{source_id}:v1", parent_id=source_id, status="published")
+    return f"{source_id}:v1"
+
+
+def ensure_asset(db, user, key: str, path: Path, folder: str):
+    asset_id = f"asset_workbench_{key}"
+    row = db.get(Item, f"{asset_id}:v1")
+    if row:
+        return item_view(row)
     media = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
-    blob = store_blob(db, data, path.name, media)
-    stage = file.get("stage") or ("requirements" if "inquiry" in file["key"] else "supplier-costing" if file["role"] == "supplier_quote" else "order" if file.get("future") else "specification")
-    value = {"id": identifier, "name": path.name, "title": file.get("title", path.name), "version": version,
-             "space": "company", "ownerId": user.id, "folder": file.get("folder") or {"requirements": "询盘资料", "specification": "产品与规格", "supplier-costing": "供应商报价", "order": "样品与订单"}.get(stage, "业务资料"),
-             "mediaType": media, "size": blob.byte_size, "blobId": blob.id, "createdAt": now(),
-             "skuScope": [], "locale": "zh-CN", "source": file.get("source", "业务资料"), "simulation": True,
-             "sourceRole": file["role"], "stage": stage, "textContent": _extract_file(data, path.name),
-             "sha256": digest, "sourceGroup": namespace, "requiresExplicitSelection": True}
-    create_item(db, "asset", value, item_id=f"{identifier}:v{version}", parent_id=identifier, version=version)
+    blob = store_blob(db, path.read_bytes(), path.name, media)
+    value = {
+        "id": asset_id,
+        "name": path.name,
+        "title": path.stem.replace("-", " ").title(),
+        "version": 1,
+        "space": "company",
+        "ownerId": user.id,
+        "folder": folder,
+        "mediaType": media,
+        "size": blob.byte_size,
+        "blobId": blob.id,
+        "createdAt": now(),
+        "skuScope": [],
+        "locale": "zh-CN",
+        "source": "Nordlicht 项目资料",
+    }
+    create_item(db, "asset", value, item_id=f"{asset_id}:v1", parent_id=asset_id)
     return value
 
 
-def core_assets(db, user):
-    root = ROOT / "test/core15"
-    manifest_path = root / "manifest.json"
-    if not manifest_path.exists():
-        return {}
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    stage_map = {1: ("requirements", "客户与询盘", "internal_note"), 2: ("requirements", "客户与询盘", "customer_request"),
-        3: ("requirements", "客户与询盘", "internal_note"), 4: ("specification", "需求与规格", "customer_request"),
-        5: ("specification", "需求与规格", "customer_request"), 6: ("check-quality", "包装与验货", "customer_request"),
-        7: ("specification", "需求与规格", "customer_approval"), 8: ("supplier-costing", "询价与核价", "supplier_quote"),
-        9: ("supplier-costing", "询价与核价", "internal_note"), 10: ("quotation", "询价与核价", "internal_note"),
-        11: ("sample-feedback", "打样与确认", "internal_note"), 12: ("sample-feedback", "打样与确认", "sample_inspection"),
-        13: ("sample-feedback", "打样与确认", "customer_approval"), 14: ("po-check", "订单与合同", "customer_po"),
-        15: ("production", "订单与合同", "customer_request")}
-    result = {}
-    for category in manifest["categories"]:
-        stage, folder, role = stage_map[category["id"]]
-        for filename in category["files"]:
-            if not (root / filename).exists():
-                continue
-            if filename.startswith(("14b_", "14c_")):
-                role = "internal_note"
-            file = {"key": Path(filename).stem, "file": filename, "role": role, "stage": stage,
-                    "folder": "核心业务资料/" + folder, "title": category["name_zh"] + " · " + Path(filename).stem,
-                    "source": "BAG-2026-DE-001 · V3 资料档案"}
-            result[file["key"]] = asset(db, user, file, root=root, namespace="core15")
-    roles = {"E01": "customer_approval", "E02": "supplier_confirmation", "E03": "sample_inspection", "E04": "customer_approval", "E05": "internal_note", "E06": "internal_note"}
-    for source in manifest["evidence"]:
-        file = {"key": Path(source["path"]).stem, "file": source["path"], "role": roles.get(source.get("alias"), "customer_change" if "change" in source["path"] else "customer_request"),
-                "stage": "sample-feedback" if "sample" in source["path"] else "specification", "folder": "核心业务资料/往来原件", "source": "BAG-2026-DE-001 · 往来原件"}
-        result[file["key"]] = asset(db, user, file, root=root, namespace="core15")
-    return result
+def evidence(db, case: Case, key: str, filename: str, role: str, title: str | None = None):
+    path = PACK / "sources" / filename
+    data = path.read_bytes()
+    media = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    blob = store_blob(db, data, path.name, media, case.id)
+    item_id = f"ev_workbench_{case.id}_{key}"
+    text = _extract_file(data, path.name)
+    value = {
+        "id": item_id,
+        "caseId": case.id,
+        "title": title or path.name,
+        "sourceRole": role,
+        "blobId": blob.id,
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "text": text,
+        "parseStatus": "pending",
+        "status": "observed",
+        "createdAt": now(),
+    }
+    create_item(db, "evidence", value, case_id=case.id, item_id=item_id, status="observed")
+    return item_id
 
 
-def seed(batch=DEFAULT_BATCH, email=None):
+CUSTOMERS = {
+    "de": {
+        "channel": "website",
+        "sourceRef": "官网询盘表单 #NL-2026-0412",
+        "email": "michael.weber@nordlicht-outdoor.de",
+        "website": "https://nordlicht-outdoor.de",
+        "linkedin": "https://www.linkedin.com/company/nordlicht-outdoor",
+        "company": "Nordlicht Outdoor GmbH",
+        "country": "Germany",
+        "business": "户外用品零售与自有品牌开发；门店与线上渠道，背包、旅行配件为主。",
+        "summary": "客户名称、域名与联系邮箱一致；采购决策人尚未确认，付款信誉与公司注册信息需在订单前核验。",
+        "checks": [
+            {"label": "公司名称与域名", "status": "matched", "detail": "邮件域名与官网一致"},
+            {"label": "采购决策人", "status": "review", "detail": "Michael Weber 的采购权限待确认"},
+            {"label": "付款信誉", "status": "pending", "detail": "首次合作，订单前核验"},
+        ],
+    },
+    "mx": {
+        "channel": "amazon",
+        "sourceRef": "Amazon 商家询盘 MX-2026-118",
+        "email": "sofia@casa-verde.mx",
+        "website": "",
+        "linkedin": "",
+        "company": "Casa Verde",
+        "country": "Mexico",
+        "business": "生活方式礼品与帆布袋零售；线上店铺为主，希望先做小批量试单。",
+        "summary": "客户为墨西哥城礼品零售商；首单数量低于常规 MOQ，需先确认数量与交期。",
+        "checks": [
+            {"label": "公司名称与邮箱", "status": "matched", "detail": "邮件签名与询盘信息一致"},
+            {"label": "采购数量", "status": "review", "detail": "300 件低于工厂 MOQ 500"},
+            {"label": "付款信誉", "status": "pending", "detail": "首次合作，订单前核验"},
+        ],
+    },
+    "uk": {
+        "channel": "email",
+        "sourceRef": "邮件询盘 UK-2026-077",
+        "email": "emma@harbor-promotions.co.uk",
+        "website": "",
+        "linkedin": "",
+        "company": "Harbor Promotions",
+        "country": "United Kingdom",
+        "business": "促销礼品代理商，终端客户活动采购。",
+        "summary": "询盘信息不足：只有产品大类、目的地和可能的 Logo 需求，数量和规格未提供。",
+        "checks": [
+            {"label": "公司名称与邮箱", "status": "matched", "detail": "公司域名邮箱"},
+            {"label": "产品与数量", "status": "pending", "detail": "未提供具体产品、尺寸和数量"},
+            {"label": "交期", "status": "pending", "detail": "仅写 as soon as possible"},
+        ],
+    },
+}
+
+CASES = {
+    "de": {
+        "id": "inq_demo_de",
+        "title": "Nordlicht Outdoor · 定制通勤背包",
+        "customer": "Michael Weber / Nordlicht Outdoor",
+        "original": "de-inquiry.eml",
+        "destination": "Hamburg, Germany",
+        "nextAction": "阅读询盘，整理客户背景与需求；再让 Agent 生成 Tech Pack 与 BOM",
+        "files": [
+            ("inquiry", "de-inquiry.eml", "customer_request", "客户询盘"),
+            ("quote_a", "supplier-a-quote.txt", "supplier_quote", "工厂 A 报价"),
+            ("quote_b", "supplier-b-quote.txt", "supplier_quote", "工厂 B 报价"),
+            ("quote_a_box", "supplier-a-colorbox.txt", "supplier_quote", "工厂 A 彩盒补充报价"),
+            ("change", "customer-change.eml", "customer_change", "客户包装变更"),
+            ("po", "po-de-001.txt", "customer_po", "客户 PO"),
+            ("sample_feedback", "sample-feedback.eml", "sample_inspection", "样品反馈"),
+            ("spec_approval", "customer-spec-approval.eml", "customer_approval", "客户规格批准"),
+            ("sample_approval", "customer-sample-approval.eml", "customer_approval", "客户样品批准"),
+            ("internal_quote", "internal-quotation-approval.eml", "internal_note", "内部报价批准"),
+            ("seller_accept", "seller-order-acceptance.eml", "internal_note", "卖方订单确认"),
+            ("supplier_confirm", "supplier-production-confirmation.eml", "supplier_confirmation", "供应商生产确认"),
+            ("payment", "payment-advice.txt", "payment_receipt", "定金到账凭据"),
+        ],
+    },
+    "mx": {
+        "id": "inq_demo_mx",
+        "title": "Casa Verde · 帆布袋试单",
+        "customer": "Sofia Martinez / Casa Verde",
+        "original": "mx-inquiry.eml",
+        "destination": "Mexico City, Mexico",
+        "nextAction": "先确认 300 件与 MOQ 500 的差异，再整理规格",
+        "files": [
+            ("inquiry", "mx-inquiry.eml", "customer_request", "客户询盘"),
+            ("quote", "mx-supplier-quote.txt", "supplier_quote", "工厂 M 报价"),
+        ],
+    },
+    "uk": {
+        "id": "inq_demo_uk",
+        "title": "Harbor Promotions · 信息不足询盘",
+        "customer": "Emma Brown / Harbor Promotions",
+        "original": "uk-inquiry.eml",
+        "destination": "London, United Kingdom",
+        "nextAction": "先澄清产品、数量、规格和交期；不要报价",
+        "files": [
+            ("inquiry", "uk-inquiry.eml", "customer_request", "客户询盘"),
+        ],
+    },
+}
+
+WIKI = [
+    ("customer", "客户与询盘评估", "业务流程", "01-customer-inquiry.md"),
+    ("techpack", "箱包 Tech Pack 与 BOM", "产品与规格", "02-bag-techpack.md"),
+    ("costing", "成本核算与报价", "报价与条款", "03-costing-quotation.md"),
+    ("trade", "贸易术语与付款方式", "报价与条款", "04-trade-terms.md"),
+    ("sample", "打样与样品确认", "样品与订单", "05-sample.md"),
+    ("order", "订单、PI 与付款保障", "样品与订单", "06-order-pi.md"),
+    ("production", "生产资料、T&A 与验货", "生产与验货", "07-production-qc.md"),
+    ("materials", "箱包材料与辅料参考", "产品与规格", "08-bag-materials.md"),
+]
+
+CASE_WIKI = [
+    ("case-nordlicht", "Nordlicht Outdoor · 采购补充确认", "项目确认", "case-nordlicht-confirmation.md", "de", {"fx": "7.20", "margin": "0.2", "quantity": 3000}),
+    ("case-casa-verde", "Casa Verde · 帆布袋试单确认", "项目确认", "case-casa-verde-confirmation.md", "mx", {"fx": "7.20", "margin": "0.25", "quantity": 600}),
+    ("case-harbor", "Harbor Promotions · 需求补充确认", "项目确认", "case-harbor-promotions-confirmation.md", "uk", {"fx": "7.20", "margin": "0.2", "quantity": 800}),
+]
+
+
+def seed(email: str | None = None):
     if os.getenv("APP_ENV", "demo") != "demo":
         raise SystemExit("演示包只允许在 APP_ENV=demo 环境导入")
-    if not re.fullmatch(r"[a-z0-9_-]{1,32}", batch):
-        raise SystemExit("batch 仅允许 1-32 位小写字母、数字、横线和下划线")
-    pack = json.loads((PACK_ROOT / "pack.json").read_text(encoding="utf-8"))
-    for file in pack["files"]:
-        if not (PACK_ROOT / file["file"]).exists():
-            raise SystemExit(f"缺少材料：{file['file']}")
     Base.metadata.create_all(engine)
-    report = {"batch": batch, "simulation": True, "cases": {}, "sources": {}, "assets": {}}
     with SessionLocal() as db:
         bootstrap(db)
         user = db.scalar(select(User).where(User.email == (email or os.getenv("DEMO_EMAIL", "demo@navowork.local")).lower()))
         if not user:
-            raise SystemExit("目标账户不存在；请先创建或登录账户")
-        for wiki in pack["wiki"]:
-            source_id = f"demo_knowledge_{wiki['key']}"
-            content = (PACK_ROOT / wiki["file"]).read_text(encoding="utf-8")
-            rows = list(db.scalars(select(Item).where(Item.kind == "resource", Item.parent_id == source_id).order_by(Item.version.desc())))
-            latest = item_view(rows[0]) if rows else None
-            if latest and latest.get("content") == content and latest.get("title") == wiki["title"]:
-                row = rows[0]
-            else:
-                version = rows[0].version + 1 if rows else 1
-                row = create_item(db, "resource", {"id": source_id, "sourceId": source_id, "kind": "knowledge", "title": wiki["title"], "folder": wiki["folder"], "content": content,
-                    "status": "published", "version": version, "editVersion": 1, "ownerId": user.id, "updatedAt": now()}, item_id=f"{source_id}:v{version}", parent_id=source_id, status="published", version=version)
-            report["sources"][wiki["key"]] = row.id
-        assets = {f["key"]: asset(db, user, f) for f in pack["files"]}
-        imported_core = core_assets(db, user)
-        report["assets"] = {k: f"{v['id']}:v{v['version']}" for k, v in assets.items()}
-        report["core15Assets"] = {k: f"{v['id']}:v{v['version']}" for k, v in imported_core.items()}
+            raise SystemExit("目标账户不存在；请先创建演示账户")
+        for slug, title, folder, filename in WIKI:
+            ensure_resource(db, user, slug, title, folder, PACK / "wiki" / filename)
+        for key, filename, folder in (
+            ("product", "product-reference.svg", "产品图片"),
+            ("po", "po-de-001.txt", "订单与单证"),
+            ("payment", "payment-advice.txt", "订单与单证"),
+        ):
+            ensure_asset(db, user, key, PACK / "sources" / filename, folder)
         db.flush()
-        for scenario in reversed(pack["scenarios"]):
-            key = scenario["key"]
-            case_id = f"inq_{batch}_{key}"
-            existing = db.get(Case, case_id)
+        for key, scenario in CASES.items():
+            path = PACK / "sources" / scenario["original"]
+            original = path.read_text(encoding="utf-8")
+            existing = db.get(Case, scenario["id"])
             if existing:
-                if not db.get(CaseAccess, (case_id, user.id)):
-                    raise SystemExit("同名批次不属于当前账户，请使用新的 --batch")
-                report["cases"][key] = {"id": case_id, "title": decode(existing.payload)["title"], "preserved": True}
+                print(f"{key}: 已存在，保留 {scenario['id']}")
                 continue
-            payload = {"title": scenario["title"], "customer": scenario["customer"], "originalText": scenario["originalText"],
-                "requestedLocales": ["en-US", "es-MX"], "destination": scenario["destination"], "nextAction": scenario["nextAction"],
-                "simulation": True, "demoBatch": batch, "demoScenario": key, "customerContext": customer_context(key)}
-            case = Case(id=case_id, workspace_id=WORKSPACE_ID, owner_id=user.id, status="todo", payload=encode(payload))
-            db.add(case); db.flush()
-            db.add(CaseAccess(case_id=case_id, user_id=user.id))
-            create_item(db, "message", {"inquiryId": case_id, "role": "user", "text": scenario["originalText"], "createdAt": now()}, case_id=case_id, item_id=f"demoinquiry_{case_id}")
-            file = next(f for f in pack["files"] if f["key"] == INITIAL_FILES[key])
-            a = assets[file["key"]]
-            ev_id = f"demoevidence_{case_id}_{file['key']}"
-            create_item(db, "evidence", {"id": ev_id, "caseId": case_id, "title": a["name"], "sourceRole": "customer_request", "blobId": a["blobId"],
-                "sha256": a["sha256"], "text": a["textContent"], "parseStatus": "pending", "simulation": True, "status": "observed", "createdAt": now()}, case_id=case_id, item_id=ev_id, status="observed")
-            file_entry = {"id": f"asset:{a['id']}:v{a['version']}", "assetId": a["id"], "version": a["version"], "name": a["name"], "title": a["title"], "mediaType": a["mediaType"], "size": a["size"], "folder": "materials"}
-            canvas = {"schema": 1, "positions": {}, "tabs": [], "active": "", "folders": [], "notes": [], "files": [file_entry], "drafts": {}, "initialRevision": 0, "results": []}
-            create_item(db, "canvas", canvas, case_id=case_id, parent_id=user.id, item_id=f"canvas:{case_id}:{user.id}")
-            report["cases"][key] = {"id": case_id, "title": scenario["title"], "evidence": {file["key"]: ev_id}, "offers": {}, "revision": 0}
+            payload = {
+                "title": scenario["title"],
+                "customer": scenario["customer"],
+                "originalText": original,
+                "requestedLocales": ["en-US"],
+                "destination": scenario["destination"],
+                "nextAction": scenario["nextAction"],
+                "customerContext": CUSTOMERS[key],
+            }
+            case = Case(id=scenario["id"], workspace_id=WORKSPACE_ID, owner_id=user.id, payload=encode(payload), status="todo")
+            db.add(case)
+            db.flush()
+            db.add(CaseAccess(case_id=case.id, user_id=user.id))
+            for file_key, filename, role, title in scenario["files"]:
+                evidence(db, case, file_key, filename, role, title)
+            db.flush()
+            case.payload = encode({**decode(case.payload), "nextAction": next_stage_action(stage_state(db, case))})
+        for slug, title, folder, filename, case_key, facts in CASE_WIKI:
+            ensure_resource(db, user, slug, title, folder, PACK / "wiki" / filename, case_id=CASES[case_key]["id"], facts=facts)
         db.commit()
-    out = ROOT / "backend/data" / f"demo-{batch}.json"
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
-    for key, value in report["cases"].items():
-        print(f"{key}: http://127.0.0.1:5173/inquiries/{value['id']}" + (" (existing work preserved)" if value.get("preserved") else ""))
-    print(f"Wiki: {len(report['sources'])}; company assets: {len(assets) + len(imported_core)}; cases: {len(report['cases'])}. New cases contain original inquiries only.")
-    return report
-
-
-def production_templates(case_id, pack):
-    return {
-        "pi": {"buyer":"Nordlicht Outdoor GmbH", "seller":"NavoWork Trading", "product":"BP-DE-3000 backpack / CB-02", "quantity":3000, "unitPrice":"9.21", "total":"27630.00", "currency":"USD", "incoterm":"FOB", "namedPlace":"Ningbo", "incotermsVersion":"2020", "paymentTerms":"30% deposit USD8289; 70% balance USD19341 before shipment", "po":"PO-DE-001-V2", "bilateralConfirmation":None, "status":"draft", "simulation":True},
-        "production": {"product":"BP-DE-3000", "quantity":3000, "specification":pack["spec2"], "sample":"SMP-DE-CB02", "packagingArtwork":"CB-02", "productionLeadDays":31, "startsAfter":"All release prerequisites met", "released":False, "status":"draft", "simulation":True},
-        "ta": {"anchor":"D0 = human release after all approvals and payment assurance; no fixed arrival commitment", "tasks":[{"day":"D0-D3", "task":"material and artwork reconfirmation", "owner":"Factory A"}, {"day":"D4-D9", "task":"cutting and embroidery", "owner":"Factory A"}, {"day":"D10-D22", "task":"sewing and assembly", "owner":"Factory A"}, {"day":"D23-D27", "task":"finishing and internal QC", "owner":"Factory A"}, {"day":"D28-D31", "task":"packing and agreed pre-shipment inspection", "owner":"Factory / inspector"}], "shipping":"booking and sea transit pending", "status":"draft", "simulation":True},
-        "qc": {"standard":pack["spec2"]["inspectionStandard"], "checks":["dimensions and tolerance", "material / color", "logo and placement", "stitches / zippers / straps", "laptop sleeve and pockets", "CB-02 artwork and box fit", "20 pcs/carton and marks"], "result":None, "inspectionEvidence":None, "status":"draft", "simulation":True},
-    }
+    print("Workbench v2 seed complete. No revisions, artifacts or approvals were created.")
+    for key, scenario in CASES.items():
+        print(f"{key}: http://127.0.0.1:5173/inquiries/{scenario['id']}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--batch", default=DEFAULT_BATCH)
     parser.add_argument("--email")
     args = parser.parse_args()
-    seed(args.batch, args.email)
+    seed(args.email)

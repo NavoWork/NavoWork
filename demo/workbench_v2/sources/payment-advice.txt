@@ -1,0 +1,8 @@
+PAYMENT ADVICE
+Payer: Nordlicht Outdoor GmbH
+Beneficiary: NavoWork Trading Co., Ltd.
+Reference: PO-DE-001 deposit
+Amount: USD 8,289.00 (30% of USD 27,630.00)
+Value date: 2026-11-25
+Bank: Demo Trade Bank, Ningbo branch
+Status: received by beneficiary bank

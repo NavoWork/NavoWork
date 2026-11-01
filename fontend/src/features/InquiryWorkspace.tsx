@@ -3,7 +3,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation } from 'react-router-dom';
 import {
   ArrowRight,
-  ArrowUp,
   BookOpen,
   Check,
   CheckCheck,
@@ -15,11 +14,8 @@ import {
   History,
   LayoutGrid,
   MessageSquare,
-  PanelLeftClose,
-  PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
-  Paperclip,
   ShieldCheck,
   Sparkles,
   Square,
@@ -42,12 +38,22 @@ import { EmptyState, ErrorNotice, Loading, Modal, StatusBadge } from '../compone
 import { ReplyEditor, type DraftState } from './inquiry-replies';
 import { InquiryResult } from './InquiryResult';
 import { InquiryRunActivity } from './InquiryRunActivity';
-import { InquiryProgress } from './InquiryProgress';
-import { createKnowledgeQuoteRun } from './knowledge-quote';
-import { SuggestedMessages } from './SuggestedMessages';
-import type { WorkspaceConfiguration } from './WorkspaceSettings';
-import { resultSnapshot, type SavedResult } from './inquiry-canvas-model';
+import {
+  inquiryAssetsChangedEvent,
+  resultSnapshot,
+  type SavedResult,
+} from './inquiry-canvas-model';
 import { InquiryCanvas } from './InquiryCanvas';
+import { InquiryChatHeading, InquiryChatTranscript } from './InquiryChatTranscript';
+import { InquiryComposer } from './InquiryComposer';
+import { useAvailableSkills } from './skill-catalog';
+import { InvocationContext } from './InvocationContext';
+import {
+  emptyComposerContext,
+  restoreContext,
+  runContext,
+  type ComposerContext,
+} from './inquiry-context';
 import { GenerateNodeDialog, type GenerationNode } from './GenerateNodeDialog';
 import { CustomerContextCard, channelLabels } from './CustomerContextCard';
 import { ResizeHandle } from '../components/ResizeHandle';
@@ -76,8 +82,9 @@ function readPref<T>(key: string, fallback: T): T {
 function writePref(key: string, value: unknown) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
+    return true;
   } catch {
-    /* Storage is optional for view preferences. */
+    return false;
   }
 }
 
@@ -99,42 +106,38 @@ export function InquiryWorkspace({
   const initial = useRef(
     readPref(prefKey, {
       input: '',
+      composerContext: emptyComposerContext(),
       deferredResults: [] as number[],
       revision: null as number | null,
       lastRunId: '',
       selectedAssets: null as string[] | null,
       assistantWidth: null as number | null,
-      workspaceOpen: true,
-      assistantOpen: true,
     }),
   );
   const [input, setInput] = useState(initial.current.input);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-  const [aiEditOpen, setAiEditOpen] = useState(false);
-  const [aiEditRequest, setAiEditRequest] = useState('');
-  const [aiEditDraft, setAiEditDraft] = useState('');
-  const [aiEditPreview, setAiEditPreview] = useState('');
-  function chooseSuggestion(message: string) {
-    setInput(message);
-    requestAnimationFrame(() => {
-      const textarea = inputRef.current;
-      textarea?.focus();
-      const placeholder = message.match(/【请[^】]+】/);
-      if (textarea && placeholder?.index !== undefined) textarea.setSelectionRange(placeholder.index, placeholder.index + placeholder[0].length);
-    });
-  }
+  const catalog = useAvailableSkills(session);
+  const [composerContext, setComposerContext] = useState<ComposerContext>(
+    initial.current.composerContext || emptyComposerContext(),
+  );
+  const [draftStored, setDraftStored] = useState(true);
   const [selectedSources, setSelectedSources] = useState<string[] | null>(null);
   const [offerId, setOfferId] = useState('');
   const [costInputs, setCostInputs] = useState({ exchangeRate: '', margin: '', quantity: '' });
-  const configuration = useQuery({ queryKey: ['workspace-settings', session.workspace.id], enabled: mode === 'real' && active, queryFn: ({ signal }) => api.get<WorkspaceConfiguration>(`${base}/settings`, signal) });
-  useEffect(() => {
-    if (!configuration.data) return;
-    setCostInputs(old => ({ ...old, exchangeRate: old.exchangeRate || configuration.data!.pricing.exchangeRate, margin: old.margin || configuration.data!.pricing.targetMargin }));
-  }, [configuration.data]);
-  const references = useQuery({ queryKey: ['inquiry-reference-library', scope], enabled: mode === 'real' && active,
-    queryFn: ({ signal }) => api.get<{ items: (Source & { sourceVersionId?: string })[] }>(`${base}/sources`, signal) });
-  const supplierOffers = useQuery({ queryKey: ['inquiry-offers', scope], enabled: mode === 'real' && active,
-    queryFn: ({ signal }) => api.get<{ items: { id: string; supplier: string; moq: number }[] }>(`${path}/supplier-offers`, signal) });
+  const references = useQuery({
+    queryKey: ['inquiry-reference-library', scope],
+    enabled: mode === 'real' && active,
+    queryFn: ({ signal }) =>
+      api.get<{ items: (Source & { sourceVersionId?: string })[] }>(`${base}/sources`, signal),
+  });
+  const supplierOffers = useQuery({
+    queryKey: ['inquiry-offers', scope],
+    enabled: mode === 'real' && active,
+    queryFn: ({ signal }) =>
+      api.get<{ items: { id: string; supplier: string; moq: number }[] }>(
+        `${path}/supplier-offers`,
+        signal,
+      ),
+  });
   const [deferredResults, setDeferredResults] = useState<number[]>(
     initial.current.deferredResults || [],
   );
@@ -149,18 +152,16 @@ export function InquiryWorkspace({
     initial.current.selectedAssets ?? null,
   );
   const [mobilePane, setMobilePane] = useState<'chat' | 'results'>('chat');
-  const [workspaceOpen, setWorkspaceOpen] = useState(initial.current.workspaceOpen ?? true);
   const [documentRequest, setDocumentRequest] = useState<{ id: string; seq: number } | null>(null);
   const openDocument = (id: string) => {
-    setWorkspaceOpen(true);
     setMobilePane('chat');
     setDocumentRequest((old) => ({ id, seq: (old?.seq || 0) + 1 }));
   };
-  const [resultsOpen, setResultsOpen] = useState(initial.current.assistantOpen ?? true);
   const showAIChat = () => {
     setResultsOpen(true);
     setMobilePane('results');
   };
+  const [resultsOpen, setResultsOpen] = useState(true);
   const [assistantWidth, setAssistantWidth] = useState<number | null>(
     typeof initial.current.assistantWidth === 'number' &&
       Number.isFinite(initial.current.assistantWidth)
@@ -177,7 +178,10 @@ export function InquiryWorkspace({
   const [error, setError] = useState<unknown>();
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
-  const [generation, setGeneration] = useState<{ node: GenerationNode; instruction?: string } | null>(null);
+  const [generation, setGeneration] = useState<{
+    node: GenerationNode;
+    instruction?: string;
+  } | null>(null);
   const [draftState, setDraftState] = useState<DraftState>({
     revision: null,
     versions: {},
@@ -187,6 +191,9 @@ export function InquiryWorkspace({
   const [exportResult, setExportResult] = useState<ExportResult | null>(null);
   const [draftRefresh, setDraftRefresh] = useState(0);
   const queryClient = useQueryClient();
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent(inquiryAssetsChangedEvent, { detail: scope }));
+  }, [scope, draftState]);
   const changedRef = useRef(onChanged);
   changedRef.current = onChanged;
   const queryKey = ['inquiry', scope];
@@ -229,30 +236,29 @@ export function InquiryWorkspace({
     running;
   const handledRun = useRef('');
   const refresh = useCallback(async () => {
-    await Promise.all(['inquiry', 'inquiry-offers', 'inquiry-reference-library', 'business-artifacts', 'inquiry-progress', 'assets-for-inquiry', 'materials', 'message-suggestions'].map(key => queryClient.invalidateQueries({ queryKey: [key, scope] })));
-    await queryClient.invalidateQueries({ queryKey: ['library', session.workspace.id] });
+    await queryClient.invalidateQueries({ queryKey: ['inquiry', scope] });
     changedRef.current();
-  }, [queryClient, scope, session.workspace.id]);
+  }, [queryClient, scope]);
   useEffect(() => {
-    writePref(prefKey, {
-      input,
-      deferredResults,
-      revision: revisionNumber,
-      lastRunId,
-      selectedAssets,
-      assistantWidth,
-      workspaceOpen,
-      assistantOpen: resultsOpen,
-    });
+    setDraftStored(
+      writePref(prefKey, {
+        input,
+        composerContext,
+        deferredResults,
+        revision: revisionNumber,
+        lastRunId,
+        selectedAssets,
+        assistantWidth,
+      }),
+    );
   }, [
     input,
+    composerContext,
     deferredResults,
     revisionNumber,
     lastRunId,
     selectedAssets,
     assistantWidth,
-    workspaceOpen,
-    resultsOpen,
     prefKey,
   ]);
   useEffect(() => {
@@ -301,22 +307,48 @@ export function InquiryWorkspace({
   ) {
     if (!inquiry || running || (draftsPending && !!revision)) return;
     await operate(async () => {
-      const canvas = mode === 'real'
-        ? await api.get<{ state: { files?: { serverFileId?: string }[] } | null }>(`${path}/canvas`)
-        : null;
-      const canvasFileIds = canvas?.state?.files?.flatMap(file => file.serverFileId ? [file.serverFileId] : []) ?? [];
+      const canvas =
+        mode === 'real'
+          ? await api.get<{ state: { files?: { serverFileId?: string }[] } | null }>(
+              `${path}/canvas`,
+            )
+          : null;
+      const canvasFileIds =
+        canvas?.state?.files?.flatMap((file) => (file.serverFileId ? [file.serverFileId] : [])) ??
+        [];
+      const context = runContext(composerContext, catalog.skills);
+      const instruction =
+        evidence ||
+        input.trim() ||
+        (action === 'analyze'
+          ? '分析客户原始询盘，提取需求与待确认项'
+          : '根据当前事实更新方案与回复');
+      if (mode === 'real' && composerContext.knowledge.some((doc) => !doc.sourceVersionId))
+        throw new Error('引用中包含本机旧资料，请移除后从团队知识库重新选择。');
+      const sourceVersionIds = [
+        ...new Set([
+          ...(selectedSources ?? revision?.sourceRefs.map((s) => s.sourceVersionId) ?? []),
+          ...composerContext.knowledge.flatMap((doc) =>
+            doc.sourceVersionId ? [doc.sourceVersionId] : [],
+          ),
+        ]),
+      ];
       const r = await api.post<Run>(`${path}/runs`, {
         ...(mode === 'real' ? { canvasFileIds } : {}),
         baseRevision: inquiry.currentRevision,
         action,
+        context,
         assetVersionIds: selectedAssets ?? revision?.assetRefs ?? [],
-        ...(mode === 'real' ? { sourceVersionIds: selectedSources ?? revision?.sourceRefs.map(s => s.sourceVersionId) ?? [], ...(offerId ? { selectedSupplierOfferId: offerId, costInputs } : {}) } : {}),
+        ...(mode === 'real'
+          ? {
+              sourceVersionIds,
+              ...(offerId ? { selectedSupplierOfferId: offerId, costInputs } : {}),
+            }
+          : {}),
         instruction:
-          evidence ||
-          input.trim() ||
-          (action === 'analyze'
-            ? '分析客户原始询盘，提取需求与待确认项'
-            : '根据当前事实更新方案与回复'),
+          mode === 'real' && context?.skills.length
+            ? `${instruction}\n\n本次技能要求：\n${context.skills.map((skill) => `${skill.name}：${skill.instructions.join('；')}`).join('\n')}`
+            : instruction,
         ...(run?.status === 'needs_input'
           ? {
               replyToRunId: run.id,
@@ -338,6 +370,7 @@ export function InquiryWorkspace({
       });
       setLastRunId(r.runId || r.id);
       setInput('');
+      setComposerContext(emptyComposerContext());
       showAIChat();
       setModal(null);
       setRevisionNumber(null);
@@ -345,29 +378,23 @@ export function InquiryWorkspace({
       await refresh();
     });
   }
-  async function prepareKnowledgeQuote() {
-    if (!inquiry || readOnly || busy) return;
-    showAIChat();
-    await operate(async () => {
-      const next = await createKnowledgeQuoteRun(path, base, inquiry);
-      setLastRunId(next.runId || next.id);
-      setRevisionNumber(null);
-      queryClient.setQueryData(['run', scope, next.runId || next.id], next);
-      await refresh();
-    });
-  }
   async function restoreRevision(number: number, target: string): Promise<number | undefined> {
     if (!inquiry || running || busy) return;
     let created: number | undefined;
     await operate(async () => {
-      const result = await api.post<Revision>(`${path}/revisions/${number}/restore`, { baseRevision: inquiry.currentRevision, target });
+      const result = await api.post<Revision>(`${path}/revisions/${number}/restore`, {
+        baseRevision: inquiry.currentRevision,
+        target,
+      });
       created = result.number;
       setRevisionNumber(null);
       setLastRunId('');
-      setDraftRefresh(v => v + 1);
+      setDraftRefresh((v) => v + 1);
       setReview(null);
       await refresh();
-      setNotice(`已从 V${number} 恢复${target === 'all' ? '全部节点' : '所选节点'}到 V${result.number}，可以继续编辑。历史仍保留。`);
+      setNotice(
+        `已从 V${number} 恢复${target === 'all' ? '全部节点' : '所选节点'}到 V${result.number}，可以继续编辑。历史仍保留。`,
+      );
     });
     return created;
   }
@@ -451,36 +478,12 @@ export function InquiryWorkspace({
       <ErrorNotice error={detail.error || '未找到该询盘'} onRetry={() => void detail.refetch()} />
     );
   const canWrite = !readOnly && !busy;
-  const hasPlaceholder = /【请[^】]+】/.test(input);
-  const canSend = canWrite && !hasPlaceholder && (!revision || !draftsPending);
+  const canSend = canWrite && (!revision || !draftsPending);
   const resultMessage =
     revision &&
     [...(detail.data?.messages || [])]
       .reverse()
       .find((message) => message.role === 'assistant' && message.runId === revision.runId);
-  const orderedMessages = [...(detail.data?.messages || [])].sort((a, b) => {
-    const time = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-    return time || a.id.localeCompare(b.id);
-  });
-  const openAiEditor = () => {
-    if (!canWrite) return;
-    setAiEditDraft(input);
-    setAiEditPreview('');
-    setAiEditRequest('');
-    setAiEditOpen(true);
-  };
-  const generateAiEdit = () => {
-    const source = aiEditDraft.trim();
-    const request = aiEditRequest.trim();
-    if (!source || !request) return;
-    const asksForPricing = /核价|报价|价格|成本|汇率|毛利/.test(request);
-    const asksForReferences = /参考|资料|依据|来源/.test(request);
-    const additions = [
-      asksForReferences ? '参考资料：请补充供应商报价、历史成交记录和当前有效的产品规格版本，并标注每项资料的版本与更新时间。' : '',
-      asksForPricing ? '核价参数：请补充数量、供应商单件成本、包装费、本地费用、汇率、目标毛利率，并明确运费、税费是否包含。' : '',
-    ].filter(Boolean);
-    setAiEditPreview(`${source}\n\n${additions.join('\n')}\n${request}`.trim());
-  };
   const resultPreview = revision ? (
     <InquiryResult
       key={revision.number}
@@ -506,13 +509,8 @@ export function InquiryWorkspace({
       }}
     />
   ) : null;
-  const pageModeClass = !workspaceOpen
-    ? 'iw-focus-results'
-    : !resultsOpen
-      ? 'iw-focus-chat'
-      : '';
   return (
-    <div className={`iw-page iw-canvas-page ${pageModeClass}`}>
+    <div className={`iw-page iw-canvas-page ${resultsOpen ? '' : 'iw-focus-chat'}`}>
       <header className="iw-heading">
         <div className="iw-title">
           <h1>{inquiry.title}</h1>
@@ -528,34 +526,12 @@ export function InquiryWorkspace({
             导出草稿材料
           </button>
           <button
-            className="icon-button iw-pane-toggle-desktop"
-            aria-label={workspaceOpen ? '收起左侧工作区' : '展开左侧工作区'}
-            aria-expanded={workspaceOpen}
-            aria-controls={`workspace-${inquiryId}`}
-            title={workspaceOpen ? '收起左侧工作区' : '展开左侧工作区'}
-            onClick={() =>
-              setWorkspaceOpen((value) => {
-                const next = !value;
-                if (!next && !resultsOpen) setResultsOpen(true);
-                return next;
-              })
-            }
-          >
-            {workspaceOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
-          </button>
-          <button
-            className="icon-button iw-results-toggle iw-pane-toggle-desktop"
-            aria-label={resultsOpen ? '收起 AI 对话窗口' : '展开 AI 对话窗口'}
+            className="icon-button iw-results-toggle"
+            aria-label={resultsOpen ? '收起 AI 面板' : '展开 AI 面板'}
             aria-expanded={resultsOpen}
             aria-controls={`results-${inquiryId}`}
-            title={resultsOpen ? '收起 AI 对话窗口' : '展开 AI 对话窗口'}
-            onClick={() =>
-              setResultsOpen((value) => {
-                const next = !value;
-                if (!next && !workspaceOpen) setWorkspaceOpen(true);
-                return next;
-              })
-            }
+            title={resultsOpen ? '收起 AI 面板' : '展开 AI 面板'}
+            onClick={() => setResultsOpen((value) => !value)}
           >
             {resultsOpen ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
           </button>
@@ -583,7 +559,19 @@ export function InquiryWorkspace({
           <History size={16} />
           正在查看 V{revisionNumber} 历史快照，内容只读。
           <button onClick={() => setRevisionNumber(null)}>回到当前版本</button>
-          {mode === 'real' && <button disabled={busy || running || inquiry.businessStatus === 'done' || inquiry.businessStatus === 'waiting'} onClick={() => void restoreRevision(selectedNumber!, 'all')}>从此版本继续编辑</button>}
+          {mode === 'real' && (
+            <button
+              disabled={
+                busy ||
+                running ||
+                inquiry.businessStatus === 'done' ||
+                inquiry.businessStatus === 'waiting'
+              }
+              onClick={() => void restoreRevision(selectedNumber!, 'all')}
+            >
+              从此版本继续编辑
+            </button>
+          )}
         </div>
       )}
       {inquiry.businessStatus === 'done' && (
@@ -627,7 +615,6 @@ export function InquiryWorkspace({
           AI 助手
         </button>
       </div>
-      <InquiryProgress path={path} scope={scope} active={active} readOnly={!canWrite} onInstruction={text => { showAIChat(); chooseSuggestion(text); }} onPrepareQuote={mode === 'real' ? () => void prepareKnowledgeQuote() : undefined} onReviewQuote={() => openDocument('artifact:cost')} />
       <div
         ref={columnsRef}
         className={`iw-columns iw-show-${mobilePane}`}
@@ -637,15 +624,11 @@ export function InquiryWorkspace({
           } as CSSProperties
         }
       >
-        <section
-          className="iw-conversation iw-data-pane"
-          id={`workspace-${inquiryId}`}
-          aria-label="询盘画板与资料"
-        >
+        <section className="iw-conversation iw-data-pane" aria-label="询盘画板与资料">
           <div className="iw-panel-head">
             <h2>
               <MessageSquare size={16} />
-              工作画布
+              对话与进展
             </h2>
             <span className="iw-small-label">仅当前询盘</span>
           </div>
@@ -658,9 +641,19 @@ export function InquiryWorkspace({
             base={base}
             path={path}
             readOnly={readOnly}
-            onGenerate={mode === 'real' ? (node, instruction) => setGeneration({ node, instruction }) : undefined}
+            onGenerate={
+              mode === 'real'
+                ? (node, instruction) => setGeneration({ node, instruction })
+                : undefined
+            }
             onRestore={mode === 'real' ? restoreRevision : undefined}
-            canRestore={mode === 'real' && !busy && !running && inquiry.businessStatus !== 'done' && inquiry.businessStatus !== 'waiting'}
+            canRestore={
+              mode === 'real' &&
+              !busy &&
+              !running &&
+              inquiry.businessStatus !== 'done' &&
+              inquiry.businessStatus !== 'waiting'
+            }
             openRequest={documentRequest}
             saveResultRequest={saveResultRequest}
             onSavedResultsChange={setSavedResults}
@@ -689,6 +682,7 @@ export function InquiryWorkspace({
                       <time>{date(message.createdAt)}</time>
                     </header>
                     <p>{message.text}</p>
+                    <InvocationContext context={message.context} />
                   </article>
                 ))}
                 <button className="button" onClick={showAIChat}>
@@ -741,72 +735,35 @@ export function InquiryWorkspace({
             }
           />
         </section>
-        {workspaceOpen && resultsOpen && (
-          <ResizeHandle
-            label="调整 AI 面板宽度"
-            controls={`results-${inquiryId}`}
-            paneRef={assistantRef}
-            containerRef={columnsRef}
-            min={280}
-            max={720}
-            remainingMin={380}
-            direction={-1}
-            onResize={setAssistantWidth}
-            onReset={() => setAssistantWidth(null)}
-            className="iw-panel-resizer"
-          />
-        )}
+        <ResizeHandle
+          label="调整 AI 面板宽度"
+          controls={`results-${inquiryId}`}
+          paneRef={assistantRef}
+          containerRef={columnsRef}
+          min={280}
+          max={720}
+          remainingMin={380}
+          direction={-1}
+          onResize={setAssistantWidth}
+          onReset={() => setAssistantWidth(null)}
+          className="iw-panel-resizer"
+        />
         <section
           ref={assistantRef}
           className="iw-results iw-assistant"
           id={`results-${inquiryId}`}
           aria-label="AI 助手"
         >
-          <div className="iw-assistant-heading">
-            <h2>
-              <MessageSquare size={14} />
-              AI 对话
-            </h2>
-            <span>业务 Agent</span>
-          </div>
+          <InquiryChatHeading />
           <div className="iw-ai-chat">
             <div className="iw-messages" ref={messagesRef}>
-              <button className="iw-original" onClick={() => openDocument('original')}>
-                <FileText size={16} />
-                <div>
-                  <strong>客户原始询盘</strong>
-                  <small>{channelLabels[inquiry.customerContext?.channel || 'unknown']}{inquiry.customerContext?.email ? ` · ${inquiry.customerContext.email}` : ''}</small>
-                  <p>
-                    {inquiry.originalText.slice(0, 110)}
-                    {inquiry.originalText.length > 110 ? '…' : ''}
-                  </p>
-                </div>
-                <ChevronRight size={14} />
-              </button>
-              {!detail.data?.messages.length && (
-                <div className="iw-assistant-intro">
-                  <span className="iw-ai-mark">
-                    <Sparkles size={16} />
-                  </span>
-                  <h3>从这条询盘开始。</h3>
-                  <p>
-                    告诉我这一步要完成什么，我会查阅资料、更新文档，并把结果留在工作画布。
-                  </p>
-                </div>
-              )}
-              {orderedMessages.map((message) => (
-                <div key={message.id}>
-                  <article className={`iw-message ${message.role}`}>
-                    <div className="iw-message-meta">
-                      <span>{message.role === 'user' ? '你' : 'Navowork'}</span>
-                      <time>{date(message.createdAt)}</time>
-                    </div>
-                    <p>{message.text}</p>
-                  </article>
-                  {message.id === resultMessage?.id && resultPreview}
-                </div>
-              ))}
-              {!resultMessage && resultPreview}
+              <InquiryChatTranscript
+                inquiry={inquiry}
+                messages={detail.data?.messages || []}
+                onOriginal={() => openDocument('original')}
+                resultMessageId={resultMessage?.id}
+                resultPreview={resultPreview}
+              />
               {run && (
                 <div
                   className={`iw-run ${['queued', 'running'].includes(run.status) ? 'iw-run-active' : ''}`}
@@ -815,7 +772,7 @@ export function InquiryWorkspace({
                   aria-label="AI 处理进度"
                 >
                   <InquiryRunActivity key={run.id} run={run} />
-
+                  {running && <p className="iw-run-hint">可以切换其他询盘，结果会保存在这里。</p>}
                   {run.error && <ErrorNotice error={run.error.message} />}{' '}
                   {run.clarification?.questions.map((q) => (
                     <p key={q.id}>
@@ -824,18 +781,26 @@ export function InquiryWorkspace({
                   ))}
                   {!!run.fileOutputs?.length && (
                     <div aria-label="本次生成的文件">
-                      <p>本次文件</p>
-                      {run.fileOutputs.map(file => (
-                        <button key={file.file_id} className="button button-ghost" title={`SHA-256: ${file.sha256}`}
-                          onClick={() => void operate(async () => {
-                            const blob = await api.download(file.downloadUrl.replace(/^\/api\/v1/, ''));
-                            const url = URL.createObjectURL(blob);
-                            const anchor = document.createElement('a');
-                            anchor.href = url;
-                            anchor.download = file.name;
-                            anchor.click();
-                            URL.revokeObjectURL(url);
-                          })}>
+                      <p>已生成文件草稿，需审核后使用。</p>
+                      {run.fileOutputs.map((file) => (
+                        <button
+                          key={file.file_id}
+                          className="button button-ghost"
+                          title={`SHA-256: ${file.sha256}`}
+                          onClick={() =>
+                            void operate(async () => {
+                              const blob = await api.download(
+                                file.downloadUrl.replace(/^\/api\/v1/, ''),
+                              );
+                              const url = URL.createObjectURL(blob);
+                              const anchor = document.createElement('a');
+                              anchor.href = url;
+                              anchor.download = file.name;
+                              anchor.click();
+                              URL.revokeObjectURL(url);
+                            })
+                          }
+                        >
                           <Download size={13} /> {file.name}
                         </button>
                       ))}
@@ -845,6 +810,7 @@ export function InquiryWorkspace({
                     <details className="iw-run-details">
                       <summary>运行详情</summary>
                       <small>runId: {run.id}</small>
+                      <InvocationContext context={run.context} />
                     </details>
                     {run.status === 'failed' && (
                       <button
@@ -852,6 +818,7 @@ export function InquiryWorkspace({
                         disabled={!canWrite}
                         onClick={() => {
                           setInput(run.instruction);
+                          setComposerContext(restoreContext(run.context));
                           setNotice('已恢复本次指令，确认后可重新处理。');
                         }}
                       >
@@ -879,110 +846,104 @@ export function InquiryWorkspace({
               )}
               <ErrorNotice error={runQuery.error} onRetry={() => void runQuery.refetch()} />
             </div>
-            <div className="iw-composer">
-              {mode === 'real' && <details>
-                <summary>参考资料与核价条件</summary>
-                <ErrorNotice error={references.error || supplierOffers.error} onRetry={() => { void references.refetch(); void supplierOffers.refetch(); }} />
-                <label className="field">指定参考资料
-                  <select multiple aria-label="本次参考资料" disabled={!canWrite} value={selectedSources ?? revision?.sourceRefs.map(s => s.sourceVersionId) ?? []} onChange={e => setSelectedSources(Array.from(e.target.selectedOptions, o => o.value))}>
-                    {references.data?.items.filter(s => s.status !== 'revoked').map(s => <option key={`${s.sourceId}:v${s.version}`} value={`${s.sourceId}:v${s.version}`}>{s.title} · V{s.version} · {s.status === 'published' ? '已发布' : '草稿'}</option>)}
+            {mode === 'real' && (
+              <details>
+                <summary>引用知识与核价条件</summary>
+                <ErrorNotice
+                  error={references.error || supplierOffers.error}
+                  onRetry={() => {
+                    void references.refetch();
+                    void supplierOffers.refetch();
+                  }}
+                />
+                <label className="field">
+                  本次参考资料（草稿仅供参考）
+                  <select
+                    multiple
+                    aria-label="本次参考资料"
+                    disabled={!canWrite}
+                    value={
+                      selectedSources ?? revision?.sourceRefs.map((s) => s.sourceVersionId) ?? []
+                    }
+                    onChange={(e) =>
+                      setSelectedSources(Array.from(e.target.selectedOptions, (o) => o.value))
+                    }
+                  >
+                    {references.data?.items
+                      .filter((s) => s.status !== 'revoked')
+                      .map((s) => (
+                        <option
+                          key={`${s.sourceId}:v${s.version}`}
+                          value={`${s.sourceId}:v${s.version}`}
+                        >
+                          {s.title} · V{s.version} · {s.status === 'published' ? '已发布' : '草稿'}
+                        </option>
+                      ))}
                   </select>
                 </label>
-                <label className="field">供应商报价
-                  <select aria-label="供应商报价" value={offerId} disabled={!canWrite} onChange={e => setOfferId(e.target.value)}>
+                <label className="field">
+                  供应商报价
+                  <select
+                    aria-label="供应商报价"
+                    value={offerId}
+                    disabled={!canWrite}
+                    onChange={(e) => setOfferId(e.target.value)}
+                  >
                     <option value="">请选择已录入的报价</option>
-                    {supplierOffers.data?.items.map(o => <option key={o.id} value={o.id}>{o.supplier} · MOQ {o.moq}</option>)}
+                    {supplierOffers.data?.items.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.supplier} · MOQ {o.moq}
+                      </option>
+                    ))}
                   </select>
                 </label>
-                {(['exchangeRate', 'margin', 'quantity'] as const).map(key => <label className="field" key={key}>
-                  {{ exchangeRate: '汇率（CNY/USD）', margin: '毛利率（%）', quantity: '数量' }[key]}
-                  <input type="number" step={key === 'quantity' ? '1' : 'any'} value={costInputs[key]} disabled={!canWrite} onChange={e => setCostInputs(old => ({ ...old, [key]: e.target.value }))} />
-                </label>)}
-                <Link to={`/workbench?case=${encodeURIComponent(inquiryId)}`}>维护供应商原件、报价及业务审批</Link>
-                <button className="button button-ghost" onClick={() => void supplierOffers.refetch()}>刷新报价列表</button>
-              </details>}
-              <label className="sr-only" htmlFor={`instruction-${inquiryId}`}>
-                补充要求或客户反馈
-              </label>
-              <textarea
-                ref={inputRef}
-                id={`instruction-${inquiryId}`}
-                placeholder={
-                  readOnly
-                    ? '请回到当前版本、恢复处理或等待运行完成'
-                    : '告诉 Agent 本次要完成的工作…'
-                }
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                disabled={!canWrite}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  openAiEditor();
-                }}
-                onKeyDown={(e) => {
-                  if (
-                    e.key !== 'Enter' ||
-                    e.nativeEvent.isComposing ||
-                    e.nativeEvent.keyCode === 229
-                  )
-                    return;
-                  e.preventDefault();
-                  if (e.ctrlKey || e.shiftKey) {
-                    const textarea = e.currentTarget;
-                    textarea.setRangeText(
-                      '\n',
-                      textarea.selectionStart,
-                      textarea.selectionEnd,
-                      'end',
-                    );
-                    setInput(textarea.value);
-                    return;
-                  }
-                  if (canSend) void startRun();
-                }}
-              />
-              <div className="iw-composer-foot">
+                {(['exchangeRate', 'margin', 'quantity'] as const).map((key) => (
+                  <label className="field" key={key}>
+                    {
+                      { exchangeRate: '汇率（CNY/USD）', margin: '毛利率（%）', quantity: '数量' }[
+                        key
+                      ]
+                    }
+                    <input
+                      type="number"
+                      step={key === 'quantity' ? '1' : 'any'}
+                      value={costInputs[key]}
+                      disabled={!canWrite}
+                      onChange={(e) => setCostInputs((old) => ({ ...old, [key]: e.target.value }))}
+                    />
+                  </label>
+                ))}
+                <Link to={`/workbench?case=${encodeURIComponent(inquiryId)}`}>
+                  维护供应商原件、报价及业务审批
+                </Link>
                 <button
-                  className="icon-button"
-                  aria-label="查看客户原始询盘"
-                  title="客户原始询盘"
-                  onClick={() => openDocument('original')}
+                  className="button button-ghost"
+                  onClick={() => void supplierOffers.refetch()}
                 >
-                  <Paperclip size={17} />
+                  刷新报价列表
                 </button>
-                <button
-                  className="icon-button iw-ai-edit-button"
-                  aria-label="用 AI 修改输入内容"
-                  title="AI 修改输入内容"
-                  disabled={!canWrite || !input.trim()}
-                  onClick={openAiEditor}
-                >
-                  <Sparkles size={16} />
-                </button>
-                <span>
-                  {revision && draftsPending
-                    ? '正在载入回复草稿…'
-                    : hasPlaceholder ? '请先补全指令中的待填内容' : input
-                      ? '草稿已暂存'
-                      : '逐步推进，由你决定'}
-                  <span className="iw-send-shortcut"> · Enter 发送 · Shift + Enter 换行</span>
-                </span>
-                <button
-                  className="button button-primary iw-send-button"
-                  aria-label={inquiry.currentRevision ? '处理反馈' : '开始处理'}
-                  aria-keyshortcuts="Enter"
-                  title={inquiry.currentRevision ? '处理反馈' : '开始处理'}
-                  disabled={!canSend}
-                  onClick={() => startRun()}
-                >
-                  <ArrowUp size={18} />
-                </button>
-              </div>
-            </div>
-            <SuggestedMessages path={path} scope={scope} inquiry={inquiry} revision={revision} run={run}
-              latestMessageId={orderedMessages.at(-1)?.id} enabled={active && canWrite} draftEmpty={!input.trim()} onChoose={chooseSuggestion} />
+              </details>
+            )}
+            <InquiryComposer
+              session={session}
+              inquiryId={inquiryId}
+              input={input}
+              selection={composerContext}
+              onInput={setInput}
+              onSelection={setComposerContext}
+              canWrite={canWrite}
+              canSend={canSend}
+              readOnly={readOnly}
+              draftsPending={!!revision && draftsPending}
+              draftStored={draftStored}
+              sendLabel={inquiry.currentRevision ? '处理反馈' : '开始处理'}
+              onSend={() => void startRun()}
+              onOriginal={() => openDocument('original')}
+            />
             <div className="iw-case-actions">
-              {mode === 'real' && <Link to={`/workbench?case=${encodeURIComponent(inquiryId)}`}>业务资料与审批</Link>}
+              {mode === 'real' && (
+                <Link to={`/workbench?case=${encodeURIComponent(inquiryId)}`}>业务资料与审批</Link>
+              )}
               {inquiry.businessStatus === 'active' && (
                 <button
                   disabled={running || busy || (!!revision && draftsPending)}
@@ -1013,53 +974,24 @@ export function InquiryWorkspace({
           <pre className="iw-original-full">{inquiry.originalText}</pre>
         </Modal>
       )}
-      {aiEditOpen && (
-        <Modal title="AI 修改输入内容" wide onClose={() => setAiEditOpen(false)}>
-          <div className="iw-ai-edit-modal">
-            <p className="iw-muted">输入修改要求，AI 会先生成草稿供你检查，确认后才会回填对话框。</p>
-            <label>
-              当前内容
-              <textarea value={aiEditDraft} onChange={(e) => setAiEditDraft(e.target.value)} rows={6} />
-            </label>
-            <label>
-              修改要求
-              <textarea
-                value={aiEditRequest}
-                onChange={(e) => setAiEditRequest(e.target.value)}
-                placeholder="例如：补充参考资料和核价参数，并列出需要客户确认的风险"
-                rows={3}
-                autoFocus
-              />
-            </label>
-            {aiEditPreview && (
-              <label>
-                AI 草稿预览
-                <textarea value={aiEditPreview} onChange={(e) => setAiEditPreview(e.target.value)} rows={8} />
-              </label>
-            )}
-            <div className="iw-modal-actions">
-              <button className="button" disabled={!aiEditDraft.trim() || !aiEditRequest.trim()} onClick={generateAiEdit}>
-                <Sparkles size={14} /> 生成预览
-              </button>
-              <button
-                className="button button-primary"
-                disabled={!aiEditPreview.trim()}
-                onClick={() => {
-                  setInput(aiEditPreview);
-                  setAiEditOpen(false);
-                  requestAnimationFrame(() => inputRef.current?.focus());
-                }}
-              >
-                采用草稿并返回
-              </button>
-            </div>
-          </div>
-        </Modal>
+      {generation && (
+        <GenerateNodeDialog
+          inquiry={inquiry}
+          base={base}
+          path={path}
+          node={generation.node}
+          instruction={generation.instruction}
+          onClose={() => setGeneration(null)}
+          onStarted={(r) => {
+            setGeneration(null);
+            setLastRunId(r.id);
+            setRevisionNumber(null);
+            showAIChat();
+            queryClient.setQueryData(['run', scope, r.id], r);
+            void refresh();
+          }}
+        />
       )}
-      {generation && <GenerateNodeDialog inquiry={inquiry} base={base} path={path} node={generation.node} instruction={generation.instruction} onClose={() => setGeneration(null)} onStarted={r => {
-        setGeneration(null); setLastRunId(r.id); setRevisionNumber(null); showAIChat();
-        queryClient.setQueryData(['run', scope, r.id], r); void refresh();
-      }} />}
       {modal === 'waiting' && (
         <Modal title="标记为待确认" onClose={() => setModal(null)}>
           <form

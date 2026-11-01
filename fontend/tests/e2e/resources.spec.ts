@@ -35,7 +35,7 @@ test('Wiki 按目录和正文搜索，阅读、原文与下载内容一致', asy
   await expect(page.locator('.wiki-row')).toHaveCount(8);
 });
 
-test('Wiki 收藏、新建和导入只作用于当前静态页面', async ({ page }) => {
+test('Wiki 收藏、新建和导入持久保存到当前用户的知识库', async ({ page }) => {
   await page.getByRole('button', { name: '知识库', exact: true }).click();
   await page.getByRole('button', { name: '收藏 交付与承诺规则', exact: true }).click();
   await page.getByLabel('知识目录').getByRole('button', { name: '我的收藏' }).click();
@@ -70,8 +70,11 @@ test('Wiki 收藏、新建和导入只作用于当前静态页面', async ({ pag
   await expect(page.getByRole('dialog').locator('script')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await page.reload();
-  await expect(page.locator('.wiki-row')).toHaveCount(8);
-  await expect(page.locator('.wiki-row').filter({ hasText: '测试知识' })).toHaveCount(0);
+  await expect(page.locator('.wiki-row')).toHaveCount(10);
+  await expect(page.locator('.wiki-row').filter({ hasText: '测试知识' })).toHaveCount(1);
+  await expect(page.locator('.wiki-row').filter({ hasText: '导入文档' })).toHaveCount(1);
+  await page.getByLabel('知识目录').getByRole('button', { name: '我的收藏' }).click();
+  await expect(page.locator('.wiki-row')).toHaveCount(4);
 });
 
 test('资产按公司和个人隔离，目录、类型、收藏和视图联动', async ({ page }) => {
@@ -79,14 +82,16 @@ test('资产按公司和个人隔离，目录、类型、收藏和视图联动',
   await expect(
     page.getByLabel('资产空间').getByRole('button', { name: '个人资产库' }),
   ).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('.library-asset-card')).toHaveCount(4);
+  await expect(page.locator('.asset-inquiry-folders')).toHaveCount(4);
+  const personalCount = await page.locator('.library-asset-card').count();
+  expect(personalCount).toBeGreaterThan(4);
   const folders = await page.getByLabel('资产文件夹').boundingBox();
   const files = await page.getByRole('region', { name: '个人资产库文件' }).boundingBox();
   expect(folders).not.toBeNull();
   expect(files).not.toBeNull();
   expect(folders!.x + folders!.width).toBeLessThan(files!.x);
-  await expect(page.getByLabel('资产文件夹').getByRole('button')).toHaveText([
-    '全部文件4',
+  await expect(page.getByLabel('资产文件夹').locator(':scope > button')).toHaveText([
+    `全部文件${personalCount}`,
     '工作文件2',
     '灵感参考2',
   ]);
@@ -101,9 +106,9 @@ test('资产按公司和个人隔离，目录、类型、收藏和视图联动',
   await expect(page.getByText('没有找到相关文件')).toBeVisible();
   await page.getByLabel('资产空间').getByRole('button', { name: '个人资产库' }).click();
   await expect(page.getByRole('textbox', { name: '搜索文件' })).toHaveValue('');
-  await expect(page.locator('.library-asset-card')).toHaveCount(4);
+  await expect(page.locator('.library-asset-card')).toHaveCount(personalCount);
   await page.getByRole('button', { name: '列表视图' }).click();
-  await expect(page.locator('.library-asset-list .library-asset-card')).toHaveCount(4);
+  await expect(page.locator('.library-asset-list .library-asset-card')).toHaveCount(personalCount);
   await page.getByRole('button', { name: '收藏', exact: true }).click();
   await expect(page.locator('.library-asset-card')).toHaveCount(1);
   await page.getByRole('button', { name: '预览 客户报价对比.xlsx' }).click();
@@ -119,6 +124,8 @@ test('资产按公司和个人隔离，目录、类型、收藏和视图联动',
 test('添加图片和任意文件到个人空间，可预览与下载且公司空间不受影响', async ({ page }) => {
   await page.getByRole('button', { name: '资产库', exact: true }).click();
   await page.getByLabel('资产空间').getByRole('button', { name: '个人资产库' }).click();
+  await expect(page.locator('.asset-inquiry-folders')).toHaveCount(4);
+  const personalCount = await page.locator('.library-asset-card').count();
   await page.getByRole('button', { name: '添加文件', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toContainText('个人资产库 / 未分类');
@@ -138,7 +145,7 @@ test('添加图片和任意文件到个人空间，可预览与下载且公司�
     },
   ]);
   await dialog.getByRole('button', { name: '添加 2 个文件' }).click();
-  await expect(page.locator('.library-asset-card')).toHaveCount(6);
+  await expect(page.locator('.library-asset-card')).toHaveCount(personalCount + 2);
   await page.getByRole('button', { name: '预览 qa-image.png' }).click();
   await expect
     .poll(() =>
@@ -178,13 +185,15 @@ test('移动端与深色下目录、弹窗、视图切换没有页面横向溢�
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   const folders = page.getByLabel('资产文件夹');
   await expect(folders).toBeHidden();
+  await expect(page.locator('.asset-inquiry-folders')).toHaveCount(4);
+  const personalCount = await page.locator('.library-asset-card').count();
   await page.getByRole('button', { name: '文件夹 · 全部文件' }).click();
   await folders.getByRole('button', { name: '工作文件' }).click();
   await expect(page.locator('.library-asset-card')).toHaveCount(2);
   await expect(folders).toBeHidden();
   await page.getByRole('button', { name: '文件夹 · 工作文件' }).click();
   await folders.getByRole('button', { name: '全部文件' }).click();
-  await expect(page.locator('.library-asset-card')).toHaveCount(4);
+  await expect(page.locator('.library-asset-card')).toHaveCount(personalCount);
   await page.getByRole('button', { name: '列表视图' }).click();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

@@ -1,64 +1,93 @@
 # NavoWork
 
-包袋出口业务工作台。前端为 React/Vite，后端为 FastAPI + SQLAlchemy/SQLite，任务由独立 LangGraph Worker 处理。当前可运行的核心流程：询盘建档、证据和候选事实、规格与询价/核价/报价草稿、成果版本和导出、任意业务变更的节点影响与候选修订、样品/订单/付款保障记录和生产资料门禁。生产进度、真实物流和银行数据仍需外部资料接入。
+包袋出口业务工作台。前端为 React/Vite，后端为 FastAPI + SQLAlchemy/SQLite，任务由独立 LangGraph Worker 处理。当前主链路：新询盘 → 客户与询盘评估 → 箱包 Tech Pack/BOM → 多供应商核价与客户报价 → 打样 → PO/PI 与付款保障 → 生产资料与验货放行。Agent 通过受控工具读写节点成果，并检索知识库和公司资产；批准、付款核验和放行由人执行。
 
-## 本地启动（Windows）
+## 本地启动（Linux / macOS / Windows）
 
-需要 Python 3.12+ 和 Node.js 20+。在仓库根目录执行：
+需要 Python 3.12+ 和 Node.js 20+。在仓库根目录选择对应入口；首次启动会自动创建 `backend/.venv`、安装 Python/npm 依赖，并从 `backend/.env.example` 生成 `backend/.env`：
 
-```powershell
-python -m venv backend/.venv
-backend/.venv/Scripts/python.exe -m pip install -e agent-kit -e 'backend[test]'
+| 系统 | 启动方式 |
+| --- | --- |
+| Linux / macOS | `./start.sh` |
+| macOS Finder | 双击 `start.command` |
+| Windows PowerShell | `.\start.ps1` |
+| Windows CMD / 双击 | 双击 `start.bat`，或在 CMD 中执行 `start.bat` |
+
+PowerShell 若提示禁止运行脚本，可执行 `powershell -ExecutionPolicy Bypass -File .\start.ps1`，或直接双击 `start.bat`。
+
+脚本会先执行数据库迁移，再启动 API（8000）、LangGraph Worker 和前端（5173）；按 Ctrl+C 停止全部服务。依赖已就绪时启动只需几秒。常用参数：`--setup-only` 只准备环境、`--no-install` 跳过自动安装、`--skip-migrate` 跳过迁移；`./start.sh --help` 可查看说明。`python dev.py` 与这些脚本等价。
+
+浏览器打开 <http://127.0.0.1:5173>。演示账号为 `demo@navowork.local`，密码为 `ChangeMe123!`；可在 `backend/.env` 修改。数据写在 `backend/data/`，上传原件写在 `backend/storage/`，均不纳入 Git。
+
+手动安装（可选；自动安装不可用或 CI 环境）：
+
+```bash
+python3 -m venv backend/.venv
+backend/.venv/bin/python -m pip install -e agent-kit -e 'backend[test]'
 npm ci
-Copy-Item backend/.env.example backend/.env
-python dev.py
+cp backend/.env.example backend/.env
+backend/.venv/bin/python dev.py
 ```
 
-浏览器打开 <http://127.0.0.1:5173>。演示账号为 `demo@navowork.local`，密码为 `ChangeMe123!`；可在 `backend/.env` 修改。`dev.py` 自动运行迁移、启动 API、Worker 和 real 模式前端，按 Ctrl+C 关闭。数据写在 `backend/data/`，上传原件写在 `backend/storage/`，均不纳入 Git。
+Windows 手动安装时把 `backend/.venv/bin/python` 换成 `backend\.venv\Scripts\python.exe`，`cp` 换成 `Copy-Item`。后文示例沿用 Windows 路径；Linux/macOS 请将 `backend/.venv/Scripts/python.exe` 换成 `backend/.venv/bin/python`。若从 ZIP 解压后提示脚本没有执行权限，先运行 `chmod +x start.sh start.command`。
 
-## 比赛演示
+新询盘从侧栏“新建工作”创建；进入 Cases 后使用三栏工作台：左侧业务节点、中间成果与结构化编辑、右侧 Agent 对话。对话中的工具调用会读取项目原件、知识库和公司资产，并把结果写入对应成果版本。
+
+## 文件、研究与自动同步
+
+工作台保留 guilimao 的业务 Agent 工具链，同时组合受控 `file_` 工具读取、复制、编辑、校验和下载真实文件。成果区支持 DOCX 段落/表格/图片与简单 XLSX 单元格/公式的内联编辑和内容预览。人工文件版本会进入同一 Agent 的可读文件列表，原件和历史版本不覆盖。
+
+系统导出的规格 DOCX/XLSX、BOM XLSX 带显式字段映射。保存数量或 BOM 用量/价格/损耗后，自动重算绑定的成本、报价和订单差异，刷新相关原生导出；同组记录快照、一致性标识及失败格式，允许只重试失败分支。未知映射、旧基线和制造适用性进入待复核，不猜测价格或继承审批。
+
+需求节点的“竞品、概念图与 BOM 识别”支持有来源的比较、设计建议采纳、规格绑定的真实图像服务接口和图片 BOM 候选复核。图像/VLM 服务需要单独配置并验收，参见 [本轮 PRD 验收与边界](doc/19-guilimao-prd-acceptance.md) 和 [真实服务验收](backend/tests/live/README.md)。Office PDF 是同文件版本的基础内容预览，不承诺 Office 分页还原。
+
+## 比赛演示资料
+
+新的演示包只导入客户原件、知识库和公司资产；**不预生成需求、报价、样品、订单或生产资料**。打开 Cases 后由你指挥 Agent 逐节点推进。
 
 ```powershell
 backend/.venv/Scripts/python.exe demo/seed.py
-python dev.py
 ```
 
-默认导入 `intake` 批次的德国定制背包、墨西哥帆布袋、英国品牌礼品三条新询盘。每条只有客户原文和询盘原件，初始没有规格、供应商报价记录、报价、样品、订单或批准。重复导入保留已做的工作；需要重新演示时使用 `demo/seed.py --batch rehearsal2`。
+会创建三条待办：
 
-导入同时准备 8 篇业务知识和 47 份公司资产，其中包含 `test/core15` 的 17 份业务文件和 9 封原件。后续报价、样品与订单材料只在资产库中，用户进入对应环节时指挥 Agent 选择引用。core15 是 WB-26 / V3 / S03 档案，引用前应核对款号与版本，不能直接当作 BP-DE-3000 的当前确认。
+- `inq_demo_de`：Nordlicht Outdoor 定制通勤背包，含客户询盘、两家工厂报价、包装变更、PO、样品反馈、客户确认、内部批准、付款凭据和供应商确认原件。
+- `inq_demo_mx`：Casa Verde 帆布袋试单，演示 300 件与 MOQ 500 的澄清。
+- `inq_demo_uk`：信息不足的英国促销询盘，演示先澄清再推进。
 
-打开“德国定制背包询盘”，先发送“请整理客户需求和待确认事项”。之后依次要求生成规格、读取工厂报价并核价、准备客户报价。每次只推进本轮指定环节；后续节点保持未开始。聊天会显示工具执行情况，保存的需求、业务草稿和知识/资产引用会同步回工作台。
+演示路径：`询盘评估 → Tech Pack/BOM → 供应商报价与核价 → 客户报价 → 打样 → PO/PI 与付款 → 生产资料与放行`。每个节点由 Agent 通过工具读取原件、写成果或向用户提问；核价时在对话中明确汇率和毛利率（例如“汇率 7.20、毛利率 20%”），人工确认、付款核验和放行由界面单独记录。
 
-详细指令见 [演示操作手册](demo/competition_v1/演示操作手册.md)。`demo/advance.py` 仅保留为手动辅助入口，默认指向 `intake`；比赛主线直接在对话中完成。
+知识库包含 8 篇通用业务规则（客户评估、箱包 Tech Pack、核价、贸易术语、打样、订单/PI、生产/验货、材料参考）和 3 份项目确认文档（Nordlicht / Casa Verde / Harbor，含客户确认人、规格补充和核价假设）。Agent 会优先用项目确认补全各案例缺项，再按节点加载对应 Skill。模型配置：
 
-在 `backend/.env` 中设置 `MODEL_BASE_URL`、`MODEL_API_KEY`、`MODEL_NAME`，即可启用模型工具调用。模型凭据只放本机配置，不提交到仓库。工作空间设置管理默认贸易条款、核价参数与启用的业务技能；最终报价仍使用本轮明确选择的供应商与条件。
+```dotenv
+MODEL_API_KEY=...
+MODEL_NAME=deepseek-flash
+MODEL_BASE_URL=https://api.deepseek.com/v1
+```
+
+未配置模型时，Agent 工具不会伪造执行结果，会明确返回 `MODEL_NOT_CONFIGURED`。
 
 ## 验证
 
 ```powershell
-backend/.venv/Scripts/python.exe -m pytest backend/tests agent-kit/tests -q
+backend/.venv/Scripts/python.exe -m pytest backend/tests agent-kit/tests -q -p no:cacheprovider
 npm run typecheck
 npm run test
 npm run build
 ```
 
-可在 `backend/.env` 设置 `MODEL_API_KEY` 和 `MODEL_NAME` 启用模型抽取；未配置时用有限规则提取，未知字段保持待确认。正式商业批准、外部确认和生产放行由服务端门禁控制，草稿下载不表示已发送或已开工。演示账号和默认密钥仅用于本机演示，不可公开部署。
-
-新增文件工具执行链见 [agent-kit/README.md](agent-kit/README.md)。设置 `AGENT_FILE_TOOLS=1` 后，对话报价/变更目标使用真实模型工具调用，读取已上传的 Case 资料及本次显式引用的画板附件，返回真实规格 DOCX、成本 XLSX、客户报价 XLSX/PDF。汇率和毛利可在对话中明确提供，例如“汇率7.20，毛利20%”。缺价先生成草稿，再通过现有澄清机制补证继续。此模式无模型配置时明确失败；确定性离线回放不代表真实 Agent 或浏览器集成已验收。
-
-文件工具无模型场景的真实浏览器检查：在 `fontend/` 执行 `npm run test:e2e -- --config=playwright.file-tools.config.ts`。该检查会使用独立临时业务存储、上传实际 XLSX，并验证 API/Worker/页面明确失败及刷新后的文件保存；它不替代真实模型报价主线。
+可在 `backend/.env` 设置 `MODEL_API_KEY`、`MODEL_NAME` 和 `MODEL_BASE_URL` 启用 Agent 工具调用；未配置时不会伪造执行结果。正式商业批准、外部确认、付款核验和生产放行由服务端门禁控制，草稿下载不表示已发送或已开工。演示账号和默认密钥仅用于本机演示，不可公开部署。
 
 ## 开发与文档
 
-根目录 npm workspaces 只包含 `fontend/`。直接执行 `npm run dev` 时，前端会连接 `http://127.0.0.1:8000` 的 API；使用 `python dev.py` 可同时启动全部服务。需要体验原有纯前端合成数据模式时，在 `fontend/.env.local` 写入 `VITE_API_MODE=mock`，再启动前端。单独运行现有 Mock 浏览器回归用 `npm run test:e2e`；真实前后端浏览器联调用 `npm run test:e2e -- --config=playwright.real.config.ts`（在 `fontend/` 目录）。Windows 测试默认使用已安装的 Edge，可用 `PLAYWRIGHT_BROWSER_PATH` 指定其他浏览器。
+根目录 npm workspaces 只包含 `fontend/`。直接执行 `npm run dev` 时，前端连接 `http://127.0.0.1:8000` 的 API；使用 `python dev.py` 可同时启动全部服务。前后端浏览器回归在 `fontend/` 执行 `npm run test:e2e`（会启动独立临时数据库）；Windows 默认使用已安装的 Edge，可用 `PLAYWRIGHT_BROWSER_PATH` 指定 Chrome/Edge 路径。
 
-- [产品需求](doc/Navowork_PRD_v1.0_满血版.md)
+- [Workbench v2 契约：阶段、成果、工具与 Skill](doc/18-workbench-v2-contract.md)
+- [当前 Hackathon PRD](doc/Navowork-PRD-v0.5--Hackathon删减版.md)
+- [本轮合入、验收与剩余边界](doc/19-guilimao-prd-acceptance.md)
 - [后端设计](doc/TradeWorkbench_Backend_Design_v1.0.md)
 - [Agent 节点图](doc/TradeWorkbench_Agent_Node_Graph_v1.0.md)
-- [新版前端适配：架构、实际节点链路与接口 v1.1](doc/Frontend_Backend_Adaptation_v1.1.md)
-- [后端开发计划](后端开发计划.md)
 - [前端接口说明](fontend/docs/INTEGRATION.md)
-- [文件 Agent 验证记录](agent-kit/docs/verification.md)
-- [BOM 图片候选模块](extensions/bom-vision/README.md)
-- [样品与订单 Skills](extensions/order-skills/README.md)
 - [独立评测入口](evaluation/README.md)
+
+本机画板演示与引用/资产回归使用 `npm run test:e2e:mock`，在 5175 端口运行，与真实服务回归分离。真实模式的询盘页可在「业务流程」和「资料画板」之间切换。

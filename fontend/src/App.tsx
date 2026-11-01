@@ -16,6 +16,7 @@ import {
   Box,
   ChevronRight,
   Command,
+  FlaskConical,
   FileText,
   LayoutDashboard,
   LogOut,
@@ -28,15 +29,15 @@ import {
   Sparkles,
   X,
 } from 'lucide-react';
-import { api, mode } from './api';
+import { api, mode, setMockFault } from './api';
 import type { Inquiry, Session } from './api/types';
 import { ErrorNotice, IconButton, Loading, Modal } from './components/ui';
 import { CreateInquiry } from './features/CreateInquiry';
+import { InquiryWorkbench } from './features/workbench-v2/InquiryWorkbench';
 import { InquiryWorkspace } from './features/InquiryWorkspace';
 import { WorkHome } from './features/workbench/WorkHome';
 import { BrandMark } from './components/BrandMark';
 import { ThemeSwitch } from './theme/ThemeSwitch';
-import { WorkspaceSettings } from './features/WorkspaceSettings';
 const Resources = lazy(() =>
   import('./features/StaticLibrary').then((module) => ({ default: module.StaticLibrary })),
 );
@@ -105,7 +106,7 @@ function Login({
         <h2>{recovery ? '重新连接工作空间' : '开始今天的工作'}</h2>
         <p>
           {mode === 'mock'
-            ? '进入工作空间，从客户询盘开始今天的工作。'
+            ? '进入示例工作空间，体验一条询盘的完整流程。'
             : '登录你的团队工作空间，继续处理客户询盘。'}
         </p>
         <div className="form-stack">
@@ -146,11 +147,23 @@ function Login({
           )}
           <ErrorNotice error={error} />
           <button className="button button-primary" disabled={pending}>
-            {pending ? '正在进入…' : mode === 'mock' ? '进入工作空间' : '登录工作空间'}
+            {pending ? '正在进入…' : mode === 'mock' ? '进入演示工作空间' : '登录工作空间'}
             <ArrowRight size={15} />
           </button>
         </div>
-        <div className="login-notice"><ShieldCheck size={13} /> 团队资料与业务成果，集中管理。</div>
+        <div className="login-notice">
+          {mode === 'mock' ? (
+            <>
+              <FlaskConical size={13} /> Mock 演示 · 合成测试数据
+              <br />
+              称呼仅用于体验，不是真实身份认证。数据保存在此浏览器，用于前端联调，不可对客使用。
+            </>
+          ) : (
+            <>
+              <ShieldCheck size={13} /> 真实服务模式 · 由服务端验证身份和访问权限。
+            </>
+          )}
+        </div>
       </form>
     </div>
   );
@@ -287,6 +300,8 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
     if (isTrade) setTradeOpened(true);
   }, [isTrade]);
   const { id, invalid: invalidPath } = parseInquiryPath(path);
+  const canvasView =
+    mode === 'mock' || new URLSearchParams(location.search).get('view') === 'canvas';
   const page =
     path === '/knowledge'
       ? 'knowledge'
@@ -296,7 +311,9 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
           ? 'capabilities'
           : 'home';
   const activeTitle = isTrade
-    ? (mode === 'real' ? '包袋出口工作台' : '德国客户 · 定制背包')
+    ? mode === 'real'
+      ? '包袋出口工作台'
+      : '德国客户 · 定制背包'
     : id
       ? tabs.find((t) => t.id === id)?.title || '询盘详情'
       : {
@@ -407,7 +424,7 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
             <PanelLeftClose size={17} />
           </IconButton>
         </div>
-                  <button
+        <button
           className="button button-ghost new-inquiry"
           aria-label="新建工作"
           aria-keyshortcuts="Meta+K Control+K"
@@ -526,10 +543,28 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
             <strong>{id ? '询盘工作区' : activeTitle}</strong>
           </div>
           <div className="topbar-actions">
+            {id && mode === 'real' && (
+              <div role="group" aria-label="询盘视图">
+                <button
+                  className="button button-ghost"
+                  aria-pressed={!canvasView}
+                  onClick={() => navigate(`/inquiries/${encodeURIComponent(id)}`)}
+                >
+                  业务流程
+                </button>
+                <button
+                  className="button button-ghost"
+                  aria-pressed={canvasView}
+                  onClick={() => navigate(`/inquiries/${encodeURIComponent(id)}?view=canvas`)}
+                >
+                  资料画板
+                </button>
+              </div>
+            )}
             <ThemeSwitch />
             <span className="mode-label">
               <span className="connection-dot" />
-              {offline ? '连接已断开' : '工作空间已连接'}
+              {mode === 'mock' ? '演示工作空间 · 本地保存' : '真实服务 · 服务端保存'}
             </span>
             <IconButton label="工作空间设置" onClick={() => setSettings(true)}>
               <Settings2 size={15} />
@@ -583,7 +618,11 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
           {tabs.map((t) => (
             <div key={t.id} hidden={id !== t.id} className="inquiry-mount">
               <FeatureBoundary>
-                <InquiryWorkspace inquiryId={t.id} session={session} onChanged={changed} />
+                {canvasView ? (
+                  <InquiryWorkspace inquiryId={t.id} session={session} onChanged={changed} />
+                ) : (
+                  <InquiryWorkbench inquiryId={t.id} session={session} onChanged={changed} />
+                )}
               </FeatureBoundary>
             </div>
           ))}
@@ -600,7 +639,48 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
           }}
         />
       )}
-      {settings && <WorkspaceSettings session={session} onClose={() => setSettings(false)} />}
+      {settings && (
+        <Modal title="工作空间设置" onClose={() => setSettings(false)}>
+          <div className="form-stack">
+            <div className="card">
+              <h3>{session.workspace.name}</h3>
+              <p className="preferences-note">
+                当前模式：
+                {mode === 'mock' ? 'Mock · 浏览器本地合成测试数据' : '真实服务 · 服务端持久化'}
+              </p>
+            </div>
+            {mode === 'mock' && (
+              <>
+                <label className="field">
+                  异常场景演示
+                  <select
+                    defaultValue="none"
+                    onChange={(e) =>
+                      setMockFault(e.target.value as Parameters<typeof setMockFault>[0])
+                    }
+                  >
+                    <option value="none">正常请求</option>
+                    <option value="network">网络请求失败</option>
+                    <option value="session">会话过期</option>
+                    <option value="forbidden">无访问权限</option>
+                    <option value="draft-conflict">下一次草稿保存冲突</option>
+                    <option value="run-failure">下一次运行失败</option>
+                  </select>
+                </label>
+                <p className="preferences-note">
+                  用于检查错误提示和重试路径。关闭弹窗后执行对应操作；故障注入不会调用真实模型。
+                </p>
+              </>
+            )}
+            <p className="preferences-note">
+              界面偏好按账号及工作空间隔离。正式模式的账号、授权及业务事实来自后端接口。
+            </p>
+            <button className="button" onClick={() => setSettings(false)}>
+              完成
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

@@ -168,6 +168,65 @@ def render_quotation(snapshot: ContentSnapshot, version: int, snapshot_hash: str
     return stream.getvalue()
 
 
+def render_pi(snapshot: ContentSnapshot, version: int, snapshot_hash: str, fmt: str) -> bytes:
+    pricing = calculate_quote(snapshot.pricing) if snapshot.pricing else {"quote": None}
+    quote = pricing.get("quote")
+    fields = {key: display(fact.value) for key, fact in snapshot.fields.items()}
+    rows = [
+        ("Buyer", fields.get("buyer", "Unknown")),
+        ("Seller", fields.get("seller", "Unknown")),
+        ("Product", fields.get("product", "Unknown")),
+        ("Quantity", fields.get("quantity", "Unknown")),
+        ("Unit price (USD)", quote["unit_usd"] if quote else "Pending confirmation"),
+        ("Goods subtotal (USD)", quote["total_usd"] if quote else "Pending confirmation"),
+        ("Incoterm", fields.get("incoterm", "Unknown")),
+        ("Named place", fields.get("named_place", "Unknown")),
+        ("Payment terms", fields.get("payment_terms", "Unknown")),
+        ("Requested arrival", fields.get("requested_arrival", "Unknown")),
+        ("Production estimate", fields.get("production_estimate", "Unknown")),
+        ("Packaging", fields.get("packaging", "Unknown")),
+    ]
+    title = "Proforma invoice draft"
+    disclaimer = "DRAFT FOR REVIEW - Not accepted, signed, paid or released for production. Unknown terms require confirmation."
+    if fmt == "docx":
+        doc = Document()
+        doc.add_paragraph(title, "Title")
+        doc.add_paragraph(f"Version {version} | Content {snapshot_hash[:12]} | Status: Draft")
+        table = doc.add_table(rows=1, cols=2)
+        table.style = "Light Shading Accent 1"
+        table.rows[0].cells[0].text, table.rows[0].cells[1].text = "Field", "Value"
+        for label, value in rows:
+            cells = table.add_row().cells
+            cells[0].text, cells[1].text = label, value
+        doc.add_paragraph(disclaimer)
+        stream = BytesIO()
+        doc.save(stream)
+        return stream.getvalue()
+    if fmt != "pdf":
+        raise ValueError("PI export supports docx and pdf")
+    font = "Helvetica"
+    if any("\u2e80" <= ch <= "\u9fff" for row in rows for cell in row for ch in str(cell)):
+        candidate = os.getenv("NAVOWORK_PDF_FONT") or ("C:/Windows/Fonts/simsun.ttc" if os.name == "nt" else "")
+        if not candidate or not Path(candidate).is_file():
+            raise ValueError("CJK PDF requires a supported TrueType NAVOWORK_PDF_FONT")
+        font = "NavoCJK"
+        pdfmetrics.registerFont(TTFont(font, candidate))
+    style = ParagraphStyle("pi-body", fontName=font, fontSize=10, leading=15, alignment=TA_LEFT, wordWrap="CJK")
+    flow = [Paragraph(title, ParagraphStyle("pi-title", parent=style, fontSize=20, leading=26)),
+            Paragraph(f"Version {version} | Content {escape(snapshot_hash[:12])} | Status: Draft", style), Spacer(1, 14)]
+    table = Table([[Paragraph(escape(str(c)), style) for c in row] for row in [("Field", "Value"), *rows]],
+                  colWidths=[155, 340], repeatRows=1, hAlign="LEFT")
+    table.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8EFF6")),
+                               ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                               ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                               ("TOPPADDING", (0, 0), (-1, -1), 8),
+                               ("LINEBELOW", (0, 0), (-1, -1), .4, colors.HexColor("#D6DFE8"))]))
+    flow.extend([table, Spacer(1, 14), Paragraph(escape(disclaimer), style)])
+    stream = BytesIO()
+    SimpleDocTemplate(stream, pagesize=A4, leftMargin=40, rightMargin=40, topMargin=40, bottomMargin=40).build(flow)
+    return stream.getvalue()
+
+
 def verify_output(data: bytes, fmt: str) -> dict:
     if fmt == "docx":
         d = Document(BytesIO(data))
@@ -187,7 +246,7 @@ def verify_output(data: bytes, fmt: str) -> dict:
         from pypdf import PdfReader
         reader = PdfReader(BytesIO(data))
         text = "\n".join(p.extract_text() or "" for p in reader.pages)
-        if "Customer quotation draft" not in text:
+        if not any(title in text for title in ("Customer quotation draft", "Proforma invoice draft")):
             raise ValueError("PDF text validation failed")
         return {"readable": True, "pages": len(reader.pages), "text": text}
     raise ValueError("Unsupported format")

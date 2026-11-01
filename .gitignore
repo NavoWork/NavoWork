@@ -16,3 +16,7 @@ demo/.previews/
 demo/__pycache__/
 __pycache__/
 demo/competition_v1/sources/*.inspect.ndjson
+
+# local root-level test data
+data/
+storage/

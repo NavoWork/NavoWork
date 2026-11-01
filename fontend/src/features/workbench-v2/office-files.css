@@ -1,0 +1,127 @@
+.office-files {
+  border: 1px solid var(--border, #ddd);
+  border-radius: 12px;
+  margin: 18px 0;
+  background: var(--surface, #fff);
+  padding: 14px;
+  color: var(--text, #222);
+}
+.office-files summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.office-files small,
+.office-hint {
+  font-weight: 400;
+  color: var(--text-muted, #666);
+  font-size: 12px;
+}
+.office-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+.office-toolbar select,
+.office-toolbar input:not([type='checkbox']) {
+  max-width: 320px;
+  padding: 7px;
+  border: 1px solid var(--border, #ccc);
+  border-radius: 6px;
+  background: var(--surface, #fff);
+  color: inherit;
+}
+.office-page {
+  max-width: 820px;
+  margin: 16px auto;
+  padding: 24px;
+  border: 1px solid var(--border, #ddd);
+  background: var(--surface, #fff);
+}
+.office-page textarea {
+  display: block;
+  width: 100%;
+  resize: vertical;
+  border: 1px solid transparent;
+  padding: 8px;
+  line-height: 1.7;
+  font: inherit;
+  background: transparent;
+  color: inherit;
+}
+.office-page textarea:hover,
+.office-page textarea:focus {
+  border-color: var(--border, #bbb);
+  outline: none;
+}
+.office-page table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 14px 0;
+}
+.office-page td {
+  border: 1px solid var(--border, #ccc);
+}
+.office-images {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.office-images figure {
+  margin: 8px 0;
+  max-width: 280px;
+}
+.office-images img {
+  display: block;
+  max-width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  margin-bottom: 8px;
+}
+.office-grid {
+  max-height: 480px;
+  overflow: auto;
+  border: 1px solid var(--border, #ddd);
+}
+.office-grid table {
+  border-collapse: collapse;
+  min-width: 100%;
+}
+.office-grid th {
+  padding: 5px;
+  font-weight: 400;
+  color: var(--text-muted, #666);
+}
+.office-grid td {
+  border: 1px solid var(--border, #ddd);
+  padding: 0;
+  min-width: 90px;
+}
+.office-cell {
+  display: block;
+  border: 0;
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 10px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  white-space: pre-wrap;
+}
+.office-cell:hover,
+.office-cell:focus {
+  background: var(--surface-hover, #f0f4ff);
+}
+.office-cell.changed {
+  background: #fff6d6;
+  color: #4f3d00;
+}
+.office-format {
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+.office-files .button:disabled {
+  opacity: 0.5;
+}

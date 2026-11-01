@@ -1,0 +1,82 @@
+.case-research {
+  border: 1px solid var(--border, #ddd);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin: 12px 0;
+  background: var(--surface, #fff);
+  min-width: 0;
+}
+.case-research summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+.case-research h3 {
+  margin: 22px 0 10px;
+}
+.case-research p,
+.case-research small {
+  color: var(--muted, #666);
+}
+.case-research label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+  margin: 8px 0;
+}
+.case-research input,
+.case-research select,
+.case-research textarea {
+  border: 1px solid var(--border, #ccc);
+  border-radius: 6px;
+  padding: 7px;
+  max-width: 100%;
+  background: var(--surface, #fff);
+  color: inherit;
+}
+.case-research textarea {
+  min-height: 70px;
+  width: 100%;
+}
+.research-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 6px 12px;
+}
+.case-research blockquote {
+  margin: 10px 0;
+  padding: 10px 14px;
+  border-left: 3px solid #9aa8c3;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--bg, #f7f8fa);
+}
+.research-result {
+  padding: 14px 0;
+  border-top: 1px solid var(--border, #ddd);
+  margin-top: 14px;
+  overflow-wrap: anywhere;
+}
+.case-research figure {
+  margin: 14px 0;
+}
+.case-research figure img {
+  max-width: 100%;
+  max-height: 360px;
+  object-fit: contain;
+}
+.research-table {
+  overflow: auto;
+}
+.research-table th,
+.research-table td {
+  padding: 6px;
+  text-align: left;
+}
+.research-table input {
+  min-width: 95px;
+  width: 100%;
+}
+.case-research button {
+  margin: 4px 4px 4px 0;
+}
