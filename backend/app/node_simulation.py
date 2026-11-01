@@ -9,11 +9,12 @@ from .db import SessionLocal
 from .demo_scenarios import scenario_inputs
 from .domain import calculate_cost, normalize_bom, normalize_spec
 from .models import Case, Job, Run, WorkItem
+from .node_simulation_assets import demo_node_data, save_competitors, save_design_image
 from .workbench import append_artifact, finalize_agent_run, latest_artifacts, save_customer_profile
 
 PHASES = ("understanding", "retrieving", "calculating", "composing", "validating", "committing")
 PHASE_SECONDS = 0.7
-LABELS = {"inquiry": "客户与询盘", "requirements": "客户需求与规格", "costing": "方案与报价", "risks": "风险与待确认项", "reply": "双语回复", "sample": "打样资料", "order": "订单与合同", "production": "生产资料"}
+LABELS = {"inquiry": "客户与询盘", "requirements": "客户需求与规格", "competitor": "竞品分析", "design": "产品设计图", "costing": "方案与报价", "risks": "风险与待确认项", "reply": "双语回复", "sample": "打样资料", "order": "订单与合同", "production": "生产资料"}
 
 
 def active_context(db, item_id, generation):
@@ -77,6 +78,12 @@ def save_simulated_node(db, case, run, job):
     elif node == "costing":
         spec()
         quotation()
+    elif node == "competitor":
+        spec()
+        save_competitors(db, case, run, current, scenario_id or "de-backpack")
+    elif node == "design":
+        spec()
+        save_design_image(db, case, run, job, current["spec"], scenario_id or "de-backpack")
     elif node == "risks":
         save("risk_review", {"risks": warnings or ["交期从样品确认及收到定金起算，需确认起算时间。", "正式报价不含国际运费、保险和进口税费。", "生产前需完成人工规格、样品和订单确认。"]}, "风险与待确认项")
     elif node == "reply":
@@ -91,14 +98,22 @@ def save_simulated_node(db, case, run, job):
         spec()
         if not current.get("quotation"):
             quotation()
-        order = save("order", {**s["order"], "quotationVersionId": current["quotation"]["itemId"], "specVersionId": current["spec"]["itemId"],
+        quote = current["quotation"]["content"]
+        total = Decimal(str(quote["unitPriceUsd"])) * quantity
+        deposit = (total * Decimal("0.30")).quantize(Decimal("0.01"))
+        schedule = [{**item, "amountUsd": str(amount)} for item, amount in zip(s["order"]["paymentSchedule"], (deposit, total - deposit))]
+        order = save("order", {**s["order"], "po": {**s["order"]["po"], "quantity": quantity, "unitPriceUsd": quote["unitPriceUsd"], "totalUsd": str(total)}, "paymentSchedule": schedule,
+            "quotationVersionId": current["quotation"]["itemId"], "specVersionId": current["spec"]["itemId"],
             "confirmations": {"buyer": {"confirmed": False}, "seller": {"confirmed": False}}}, "订单与合同")
-        save("payment", {"schedule": s["order"]["paymentSchedule"], "orderVersionId": order["itemId"], "verification": {"verified": False}}, "付款计划")
+        save("payment", {"schedule": schedule, "orderVersionId": order["itemId"], "verification": {"verified": False}}, "付款计划")
     elif node == "production":
         spec()
-        save("production", {"specVersionId": current["spec"]["itemId"], "orderVersionId": current.get("order", {}).get("itemId"), "qcStandard": fields["inspection"], "factoryConfirmation": {"confirmed": False}}, "生产资料")
-        save("ta", {"tasks": [{"day": 0, "task": "确认规格、样品及定金", "owner": "跟单"}, {"day": 7, "task": "备料与裁剪", "owner": "工厂"}, {"day": s["days"] - 3, "task": "出货前检验", "owner": "QC"}]}, "T&A 计划")
-        save("qc", {"standard": fields["inspection"], "checks": ["尺寸与外观", "面料及辅料", "Logo位置", "车缝与承重", "包装及唛头"]}, "QC 检查表")
+        save("production", {"specVersionId": current["spec"]["itemId"], "sampleVersionId": current.get("sample", {}).get("itemId"), "orderVersionId": current.get("order", {}).get("itemId"),
+            "product": fields["product"], "quantity": quantity, "productionDays": s["days"], "packaging": fields["packaging"], "shippingMarks": fields.get("shippingMarks", "按客户确认唛头"),
+            "qcStandard": fields["inspection"], "factoryConfirmation": {"confirmed": False}}, "生产资料")
+        _, tasks = demo_node_data(scenario_id or "de-backpack")
+        save("ta", {"tasks": [{"day": round(task["dayRatio"] * s["days"]), "task": task["task"], "owner": task["owner"]} for task in tasks]}, "T&A 计划")
+        save("qc", {"standard": fields["inspection"], "checks": ["尺寸与外观", "面料及辅料", "Logo位置", "车缝与承重", "包装及唛头"], "requirements": fields["tests"]}, "QC 检查表")
     else:
         raise ValueError("Unknown simulation node")
     return f"已用模拟资料保存「{LABELS[node]}」草稿，可在画板节点查看。" + ("原有缺项仍保留待确认警告。" if warnings else "")

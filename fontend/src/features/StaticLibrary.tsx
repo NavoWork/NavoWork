@@ -1037,7 +1037,7 @@ function AssetPreviewContent({
           {asset.folder}
         </span>
         <span>
-          {kindLabel} · {asset.size}
+          {kindLabel} · {asset.size}{asset.version ? ` · V${asset.version}` : ''}
         </span>
       </div>
       {asset.inquiry && (
@@ -1134,9 +1134,9 @@ function AssetLibrary({ session }: { session: Session }) {
     path,
   } = useLibraryCollection(session, 'assets', libraryAssets);
   const [error, setError] = useState<unknown>();
-  const synced = useInquiryAssets(session);
+  const synced = useInquiryAssets(session, localAssets);
   const [syncedStars, setSyncedStars] = useState<Record<string, boolean>>({});
-  const assets = [
+  const assets = mode === 'real' ? localAssets : [
     ...localAssets,
     ...synced.groups
       .flatMap((group) => group.assets)
@@ -1207,7 +1207,7 @@ function AssetLibrary({ session }: { session: Session }) {
   };
   const toggleStar = async (id: string) => {
     const asset = assets.find((item) => item.id === id);
-    if (asset?.inquiry) {
+    if (asset?.inquiry && mode === 'mock') {
       setSyncedStars((current) => ({ ...current, [id]: !asset.starred }));
       return;
     }
@@ -1239,7 +1239,7 @@ function AssetLibrary({ session }: { session: Session }) {
       <header className="library-heading">
         <div>
           <h1>资产库</h1>
-          <p>文件各归其位，询盘资料自动同步到个人资产库。</p>
+          <p>询盘原始附件与生成文件自动归档，保留来源和版本。</p>
         </div>
         <button className="button button-primary" onClick={() => setUploading(true)}>
           <Upload size={16} />

@@ -10,12 +10,12 @@ from pathlib import Path
 
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from starlette.datastructures import UploadFile
 
 from .core import WORKSPACE_ID, create_item, decode, encode, fail, item_view, items, store_blob, uid
-from .models import Blob, Item, now
+from .models import Blob, Case, CaseAccess, Item, now
 
 
 def visible(row: Item, user) -> bool:
@@ -24,7 +24,16 @@ def visible(row: Item, user) -> bool:
 
 
 def asset_rows(db, user):
-    return [r for r in items(db, "asset") if visible(r, user)]
+    case_ids = set(db.scalars(select(CaseAccess.case_id).where(CaseAccess.user_id == user.id)))
+    result = []
+    for row in items(db, "asset"):
+        value = decode(row.payload)
+        if value.get("inquiry"):
+            if row.case_id in case_ids and value.get("privateOwnerId") in (None, user.id):
+                result.append(row)
+        elif visible(row, user):
+            result.append(row)
+    return result
 
 
 def asset_version(db, user, asset_id, version):
@@ -80,11 +89,16 @@ def library_asset_view(db, user, row):
     ext = Path(v["name"]).suffix.lower()
     mime = v["mediaType"]
     kind = "image" if mime.startswith("image/") else "video" if mime.startswith("video/") else "spreadsheet" if ext in (".xlsx", ".xls", ".csv", ".ods") else "document" if ext in (".pdf", ".docx", ".doc", ".ppt", ".pptx", ".txt", ".md") else "other"
+    origin = v.get("inquiry")
+    if origin:
+        case = db.get(Case, row.case_id)
+        origin = {**origin, "title": decode(case.payload).get("title", origin["title"])}
     return {"id": v["id"], "version": row.version, "assetVersionId": f"{v['id']}:v{row.version}",
             "name": v["name"], "folder": v.get("folder", "未分类"), "space": v.get("space", "company"),
             "size": f"{max(1, round(size / 1024))} KB" if size < 1024 * 1024 else f"{size / 1024 / 1024:.1f} MB",
             "byteSize": size, "updated": v["createdAt"], "mime": mime, "kind": kind, "art": "notes",
             "starred": favorite(db, user, v["id"]),
+            **({"inquiry": origin, "sourceKind": v.get("sourceKind"), "sourceId": v.get("sourceId")} if origin else {}),
             "downloadPath": f"/workspaces/{WORKSPACE_ID}/assets/{v['id']}/versions/{row.version}/download"}
 
 

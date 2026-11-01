@@ -33,6 +33,9 @@ async def lifespan(app: FastAPI):
             for key, name in (("evidence", "证据与事实"), ("costing", "确定性核价"), ("agent", "Agent 工作流"), ("exports", "成果导出")):
                 create_item(db, "capability", {"id": key, "name": name, "description": name, "enabled": True, "required": key != "agent", "version": "1.0", "category": "core"}, item_id=f"cap_{key}")
             db.commit()
+        from .inquiry_assets import backfill_inquiry_assets
+        backfill_inquiry_assets(db)
+        db.commit()
     yield
 
 
@@ -71,9 +74,12 @@ def ready(db: Session = Depends(get_db)):
     return {"status": "ok", "database": "sqlite"}
 
 
+async def login_payload(request: Request):
+    return await request.json()
+
+
 @app.post("/api/v1/auth/session")
-async def login(request: Request, response: Response, db: Session = Depends(get_db)):
-    data = await request.json()
+def login(response: Response, data: dict = Depends(login_payload), db: Session = Depends(get_db)):
     result, token = login_user(db, str(data.get("email", "")), str(data.get("password", "")))
     response.set_cookie("nv_session", token, httponly=True, samesite="lax", secure=os.getenv("APP_ENV", "demo") != "demo", max_age=7 * 86400)
     return result
@@ -175,6 +181,8 @@ def case_routes(request: Request, db: Session, user: User, parts: list[str], bod
             if demo_id:
                 from .demo_scenarios import seed_demo
                 seed_demo(db, case, demo_id, full=demo_scope == "full")
+            from .inquiry_assets import archive_original
+            archive_original(db, case)
             result = case_view(case)
             idem_store(db, marker, result)
             db.commit()
@@ -216,6 +224,9 @@ def case_routes(request: Request, db: Session, user: User, parts: list[str], bod
                 payload["originalText"] = body["originalText"]
             case.payload = encode(payload)
             touch(case)
+            if "originalText" in body:
+                from .inquiry_assets import archive_original
+                archive_original(db, case)
             db.commit()
             return case_view(case)
     if tail == ["status-transitions"] and method == "POST":
@@ -257,15 +268,16 @@ def case_routes(request: Request, db: Session, user: User, parts: list[str], bod
             db.commit()
             return message
     if tail and tail[0] == "revisions":
+        from .workbench import revision_view
         revs = revisions(db, case.id)
         if len(tail) == 1:
-            return {"items": [item_view(i) for i in revs]}
+            return {"items": [revision_view(db, i) for i in revs]}
         number = int(tail[1])
         found = next((i for i in revs if i.version == number), None)
         if not found:
             fail("NOT_FOUND", "业务版本不存在", 404)
         if len(tail) == 2:
-            return item_view(found)
+            return revision_view(db, found)
         if tail[2] == "restore" and method == "POST":
             from .revision_history import restore_revision
             return restore_revision(db, user, case, found, body)
@@ -465,11 +477,7 @@ def create_run(request: Request, db: Session, user: User, case: Case, body: dict
     return result
 
 
-@app.api_route("/api/v1/workspaces/{workspace_id}/{rest:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
-async def workspace_dispatch(workspace_id: str, rest: str, request: Request, db: Session = Depends(get_db)):
-    require_workspace(workspace_id)
-    user = current_user(request, db)
-    parts = [p for p in rest.split("/") if p]
+async def workspace_payload(request: Request):
     body = {}
     form = None
     if request.method in ("POST", "PUT", "PATCH"):
@@ -483,6 +491,17 @@ async def workspace_dispatch(workspace_id: str, rest: str, request: Request, db:
                 fail("INVALID_JSON", "请求 JSON 无效")
             if not isinstance(body, dict):
                 fail("INVALID_INPUT", "请求正文必须是对象")
+    return body, form
+
+
+@app.api_route("/api/v1/workspaces/{workspace_id}/{rest:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+def workspace_dispatch(workspace_id: str, rest: str, request: Request, db: Session = Depends(get_db), payload: tuple = Depends(workspace_payload)):
+    # Synchronous SQLAlchemy work must run in FastAPI's worker threads. A pool
+    # checkout on the event loop prevents other requests from releasing theirs.
+    require_workspace(workspace_id)
+    user = current_user(request, db)
+    parts = [p for p in rest.split("/") if p]
+    body, form = payload
     if not parts:
         fail("NOT_FOUND", "接口不存在", 404)
     if parts[0] == "library":

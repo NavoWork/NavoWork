@@ -49,9 +49,12 @@ import { ResizeHandle } from '../components/ResizeHandle';
 import { FilePreview, NodeReferenceDocument, OriginalDocument, WorkingDocument } from './InquiryDocument';
 import { filterNodeFolders, nodeDirectoryFolders, nodeReferenceDocuments } from './inquiry-node-directory';
 import { ConversationResults } from './ConversationResults';
+import { InquiryStageDocument } from './InquiryStageDocument';
 import type { GenerationNode } from './inquiry-generation';
 import {
   canvasKey,
+  canvasKindOrder,
+  workflowKinds,
   defaultFolders,
   initialCanvas,
   readCanvas,
@@ -76,6 +79,11 @@ const icons = {
   risks: ShieldAlert,
   quote: Table2,
   reply: Mail,
+  competitor: Search,
+  design: Image,
+  sample: Check,
+  order: FileText,
+  production: ListTree,
   source: FileText,
   file: Paperclip,
   note: NotebookPen,
@@ -89,6 +97,11 @@ const kindLabels: Record<DocumentKind, string> = {
   risks: '风险清单',
   quote: '方案报价',
   reply: '回复草稿',
+  competitor: '竞品研究',
+  design: '设计生图',
+  sample: '打样确认',
+  order: '订单合同',
+  production: '生产准备',
   source: '引用资料',
   file: '附件',
   note: '笔记',
@@ -133,7 +146,7 @@ function PreviewCard({ data, selected }: NodeProps<PreviewNode>) {
         </button>
       </div>
       <h3>{doc.title}{!!doc.warnings?.length && <span className="ic-node-warning" role="img" aria-label={`${doc.title}有${doc.warnings.length}项待确认`} title={doc.warnings.join('\n')}><TriangleAlert size={16} /></span>}</h3>
-      {doc.file ? (
+      {doc.imageUrl ? <img className="ic-card-image" src={doc.imageUrl} alt={`${doc.title}预览`} /> : doc.file ? (
         <FilePreview file={doc.file} base={data.base} scope={data.scope} compact />
       ) : (
         <p
@@ -447,7 +460,7 @@ function CanvasWorkspace({
     text: `已保存 ${revisions.length} 个业务版本。统一查看每轮需求、报价、回复与来源；历史恢复请到版本记录。`,
     caption: '统一成果入口',
   });
-  for (const doc of nodeReferenceDocuments(nodeSources.data)) {
+  for (const doc of nodeReferenceDocuments(nodeSources.data, revision)) {
     const existing = docs.find((item) => item.id === doc.id);
     if (existing) existing.reference = doc.reference;
     else docs.push(doc);
@@ -455,7 +468,7 @@ function CanvasWorkspace({
   useEffect(() => {
     if (mode !== 'real') return;
     const remap = (id: string) =>
-      /^(requirements|risks|quote|reply):\d+$/.test(id)
+      workflowKinds.includes(id.split(':')[0] as DocumentKind) && /^\w+:\d+$/.test(id)
         ? `${id.split(':')[0]}:${revision?.number || 0}`
         : id;
     setState((s) => ({ ...s, tabs: [...new Set(s.tabs.map(remap))], active: remap(s.active) }));
@@ -586,7 +599,7 @@ function CanvasWorkspace({
       mode === 'real'
         ? doc.kind !== 'revision' &&
           visible.findIndex((d) => d.id === doc.id) === index &&
-          (!['requirements', 'risks', 'quote', 'reply'].includes(doc.kind) ||
+          (!workflowKinds.includes(doc.kind) ||
             doc.id.endsWith(`:${revision?.number || 0}`)) &&
           (doc.kind !== 'result' || doc.id === 'result:hub')
         : initialIds.has(doc.id) ||
@@ -594,23 +607,7 @@ function CanvasWorkspace({
           doc.id.startsWith('bundle:') ||
           state.positions[doc.id] !== undefined,
     )
-    .sort((a, b) => {
-      const rank = (kind: DocumentKind) =>
-        ({
-          original: 0,
-          requirements: 1,
-          quote: 2,
-          conversation: 3,
-          risks: 4,
-          reply: 5,
-          source: 6,
-          file: 7,
-          note: 8,
-          result: 9,
-          revision: 10,
-        })[kind];
-      return rank(a.kind) - rank(b.kind);
-    });
+    .sort((a, b) => canvasKindOrder.indexOf(a.kind) - canvasKindOrder.indexOf(b.kind));
   const ordered = progressiveCanvasDocuments(candidates, Boolean(state.results?.length));
   const directoryFolders = nodeDirectoryFolders(ordered, docs, nodeSources.data);
   const visibleFolders = filterNodeFolders(directoryFolders, search);
@@ -647,7 +644,7 @@ function CanvasWorkspace({
       generating: readOnly || !!generationDisabled,
       skipsPending: !!inquiry.pendingRunId,
       generate:
-        onGenerate && ['requirements', 'risks', 'quote', 'reply'].includes(doc.kind)
+        onGenerate && workflowKinds.includes(doc.kind)
           ? () => onGenerate(doc.kind as GenerationNode)
           : undefined,
     },
@@ -656,16 +653,25 @@ function CanvasWorkspace({
   const edges: Edge[] = [];
   {
     const n = revision?.number || 0;
-    const pairs = [
-      ['original', `requirements:${n}`],
-      [`requirements:${n}`, `quote:${n}`],
-      [`quote:${n}`, `reply:${n}`],
-      [`requirements:${n}`, `risks:${n}`],
-    ];
+    const sequence = ['original', ...workflowKinds.map((kind) => `${kind}:${n}`)];
+    const pairs = sequence.slice(1).map((id, index) => [sequence[index], id]);
     for (const [source, target] of pairs)
       if (nodes.some((node) => node.id === source) && nodes.some((node) => node.id === target))
         edges.push({ id: `${source}-${target}`, source, target, ...edgeOptions });
   }
+  const shownRevision = useRef(inquiry.currentRevision);
+  useEffect(() => {
+    const number = revision?.number || 0;
+    const changed = number > shownRevision.current && number === inquiry.currentRevision;
+    shownRevision.current = Math.max(shownRevision.current, number);
+    if (!changed || active !== 'canvas') return;
+    const next = ordered.find((doc) => workflowKinds.includes(doc.kind) && !doc.hasContent && !doc.skippedMissing);
+    const generatedKind = revision?.generatedNode === 'costing' ? 'quote' : revision?.generatedNode;
+    const focusIds = [next?.id, ordered.find((doc) => doc.kind === generatedKind)?.id].filter((id): id is string => !!id);
+    if (!focusIds.length) return;
+    const frame = requestAnimationFrame(() => void flow.fitView({ nodes: focusIds.map((id) => ({ id })), padding: 0.25, maxZoom: 0.9, duration: 300 }));
+    return () => cancelAnimationFrame(frame);
+  }, [revision?.number, active]);
   useEffect(() => {
     if (!saveResultRequest || readOnly) return;
     try {
@@ -1107,6 +1113,9 @@ function CanvasWorkspace({
                           : undefined
                       }
                     />
+                  ) : ['competitor', 'design', 'sample', 'order', 'production'].includes(doc.kind) ? (
+                    <InquiryStageDocument doc={doc} disabled={readOnly || !!generationDisabled}
+                      onGenerate={onGenerate ? () => onGenerate(doc.kind as GenerationNode) : undefined} />
                   ) : doc.evidenceId || doc.reference ? (
                     <NodeReferenceDocument doc={doc} path={path} base={base} />
                   ) : doc.kind === 'note' ? (

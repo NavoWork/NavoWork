@@ -8,6 +8,7 @@ export function useLibraryCollection<T>(session: Session, group: string, demo: T
   const key = ['library', session.workspace.id, session.user.id, group];
   const path = `/workspaces/${session.workspace.id}/library/${group}`;
   const query = useQuery({ queryKey: key, enabled: mode === 'real',
+    refetchInterval: group === 'assets' ? 5000 : false,
     queryFn: ({ signal }) => api.get<{ items: T[] }>(path, signal) });
   const values = mode === 'real' ? query.data?.items || [] : local;
   const setValues = (action: SetStateAction<T[]>) => {

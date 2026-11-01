@@ -315,7 +315,7 @@ def workbench_routes(request: Request, db: Session, user: User, case: Case, tail
             # can choose any relevant capability, including image generation.
             node = next((key for key, prompt in PROMPTS.items() if instruction.startswith(prompt)), None)
         simulation = tail == ["simulations"]
-        if simulation and node not in {*NODE_KINDS, "risks", "reply"}:
+        if simulation and node not in {*NODE_KINDS, "risks", "reply", "competitor", "design"}:
             fail("INVALID_INPUT", "未知模拟节点", 400)
         if not simulation and node is not None and node not in NODE_KINDS:
             fail("INVALID_INPUT", "未知的业务节点", 400)

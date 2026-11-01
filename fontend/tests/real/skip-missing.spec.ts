@@ -58,6 +58,11 @@ test('a quote node can continue past pending requirements and reveal the next no
   await page.request.put(`${path}/workbench/artifacts/spec`, { data: { baseVersion: 0, content: { fields: { product: 'Cotton tote', quantity: '5000' } } } });
   const revisions = await (await page.request.get(`${path}/revisions`)).json();
   const current = revisions.items[0];
+  // This test starts after the research and artwork nodes, immediately before quotation.
+  current.nodeArtifacts = { ...current.nodeArtifacts,
+    competitor_analysis: { itemId: 'fixture-comparison', kind: 'competitor_analysis', title: '竞品分析', version: 1, content: { observations: [] } },
+    concept_image: { itemId: 'fixture-design', kind: 'concept_image', title: '产品设计图', version: 1, content: { prompt: 'Canvas tote design' } },
+  };
   const waiting = await (await page.request.post(`${path}/workbench/agent`, { data: { node: 'requirements', instruction: '整理需求', baseRevision: 1 } })).json();
   const nextId = 'quote-after-pending';
   const questions = [{ id: 'logo', question: '请补充印刷位置。' }];

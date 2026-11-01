@@ -30,12 +30,15 @@ test('node folders expose their data and original files without duplicate revisi
     } });
     expect(response.ok(), await response.text()).toBeTruthy();
   }
+  const quoteRun = await (await page.request.post(`${path}/workbench/simulations`, { data: { node: 'costing', baseRevision: 2, instruction: '生成演示报价' } })).json();
+  await expect.poll(async () => (await (await page.request.get(`${base}/runs/${quoteRun.id}`)).json()).status, { timeout: 15000 }).toBe('succeeded');
   await page.reload();
-  await expect(directory.locator('[data-node-id="quote:2"]')).toBeVisible();
+  await expect(directory.locator('[data-node-id="quote:3"]')).toBeVisible();
+  await page.getByRole('tab', { name: '询盘画板', exact: true }).click();
   const nodeIds = await page.locator('.react-flow__node:visible').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-id')).sort());
   const folderIds = await directory.locator('[data-node-id]').evaluateAll((folders) => folders.map((folder) => folder.getAttribute('data-node-id')).sort());
   expect(folderIds).toEqual(nodeIds);
-  const quote = directory.locator('[data-node-id="quote:2"]');
+  const quote = directory.locator('[data-node-id="quote:3"]');
   await expect(quote.getByRole('button', { name: 'factory-original.txt', exact: true })).toBeVisible();
   await expect(directory.getByRole('button', { name: '需求数据', exact: true })).toHaveCount(1);
   await directory.getByRole('button', { name: '需求数据', exact: true }).click();
@@ -47,5 +50,5 @@ test('node folders expose their data and original files without duplicate revisi
   await search.fill('');
   await directory.getByRole('button', { name: '版本记录文件夹', exact: true }).click();
   await expect(directory.getByRole('button', { name: 'V1 · 历史版本', exact: true })).toBeVisible();
-  await expect(directory.getByRole('button', { name: 'V2 · 当前版本', exact: true })).toBeVisible();
+  await expect(directory.getByRole('button', { name: 'V3 · 当前版本', exact: true })).toBeVisible();
 });

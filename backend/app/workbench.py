@@ -626,6 +626,7 @@ def workbench_view(db: Session, case: Case, user: User) -> dict:
             "id": row.id,
             "title": value.get("title"),
             "sourceRole": value.get("sourceRole"),
+            "node": value.get("node"),
             "parseStatus": value.get("parseStatus"),
             "blobId": value.get("blobId"),
             "text": (value.get("text") or "")[:4000],
@@ -767,6 +768,9 @@ def revision_from_artifacts(case: Case, latest: dict[str, dict], *, number: int,
             "inquiry_assessment": "inquiry",
             "risk_review": "risks",
             "customer_reply": "reply",
+            "competitor_analysis": "competitor",
+            "design_brief": "competitor",
+            "concept_image": "design",
         }.get(kind, "requirements")
         for kind in latest
     )
@@ -806,10 +810,23 @@ def revision_from_artifacts(case: Case, latest: dict[str, dict], *, number: int,
         "sourceRefs": [],
         "assetRefs": [],
         "artifactVersionIds": {kind: value["itemId"] for kind, value in latest.items()},
+        "nodeArtifacts": latest,
         "ruleSetVersion": "workbench-v2",
         "changeSummary": [summary],
         "createdAt": now(),
     }
+
+
+def revision_view(db: Session, row: Item) -> dict:
+    """Hydrate older revisions from their frozen artifact IDs, never from latest state."""
+    value = item_view(row)
+    if {kind: artifact.get("itemId") for kind, artifact in value.get("nodeArtifacts", {}).items()} != value.get("artifactVersionIds", {}):
+        value["nodeArtifacts"] = {}
+        for kind, artifact_id in value.get("artifactVersionIds", {}).items():
+            artifact = db.get(Item, artifact_id)
+            if artifact and artifact.kind == "artifact" and artifact.case_id == row.case_id and decode(artifact.payload).get("kind") == kind:
+                value["nodeArtifacts"][kind] = _view(artifact)
+    return value
 
 
 def commit_revision(db: Session, case: Case, summary: str, *, node: str | None = None, run_id: str = "", job_id: str | None = None) -> dict | None:

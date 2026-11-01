@@ -105,6 +105,7 @@ export interface Revision {
   restoredNode?: string;
   generatedNode?: string;
   artifactVersionIds?: Record<string, string>;
+  nodeArtifacts?: Record<string, WorkbenchArtifact>;
   inquiryId: string;
   number: number;
   runId: string;
@@ -284,6 +285,7 @@ export interface WorkbenchEvidence {
   blobId?: string | null;
   text: string;
   createdAt: string;
+  node?: string;
 }
 export interface WorkbenchKnowledge {
   id: string;

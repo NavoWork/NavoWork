@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "simulation": true,
+  "sourceNote": "德国竞品复用 manifest.json 中 competitor_a / competitor_b 原件；其余四类为补充虚构资料。后续阶段沿用当前询盘规格、报价与 demo_scenarios 的原始资料，不混用 Nordlicht V2 彩盒变更案例。",
+  "scenarios": {
+    "de-backpack": {
+      "competitors": [
+        {"name": "Aster Daypack 22", "fixtureKey": "competitor_a", "price": "EUR 69", "material": "recycled polyester", "features": "front zip pocket; laptop sleeve"},
+        {"name": "Fjord Metro 20", "fixtureKey": "competitor_b", "price": "EUR 79", "material": "coated polyester", "features": "roll top; two bottle pockets"}
+      ],
+      "suggestions": ["沿用客户要求的再生涤纶面料、前拉链袋和电脑夹层，突出通勤功能。", "保留双侧水杯袋；维持已确认的拉链主仓，不替换为卷口结构。", "以海军蓝外观、白色刺绣标识和背部缓冲形成产品识别；零售价仅用于定位参考。"],
+      "designDirection": "海军蓝 20L 通勤背包；前拉链袋、双侧网袋、15.6 英寸电脑夹层；白色 Logo 位置按当前规格核对。"
+    },
+    "us-tote": {
+      "competitors": [
+        {"name": "Maple Everyday Tote", "price": "USD 24", "material": "12 oz cotton canvas", "features": "open top; long handles; front print"},
+        {"name": "Cedar Market Tote", "price": "USD 29", "material": "heavy cotton canvas", "features": "bottom gusset; inner pocket"}
+      ],
+      "suggestions": ["保留本色帆布与单色品牌印花，突出重复使用场景。", "袋底结构与提手承重按客户规格复核，内袋仅作可选建议。"],
+      "designDirection": "本色帆布袋，正面单色印花，长提手，展示袋底结构。"
+    },
+    "uk-duffel": {
+      "competitors": [
+        {"name": "Harbor Active Duffel", "price": "GBP 49", "material": "900D polyester", "features": "large zip opening; detachable strap"},
+        {"name": "Cove Gym Carry", "price": "GBP 59", "material": "PU-backed polyester", "features": "side pocket; reinforced base"}
+      ],
+      "suggestions": ["保留大开口、加固包底与可调肩带，便于健身及短途出行。", "侧袋分区作为结构参考，不据此增加未确认的防水或承重承诺。"],
+      "designDirection": "黑色健身旅行包，织标、侧袋、可拆肩带及加固包底。"
+    },
+    "jp-cooler": {
+      "competitors": [
+        {"name": "Hikari Lunch Carry", "price": "JPY 2800", "material": "polyester / PEVA", "features": "wide opening; wipe-clean lining"},
+        {"name": "Mori Daily Cooler", "price": "JPY 3200", "material": "polyester / foam insulation", "features": "compact box shape; carry handle"}
+      ],
+      "suggestions": ["使用浅灰色盒型包身和便于清洁的内衬表达午餐收纳场景。", "保温时长与食品接触性能保留为待测试项。"],
+      "designDirection": "浅灰保温午餐包，拉链大开口、手提带和内衬层次示意。"
+    },
+    "au-laptop": {
+      "competitors": [
+        {"name": "Southern Commuter 15", "price": "AUD 79", "material": "420D nylon", "features": "padded laptop compartment; shoulder strap"},
+        {"name": "Coast Office Carry", "price": "AUD 89", "material": "nylon / foam", "features": "front organizer; reinforced handles"}
+      ],
+      "suggestions": ["保留 15.6 英寸缓冲电脑夹层，突出轻量通勤外观。", "前袋分区与肩带连接点作为打样核对重点。"],
+      "designDirection": "炭灰色电脑单肩包，前收纳袋、缓冲电脑夹层和加固提手。"
+    }
+  },
+  "productionTasks": [
+    {"dayRatio": 0, "task": "复核规格、样品、订单及定金", "owner": "跟单"},
+    {"dayRatio": 0.15, "task": "面辅料到厂与来料检验", "owner": "采购 / IQC"},
+    {"dayRatio": 0.3, "task": "裁剪与 Logo 工艺首件确认", "owner": "工厂"},
+    {"dayRatio": 0.55, "task": "车缝、组装及在线巡检", "owner": "工厂 / IPQC"},
+    {"dayRatio": 0.85, "task": "成品检验与包装核对", "owner": "QC"},
+    {"dayRatio": 1, "task": "装箱与 FOB 宁波交接准备", "owner": "物流"}
+  ]
+}

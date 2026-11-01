@@ -126,6 +126,7 @@ def restore_revision(db, user, case, source_row, body):
     db.flush()
     # A full fork's manifest contains only that historical branch's artifacts.
     result["artifactVersionIds"] = restored if target == "all" else {**current_artifacts, **restored}
+    result.pop("nodeArtifacts", None)  # Rehydrate the newly restored artifact versions on read.
     if target != "all":
         result["sourceRefs"] = list({r["sourceVersionId"]: r for r in [*current.get("sourceRefs", []), *source.get("sourceRefs", [])]}.values())
     if target in ("all", "requirements", "quote"):

@@ -1,5 +1,6 @@
 import { openDB } from 'idb';
 import { channelLabels } from './CustomerContextCard';
+import { additionalStageDocuments, stageHasContent } from './inquiry-stage-documents';
 import type {
   Asset,
   Inquiry,
@@ -19,6 +20,11 @@ export type DocumentKind =
   | 'risks'
   | 'quote'
   | 'reply'
+  | 'competitor'
+  | 'design'
+  | 'sample'
+  | 'order'
+  | 'production'
   | 'source'
   | 'file'
   | 'note'
@@ -45,9 +51,12 @@ export interface WorkspaceDocument {
   reference?: { sourceId: string; version: number };
   warnings?: string[];
   skippedMissing?: boolean;
+  imageUrl?: string;
+  comparisons?: { name: string; price: string; material: string; features: string }[];
 }
 
-const workflowKinds: DocumentKind[] = ['requirements', 'quote', 'risks', 'reply'];
+export const workflowKinds: DocumentKind[] = ['requirements', 'competitor', 'design', 'quote', 'risks', 'reply', 'sample', 'order', 'production'];
+export const canvasKindOrder: DocumentKind[] = ['original', ...workflowKinds, 'conversation', 'source', 'file', 'note', 'result', 'revision'];
 
 function hasMeaningfulText(text: string): boolean {
   return text.split('\n').some((line) => {
@@ -92,7 +101,7 @@ function revisionNodeHasContent(
     case 'reply':
       return hasMeaningfulText(replyText ?? revision.replies['en-US']);
     default:
-      return false;
+      return stageHasContent(revision, kind);
   }
 }
 
@@ -110,7 +119,7 @@ export function progressiveCanvasDocuments(
     if (doc.kind === 'result') return includeResults;
     if (workflowKinds.includes(doc.kind)) return doc.hasContent || doc.skippedMissing || doc === next;
     return true;
-  });
+  }).sort((a, b) => canvasKindOrder.indexOf(a.kind) - canvasKindOrder.indexOf(b.kind));
 }
 export interface WorkspaceFile {
   serverFileId?: string;
@@ -206,7 +215,7 @@ export function resultSnapshot(
     title: `V${revision.number} · 对话成果`,
     text: [
       ...documents
-        .filter((doc) => ['requirements', 'risks', 'quote', 'reply'].includes(doc.kind))
+        .filter((doc) => workflowKinds.includes(doc.kind) && doc.hasContent)
         .map((doc) => `## ${doc.title}\n\n${doc.text}`),
       `## Español · México\n\n${replies?.['es-MX'] ?? revision.replies['es-MX']}`,
       `## 资料依据\n\n${revision.sourceRefs.map((ref) => `${ref.title} · V${ref.version}\n${ref.supports.join('、')}`).join('\n\n') || '暂无引用来源'}`,
@@ -351,6 +360,7 @@ export function revisionDocuments(
         caption: '等待生成',
       });
   }
+  docs.push(...additionalStageDocuments(r));
   for (const doc of docs) {
     if (!workflowKinds.includes(doc.kind)) continue;
     doc.hasContent = revisionNodeHasContent(r, doc.kind, replyText);
@@ -458,7 +468,7 @@ export function workspaceDocuments({
     })),
   );
   for (const doc of docs) {
-    const node = ({ original: 'inquiry', requirements: 'requirements', quote: 'costing', risks: 'risks', reply: 'reply' } as Record<string, string>)[doc.kind];
+    const node = ({ original: 'inquiry', quote: 'costing' } as Record<string, string>)[doc.kind] || doc.kind;
     const warnings = !doc.revision || doc.revision.number === inquiry.currentRevision ? inquiry.nodeWarnings?.[node] || [] : [];
     doc.warnings = [...new Set(warnings.map((warning) => warning.question))];
     doc.skippedMissing = warnings.some((warning) => warning.skipped);

@@ -207,11 +207,28 @@ export async function loadInquiryAssetGroup(
   return { id: inquiry.id, title: inquiry.title, folders, assets };
 }
 
-export function useInquiryAssets(session: Session) {
+export function groupPersistedInquiryAssets(assets: LibraryAsset[]): InquiryAssetGroup[] {
+  const groups = new Map<string, InquiryAssetGroup>();
+  for (const asset of assets) {
+    const origin = asset.inquiry;
+    if (!origin) continue;
+    const group = groups.get(origin.id) || {
+      id: origin.id, title: origin.title, folders: [], assets: [],
+    };
+    if (!group.folders.some((folder) => folder.id === origin.folderId))
+      group.folders.push({ id: origin.folderId, title: origin.folderTitle });
+    group.assets.push(asset);
+    groups.set(origin.id, group);
+  }
+  return [...groups.values()];
+}
+
+export function useInquiryAssets(session: Session, persistedAssets: LibraryAsset[] = []) {
   const queryClient = useQueryClient();
   const prefix = ['inquiry-library', session.user.id, session.workspace.id];
   const list = useQuery({
     queryKey: [...prefix, 'list'],
+    enabled: mode === 'mock',
     staleTime: 0,
     queryFn: async ({ signal }) => {
       const items: Inquiry[] = [];
@@ -228,7 +245,7 @@ export function useInquiryAssets(session: Session) {
     },
   });
   const queries = useQueries({
-    queries: (list.data || []).map((inquiry) => ({
+    queries: (mode === 'mock' ? list.data || [] : []).map((inquiry) => ({
       queryKey: [...prefix, inquiry.id, inquiry.updatedAt, inquiry.currentRevision],
       staleTime: 0,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
@@ -240,10 +257,14 @@ export function useInquiryAssets(session: Session) {
     const invalidate = () => {
       clearTimeout(timer);
       timer = setTimeout(
-        () =>
+        () => {
           void queryClient.invalidateQueries({
             queryKey: ['inquiry-library', session.user.id, session.workspace.id],
-          }),
+          });
+          void queryClient.invalidateQueries({
+            queryKey: ['library', session.workspace.id, session.user.id, 'assets'],
+          });
+        },
         200,
       );
     };
@@ -271,9 +292,10 @@ export function useInquiryAssets(session: Session) {
     };
   }, [queryClient, session.user.id, session.workspace.id]);
   return {
-    groups: queries.flatMap((query) => (query.data ? [query.data] : [])),
-    loading: list.isPending || queries.some((query) => query.isPending),
-    error: list.error || queries.find((query) => query.error)?.error,
+    groups: mode === 'real' ? groupPersistedInquiryAssets(persistedAssets)
+      : queries.flatMap((query) => (query.data ? [query.data] : [])),
+    loading: mode === 'mock' && (list.isPending || queries.some((query) => query.isPending)),
+    error: mode === 'mock' ? list.error || queries.find((query) => query.error)?.error : undefined,
     retry: () => queryClient.invalidateQueries({ queryKey: prefix }),
   };
 }

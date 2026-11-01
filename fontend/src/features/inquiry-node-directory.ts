@@ -1,5 +1,6 @@
-import type { WorkbenchData } from '../api/types';
-import type { WorkspaceDocument } from './inquiry-canvas-model';
+import type { Revision, WorkbenchData } from '../api/types';
+import { workflowKinds, type WorkspaceDocument } from './inquiry-canvas-model';
+import { artifactText, stageDocuments } from './inquiry-stage-documents';
 
 export interface NodeFolder {
   id: string;
@@ -11,11 +12,17 @@ export interface NodeFolder {
 const contentTitles: Record<string, string> = {
   original: '客户原文', requirements: '需求数据', risks: '风险清单',
   quote: '方案与报价', reply: '回复内容', result: '成果内容',
+  competitor: '对比结论', design: '产品概念图', sample: '样品记录', order: 'PO 与 PI', production: '生产资料',
 };
 
-export function nodeReferenceDocuments(data?: WorkbenchData): WorkspaceDocument[] {
+export function nodeReferenceDocuments(data?: WorkbenchData, revision?: Revision): WorkspaceDocument[] {
   if (!data) return [];
   return [
+    ...stageDocuments.flatMap((stage) => stage.artifacts.slice(1).flatMap((key) => {
+      const artifact = revision?.nodeArtifacts?.[key];
+      return artifact ? [{ id: `artifact:${artifact.itemId}`, kind: 'source' as const, title: artifact.title,
+        folder: stage.kind, text: artifactText(artifact), caption: `V${artifact.version} · 节点原始数据`, directoryOnly: true }] : [];
+    })),
     ...data.evidence.map((item) => ({
       id: `evidence:${item.id}`, title: item.title, kind: 'source' as const,
       folder: 'materials', text: item.text, caption: '询盘原件',
@@ -35,7 +42,7 @@ export function nodeDirectoryFolders(
 ): NodeFolder[] {
   const byId = new Map(documents.map((doc) => [doc.id, doc]));
   const folders: NodeFolder[] = nodes.map((doc) => ({
-    id: `node:${['original', 'requirements', 'risks', 'quote', 'reply'].includes(doc.kind) ? doc.kind : doc.id}`,
+    id: `node:${doc.kind === 'original' || workflowKinds.includes(doc.kind) ? doc.kind : doc.id}`,
     title: doc.title, node: doc,
     items: [{ doc, title: contentTitles[doc.kind] || doc.title }],
   }));
@@ -47,11 +54,15 @@ export function nodeDirectoryFolders(
   };
   for (const evidence of data?.evidence || []) {
     // Quotes live with the quote node once it exists; all originals remain reachable before then.
-    const owner = evidence.sourceRole === 'supplier_quote' ? folderFor('quote') : undefined;
+    const kind = evidence.node || (evidence.sourceRole === 'supplier_quote' ? 'quote'
+      : /样品/.test(evidence.title) ? 'sample' : /订单|定金|PO|PI/.test(evidence.title) ? 'order'
+      : /生产条件/.test(evidence.title) ? 'production' : /竞品/.test(evidence.title) ? 'competitor' : 'original');
+    const owner = folderFor(kind);
     add(owner || folderFor('original'), `evidence:${evidence.id}`);
   }
   for (const folder of folders) {
     const node = folder.node!;
+    for (const doc of documents) if (doc.directoryOnly && doc.id.startsWith('artifact:') && doc.folder === node.kind) add(folder, doc.id);
     if (['requirements', 'quote', 'risks', 'reply'].includes(node.kind)) {
       const refs = node.kind === 'requirements' ? node.revision?.requirements.evidenceRefs
         : node.kind === 'risks' ? node.revision?.risks.flatMap((risk) => risk.evidenceRefs) : [];

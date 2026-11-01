@@ -53,4 +53,17 @@ describe('node folders', () => {
     expect(filterNodeFolders(folders, '客户需求与规格')[0].items).toHaveLength(2);
     expect(filterNodeFolders(folders, '不存在的内容')).toEqual([]);
   });
+
+  it('groups research sources and production files under their matching node folders', () => {
+    const competitor = doc('competitor:9', 'competitor', '竞品分析');
+    const production = doc('production:9', 'production', '生产准备');
+    const view = { ...data, evidence: [...data.evidence, { id: 'aster', title: 'Aster 原始快照', sourceRole: 'internal_note', node: 'competitor', text: 'EUR 69', parseStatus: 'parsed', createdAt: '' }] };
+    const revision = { nodeArtifacts: { qc: { itemId: 'qc:v1', kind: 'qc', title: 'QC 检查表', version: 1, status: 'draft', content: { standard: 'AQL 2.5', checks: ['尺寸'] } } } } as unknown as Revision;
+    const docs = [original, competitor, production, ...nodeReferenceDocuments(view, revision)];
+    const folders = nodeDirectoryFolders([original, competitor, production], docs, view);
+    expect(folders[1].items.map(item => item.doc.id)).toContain('evidence:aster');
+    expect(folders[0].items.map(item => item.doc.id)).not.toContain('evidence:aster');
+    expect(folders[2].items.map(item => item.title)).toEqual(['生产资料', 'QC 检查表']);
+    expect(filterNodeFolders(folders, 'AQL 2.5')[0].title).toBe('生产准备');
+  });
 });

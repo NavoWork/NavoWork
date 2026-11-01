@@ -27,13 +27,13 @@ test('node generation simulates all six phases, persists content and keeps chat 
   }
   await expect(activity.getByText('本轮处理已完成', { exact: true })).toBeVisible();
   await expect(activity.locator('.iw-run-steps .is-complete')).toHaveCount(6);
-  await expect(page.locator('.react-flow__node[data-id="quote:1"]')).toBeVisible();
+  await expect(page.locator('.react-flow__node[data-id="competitor:1"]')).toBeVisible();
   expect(liveRequests).toBe(0);
   const stored = await (await page.request.get(`${base}/runs/${run.id}`)).json();
   expect(stored.agentVerification.modelApiCalled).toBe(false);
   await page.reload();
   await expect(page.locator('.react-flow__node[data-id="requirements:1"]')).toContainText('recycled polyester');
-  await expect(page.locator('.react-flow__node[data-id="quote:1"]')).toBeVisible();
+  await expect(page.locator('.react-flow__node[data-id="competitor:1"]')).toBeVisible();
   const chat = page.locator('.iw-assistant');
   await chat.getByLabel('补充要求或客户反馈').fill('请解释客户需求');
   await chat.getByRole('button', { name: '处理反馈', exact: true }).click();

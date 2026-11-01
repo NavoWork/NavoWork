@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Inquiry, Revision } from '../api/types';
 import {
   initialCanvas,
+  workflowKinds,
   progressiveCanvasDocuments,
   workspaceDocuments,
   type CanvasState,
@@ -68,7 +69,7 @@ function documents(current?: Revision, state: CanvasState = initialCanvas()) {
     state,
   }).filter(
     (doc) =>
-      !['requirements', 'quote', 'risks', 'reply'].includes(doc.kind) ||
+      !workflowKinds.includes(doc.kind) ||
       doc.id.endsWith(`:${current?.number || 0}`),
   );
 }
@@ -82,7 +83,7 @@ describe('progressive inquiry canvas', () => {
       requirements: [{ question: '请补充尺寸。', runId: 'run-skip', skipped: true }],
     } }, revisions: [], messages: [], state: initialCanvas() });
     const nodes = progressiveCanvasDocuments(docs);
-    expect(nodes.map((node) => node.kind)).toEqual(['original', 'requirements', 'quote']);
+    expect(nodes.map((node) => node.kind)).toEqual(['original', 'requirements', 'competitor']);
     const requirements = nodes.find((node) => node.kind === 'requirements')!;
     expect(requirements.text).toBe('');
     expect(requirements.hasContent).toBe(false);
@@ -99,40 +100,41 @@ describe('progressive inquiry canvas', () => {
     expect(businessNodes(documents(revision()))).toEqual(['original', 'requirements']);
   });
 
-  it('reveals an empty quote after requirements, without treating its copied SKU as a quote', () => {
+  it('reveals competitor analysis after requirements without treating the copied SKU as a quote', () => {
     const current = revision();
     current.requirements.requestedProduct = 'Custom backpack';
     current.proposal.selectedSku = 'Custom backpack';
     const docs = documents(current);
-    expect(businessNodes(docs)).toEqual(['original', 'requirements', 'quote']);
+    expect(businessNodes(docs)).toEqual(['original', 'requirements', 'competitor']);
     expect(docs.find((doc) => doc.kind === 'quote')?.text).toBe('');
   });
 
-  it('reveals only one new empty node as drafts gain content and survive restoration', () => {
+  it('reveals each research, image and downstream stage in order and restores saved drafts', () => {
     const state = initialCanvas();
-    state.drafts['requirements:0'] = '产品：定制背包';
-    expect(businessNodes(documents(undefined, state))).toEqual([
-      'original',
-      'requirements',
-      'quote',
-    ]);
-    state.drafts['quote:0'] = '建议使用再生涤纶，报价待供应商确认。';
-    expect(businessNodes(documents(undefined, state))).toEqual([
-      'original',
-      'requirements',
-      'risks',
-      'quote',
-    ]);
-    state.drafts['risks:0'] = '需确认到港时间。';
+    for (let index = 0; index < workflowKinds.length; index++) {
+      const visible = businessNodes(documents(undefined, state));
+      expect(visible).toEqual(['original', ...workflowKinds.slice(0, index + 1)]);
+      state.drafts[`${workflowKinds[index]}:0`] = `已保存的${workflowKinds[index]}内容`;
+    }
     const restored = JSON.parse(JSON.stringify(state)) as CanvasState;
-    expect(businessNodes(documents(undefined, restored))).toEqual([
-      'original',
-      'requirements',
-      'risks',
-      'quote',
-      'reply',
-    ]);
-    expect(documents(undefined, restored).find((doc) => doc.kind === 'reply')?.text).toBe('');
+    expect(businessNodes(documents(undefined, restored))).toEqual(['original', ...workflowKinds]);
+    expect(businessNodes(documents(undefined, restored))).toHaveLength(10);
+  });
+
+  it('renders artwork only from the saved image artifact, not from a design brief', () => {
+    const current = revision();
+    current.requirements.requestedProduct = 'Recycled backpack';
+    const artifact = (kind: string, content: Record<string, unknown>) => ({ itemId: kind, kind, title: kind, version: 1, status: 'draft', content });
+    current.nodeArtifacts = {
+      competitor_analysis: artifact('competitor_analysis', { comparisons: [{ name: 'Aster', price: 'EUR 69', material: 'recycled polyester', features: 'laptop sleeve' }] }),
+      design_brief: artifact('design_brief', { competitorSuggestions: [] }),
+    };
+    expect(businessNodes(documents(current))).toEqual(['original', 'requirements', 'competitor', 'design']);
+    expect(documents(current).find(doc => doc.kind === 'design')?.hasContent).toBe(false);
+    current.nodeArtifacts.concept_image = artifact('concept_image', { downloadUrl: '/api/v1/workspaces/ws_demo/exports/image/download', prompt: 'Navy backpack' });
+    const visible = progressiveCanvasDocuments(documents(current));
+    expect(visible.find(doc => doc.kind === 'design')?.imageUrl).toContain('/exports/image/download');
+    expect(visible.map(doc => doc.kind)).toEqual(['original', 'requirements', 'competitor', 'design', 'quote']);
   });
 
   it('ignores empty fields, waiting labels and legacy placeholder prose', () => {
@@ -163,8 +165,8 @@ describe('progressive inquiry canvas', () => {
       'original',
       'requirements',
       'reply',
-      'note',
       'file',
+      'note',
     ]);
   });
 

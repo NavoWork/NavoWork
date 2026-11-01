@@ -98,6 +98,9 @@ def item_view(item: Item) -> dict:
 def create_item(db: Session, kind: str, payload: dict, *, case_id: str | None = None, parent_id: str | None = None, version: int = 1, status: str = "draft", item_id: str | None = None) -> Item:
     item = Item(id=item_id or uid(kind), kind=kind, workspace_id=WORKSPACE_ID, case_id=case_id, parent_id=parent_id, version=version, status=status, payload=encode(payload))
     db.add(item)
+    if case_id and kind in {"evidence", "canvas_file", "artifact", "export", "office_file", "draft"}:
+        from .inquiry_assets import archive_source
+        archive_source(db, item)
     return item
 
 
