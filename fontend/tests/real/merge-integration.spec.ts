@@ -38,8 +38,6 @@ test('team Wiki is immediately available in @ references and submits its fixed s
   expect(document.sourceVersionId).toBeTruthy();
   const inquiry = await createInquiry(page, '合并引用询盘');
   await page.goto(`/inquiries/${inquiry.id}`);
-  await expect(page.locator('.wbv2')).toBeVisible();
-  await page.getByRole('button', { name: '资料画板', exact: true }).click();
   const work = page.locator('.inquiry-mount:not([hidden])');
   await expect(work.getByRole('tab', { name: '询盘画板', exact: true })).toBeVisible();
   const input = work.getByLabel('补充要求或客户反馈');

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import {
@@ -27,7 +27,7 @@ import type {
   WorkbenchEvidence,
   WorkbenchStage,
 } from '../../api/types';
-import { ErrorNotice, Loading, Modal } from '../../components/ui';
+import { ErrorNotice, Loading, Modal, StatusBadge } from '../../components/ui';
 import { runContext, type ComposerContext } from '../inquiry-context';
 import { useAvailableSkills } from '../skill-catalog';
 import { AgentPanel } from './AgentPanel';
@@ -166,7 +166,6 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
     if (run.data?.status === 'needs_input' && node && CORE_STAGES.includes(node)) setStage(node);
   }, [run.data?.id, run.data?.status, run.data?.node]);
 
-  const stageData = useMemo(() => data?.stages.find((item) => item.key === stage), [data, stage]);
 
   const operate = async (operation: () => Promise<void>, success?: string) => {
     setBusy(true);
@@ -316,14 +315,13 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
   if (!data) return <EmptyHint>项目不存在或没有访问权限。</EmptyHint>;
 
   const selectedRefCount = selectedEvidence.length + selectedKnowledge.length + selectedAssets.length;
-  const stageTitle = data.stages.find((item) => item.key === stage)?.title || '当前工作';
 
   return (
     <div className="wbv2">
-      <header className="wbv2-head">
-        <div className="wbv2-head-title">
+      <header className="iw-heading wbv2-head">
+        <div className="iw-title">
           <h1>{data.case.title}</h1>
-          <p>{[data.case.customer, data.case.destination].filter(Boolean).join(' · ')}</p>
+          <StatusBadge status={data.case.businessStatus} />
         </div>
       </header>
 
@@ -355,18 +353,6 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
         </aside>
 
         <main className={`wbv2-main ${stage === 'inquiry' ? 'wbv2-inquiry-main' : ''}`}>
-          <div className="wbv2-main-head">
-            <div>
-              <span className="wbv2-eyebrow">STAGE {stageIndex[stage]}</span>
-              <h2>{stageTitle}</h2>
-              <p>{stageData?.nextAction}</p>
-            </div>
-            <div className="wbv2-main-meta">
-              {stageData && <Pill tone={stageData.status === 'confirmed' ? 'green' : stageData.status === 'blocked' ? 'red' : stageData.status === 'ready' ? 'blue' : 'neutral'}>{stageLabel(stageData)}</Pill>}
-              {stageData?.missing?.length ? <span>{stageData.missing.length} 项待处理</span> : null}
-            </div>
-          </div>
-
           {notice && <div className="wbv2-notice"><Check size={14} />{notice}</div>}
           <ErrorNotice error={error} onRetry={() => setError(undefined)} />
           {stage === 'inquiry' && <InquiryPanel data={data} onAgent={sendAgent} />}
