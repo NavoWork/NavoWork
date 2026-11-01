@@ -15,6 +15,8 @@ import {
   History,
   LayoutGrid,
   MessageSquare,
+  PanelLeftClose,
+  PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
   Paperclip,
@@ -102,10 +104,16 @@ export function InquiryWorkspace({
       lastRunId: '',
       selectedAssets: null as string[] | null,
       assistantWidth: null as number | null,
+      workspaceOpen: true,
+      assistantOpen: true,
     }),
   );
   const [input, setInput] = useState(initial.current.input);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [aiEditOpen, setAiEditOpen] = useState(false);
+  const [aiEditRequest, setAiEditRequest] = useState('');
+  const [aiEditDraft, setAiEditDraft] = useState('');
+  const [aiEditPreview, setAiEditPreview] = useState('');
   function chooseSuggestion(message: string) {
     setInput(message);
     requestAnimationFrame(() => {
@@ -141,16 +149,18 @@ export function InquiryWorkspace({
     initial.current.selectedAssets ?? null,
   );
   const [mobilePane, setMobilePane] = useState<'chat' | 'results'>('chat');
+  const [workspaceOpen, setWorkspaceOpen] = useState(initial.current.workspaceOpen ?? true);
   const [documentRequest, setDocumentRequest] = useState<{ id: string; seq: number } | null>(null);
   const openDocument = (id: string) => {
+    setWorkspaceOpen(true);
     setMobilePane('chat');
     setDocumentRequest((old) => ({ id, seq: (old?.seq || 0) + 1 }));
   };
+  const [resultsOpen, setResultsOpen] = useState(initial.current.assistantOpen ?? true);
   const showAIChat = () => {
     setResultsOpen(true);
     setMobilePane('results');
   };
-  const [resultsOpen, setResultsOpen] = useState(true);
   const [assistantWidth, setAssistantWidth] = useState<number | null>(
     typeof initial.current.assistantWidth === 'number' &&
       Number.isFinite(initial.current.assistantWidth)
@@ -231,8 +241,20 @@ export function InquiryWorkspace({
       lastRunId,
       selectedAssets,
       assistantWidth,
+      workspaceOpen,
+      assistantOpen: resultsOpen,
     });
-  }, [input, deferredResults, revisionNumber, lastRunId, selectedAssets, assistantWidth, prefKey]);
+  }, [
+    input,
+    deferredResults,
+    revisionNumber,
+    lastRunId,
+    selectedAssets,
+    assistantWidth,
+    workspaceOpen,
+    resultsOpen,
+    prefKey,
+  ]);
   useEffect(() => {
     if (
       run &&
@@ -436,6 +458,29 @@ export function InquiryWorkspace({
     [...(detail.data?.messages || [])]
       .reverse()
       .find((message) => message.role === 'assistant' && message.runId === revision.runId);
+  const orderedMessages = [...(detail.data?.messages || [])].sort((a, b) => {
+    const time = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    return time || a.id.localeCompare(b.id);
+  });
+  const openAiEditor = () => {
+    if (!canWrite) return;
+    setAiEditDraft(input);
+    setAiEditPreview('');
+    setAiEditRequest('');
+    setAiEditOpen(true);
+  };
+  const generateAiEdit = () => {
+    const source = aiEditDraft.trim();
+    const request = aiEditRequest.trim();
+    if (!source || !request) return;
+    const asksForPricing = /核价|报价|价格|成本|汇率|毛利/.test(request);
+    const asksForReferences = /参考|资料|依据|来源/.test(request);
+    const additions = [
+      asksForReferences ? '参考资料：请补充供应商报价、历史成交记录和当前有效的产品规格版本，并标注每项资料的版本与更新时间。' : '',
+      asksForPricing ? '核价参数：请补充数量、供应商单件成本、包装费、本地费用、汇率、目标毛利率，并明确运费、税费是否包含。' : '',
+    ].filter(Boolean);
+    setAiEditPreview(`${source}\n\n${additions.join('\n')}\n${request}`.trim());
+  };
   const resultPreview = revision ? (
     <InquiryResult
       key={revision.number}
@@ -461,8 +506,13 @@ export function InquiryWorkspace({
       }}
     />
   ) : null;
+  const pageModeClass = !workspaceOpen
+    ? 'iw-focus-results'
+    : !resultsOpen
+      ? 'iw-focus-chat'
+      : '';
   return (
-    <div className={`iw-page iw-canvas-page ${resultsOpen ? '' : 'iw-focus-chat'}`}>
+    <div className={`iw-page iw-canvas-page ${pageModeClass}`}>
       <header className="iw-heading">
         <div className="iw-title">
           <h1>{inquiry.title}</h1>
@@ -478,12 +528,34 @@ export function InquiryWorkspace({
             导出草稿材料
           </button>
           <button
-            className="icon-button iw-results-toggle"
-            aria-label={resultsOpen ? '收起 AI 面板' : '展开 AI 面板'}
+            className="icon-button iw-pane-toggle-desktop"
+            aria-label={workspaceOpen ? '收起左侧工作区' : '展开左侧工作区'}
+            aria-expanded={workspaceOpen}
+            aria-controls={`workspace-${inquiryId}`}
+            title={workspaceOpen ? '收起左侧工作区' : '展开左侧工作区'}
+            onClick={() =>
+              setWorkspaceOpen((value) => {
+                const next = !value;
+                if (!next && !resultsOpen) setResultsOpen(true);
+                return next;
+              })
+            }
+          >
+            {workspaceOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+          </button>
+          <button
+            className="icon-button iw-results-toggle iw-pane-toggle-desktop"
+            aria-label={resultsOpen ? '收起 AI 对话窗口' : '展开 AI 对话窗口'}
             aria-expanded={resultsOpen}
             aria-controls={`results-${inquiryId}`}
-            title={resultsOpen ? '收起 AI 面板' : '展开 AI 面板'}
-            onClick={() => setResultsOpen((value) => !value)}
+            title={resultsOpen ? '收起 AI 对话窗口' : '展开 AI 对话窗口'}
+            onClick={() =>
+              setResultsOpen((value) => {
+                const next = !value;
+                if (!next && !workspaceOpen) setWorkspaceOpen(true);
+                return next;
+              })
+            }
           >
             {resultsOpen ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
           </button>
@@ -565,7 +637,11 @@ export function InquiryWorkspace({
           } as CSSProperties
         }
       >
-        <section className="iw-conversation iw-data-pane" aria-label="询盘画板与资料">
+        <section
+          className="iw-conversation iw-data-pane"
+          id={`workspace-${inquiryId}`}
+          aria-label="询盘画板与资料"
+        >
           <div className="iw-panel-head">
             <h2>
               <MessageSquare size={16} />
@@ -665,19 +741,21 @@ export function InquiryWorkspace({
             }
           />
         </section>
-        <ResizeHandle
-          label="调整 AI 面板宽度"
-          controls={`results-${inquiryId}`}
-          paneRef={assistantRef}
-          containerRef={columnsRef}
-          min={280}
-          max={720}
-          remainingMin={380}
-          direction={-1}
-          onResize={setAssistantWidth}
-          onReset={() => setAssistantWidth(null)}
-          className="iw-panel-resizer"
-        />
+        {workspaceOpen && resultsOpen && (
+          <ResizeHandle
+            label="调整 AI 面板宽度"
+            controls={`results-${inquiryId}`}
+            paneRef={assistantRef}
+            containerRef={columnsRef}
+            min={280}
+            max={720}
+            remainingMin={380}
+            direction={-1}
+            onResize={setAssistantWidth}
+            onReset={() => setAssistantWidth(null)}
+            className="iw-panel-resizer"
+          />
+        )}
         <section
           ref={assistantRef}
           className="iw-results iw-assistant"
@@ -716,7 +794,7 @@ export function InquiryWorkspace({
                   </p>
                 </div>
               )}
-              {detail.data?.messages.map((message) => (
+              {orderedMessages.map((message) => (
                 <div key={message.id}>
                   <article className={`iw-message ${message.role}`}>
                     <div className="iw-message-meta">
@@ -837,6 +915,10 @@ export function InquiryWorkspace({
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 disabled={!canWrite}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  openAiEditor();
+                }}
                 onKeyDown={(e) => {
                   if (
                     e.key !== 'Enter' ||
@@ -868,6 +950,15 @@ export function InquiryWorkspace({
                 >
                   <Paperclip size={17} />
                 </button>
+                <button
+                  className="icon-button iw-ai-edit-button"
+                  aria-label="用 AI 修改输入内容"
+                  title="AI 修改输入内容"
+                  disabled={!canWrite || !input.trim()}
+                  onClick={openAiEditor}
+                >
+                  <Sparkles size={16} />
+                </button>
                 <span>
                   {revision && draftsPending
                     ? '正在载入回复草稿…'
@@ -889,7 +980,7 @@ export function InquiryWorkspace({
               </div>
             </div>
             <SuggestedMessages path={path} scope={scope} inquiry={inquiry} revision={revision} run={run}
-              latestMessageId={detail.data?.messages.at(-1)?.id} enabled={active && canWrite} draftEmpty={!input.trim()} onChoose={chooseSuggestion} />
+              latestMessageId={orderedMessages.at(-1)?.id} enabled={active && canWrite} draftEmpty={!input.trim()} onChoose={chooseSuggestion} />
             <div className="iw-case-actions">
               {mode === 'real' && <Link to={`/workbench?case=${encodeURIComponent(inquiryId)}`}>业务资料与审批</Link>}
               {inquiry.businessStatus === 'active' && (
@@ -920,6 +1011,49 @@ export function InquiryWorkspace({
           <p className="iw-muted">客户：{inquiry.customer} · 原文留档</p>
           <CustomerContextCard inquiry={inquiry} />
           <pre className="iw-original-full">{inquiry.originalText}</pre>
+        </Modal>
+      )}
+      {aiEditOpen && (
+        <Modal title="AI 修改输入内容" wide onClose={() => setAiEditOpen(false)}>
+          <div className="iw-ai-edit-modal">
+            <p className="iw-muted">输入修改要求，AI 会先生成草稿供你检查，确认后才会回填对话框。</p>
+            <label>
+              当前内容
+              <textarea value={aiEditDraft} onChange={(e) => setAiEditDraft(e.target.value)} rows={6} />
+            </label>
+            <label>
+              修改要求
+              <textarea
+                value={aiEditRequest}
+                onChange={(e) => setAiEditRequest(e.target.value)}
+                placeholder="例如：补充参考资料和核价参数，并列出需要客户确认的风险"
+                rows={3}
+                autoFocus
+              />
+            </label>
+            {aiEditPreview && (
+              <label>
+                AI 草稿预览
+                <textarea value={aiEditPreview} onChange={(e) => setAiEditPreview(e.target.value)} rows={8} />
+              </label>
+            )}
+            <div className="iw-modal-actions">
+              <button className="button" disabled={!aiEditDraft.trim() || !aiEditRequest.trim()} onClick={generateAiEdit}>
+                <Sparkles size={14} /> 生成预览
+              </button>
+              <button
+                className="button button-primary"
+                disabled={!aiEditPreview.trim()}
+                onClick={() => {
+                  setInput(aiEditPreview);
+                  setAiEditOpen(false);
+                  requestAnimationFrame(() => inputRef.current?.focus());
+                }}
+              >
+                采用草稿并返回
+              </button>
+            </div>
+          </div>
         </Modal>
       )}
       {generation && <GenerateNodeDialog inquiry={inquiry} base={base} path={path} node={generation.node} instruction={generation.instruction} onClose={() => setGeneration(null)} onStarted={r => {

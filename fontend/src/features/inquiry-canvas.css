@@ -914,6 +914,9 @@
 .iw-canvas-page.iw-focus-chat .iw-panel-resizer {
   display: none;
 }
+.iw-canvas-page.iw-focus-results .iw-panel-resizer {
+  display: none;
+}
 .iw-canvas-page .iw-assistant {
   display: flex;
   flex-direction: column;
@@ -1051,6 +1054,22 @@
 }
 .iw-canvas-page.iw-focus-chat .iw-assistant {
   display: none;
+}
+.iw-canvas-page.iw-focus-results .iw-conversation {
+  display: none;
+}
+.iw-canvas-page.iw-focus-results .iw-ai-chat > .iw-composer {
+  width: calc(100% - 64px);
+  max-width: 860px;
+  margin: 10px auto 7px;
+}
+.iw-canvas-page.iw-focus-results .iw-messages {
+  width: calc(100% - 64px);
+  max-width: 860px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 0;
+  padding-right: 0;
 }
 .iw-canvas-page .iw-ai-chat > .iw-composer {
   margin: 10px 16px 7px;

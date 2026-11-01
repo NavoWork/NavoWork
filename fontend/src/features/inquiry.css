@@ -221,6 +221,12 @@
   margin: 21px 0;
   font-size: 12px;
 }
+.iw-message.user {
+  margin-left: 28px;
+}
+.iw-message.assistant {
+  margin-right: 28px;
+}
 .iw-message p {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -231,7 +237,19 @@
   margin: 8px 0;
 }
 .iw-message.user p {
+  background: color-mix(in srgb, var(--navo-color-action) 9%, var(--navo-color-surface));
+  border: 1px solid color-mix(in srgb, var(--navo-color-action) 24%, var(--navo-color-border-subtle));
+  border-radius: 9px 0 9px 9px;
+}
+.iw-message.assistant p {
   background: var(--navo-color-surface-muted);
+  border-left: 3px solid var(--navo-color-action);
+}
+.iw-message.user .iw-message-meta {
+  justify-content: flex-end;
+}
+.iw-message.user .iw-message-meta > span {
+  color: var(--navo-color-action);
 }
 .iw-message-meta {
   display: flex;
@@ -285,6 +303,37 @@
 .iw-composer-foot > span {
   font-size: 9px;
   color: var(--navo-color-text-muted);
+}
+.iw-ai-edit-button:not(:disabled) {
+  color: var(--navo-color-action);
+  background: color-mix(in srgb, var(--navo-color-action) 9%, transparent);
+}
+.iw-ai-edit-modal {
+  display: grid;
+  gap: 14px;
+}
+.iw-ai-edit-modal label {
+  display: grid;
+  gap: 7px;
+  font-size: 11px;
+  color: var(--navo-color-text-secondary);
+}
+.iw-ai-edit-modal textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--navo-color-border-control);
+  border-radius: 7px;
+  padding: 10px 11px;
+  font: inherit;
+  line-height: 1.65;
+  color: var(--navo-color-text);
+  background: var(--navo-color-surface);
+}
+.iw-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  padding-top: 4px;
 }
 .iw-case-actions {
   display: flex;
