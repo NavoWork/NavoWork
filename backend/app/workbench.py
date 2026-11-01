@@ -5,6 +5,7 @@ business artifacts. It deliberately has no model dependency.
 """
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -47,6 +48,9 @@ ARTIFACT_KINDS = (
     "ta",
     "qc",
     "inquiry_assessment",
+    "competitor_analysis",
+    "design_brief",
+    "concept_image",
 )
 
 APPROVAL_SCOPES = (
@@ -74,7 +78,7 @@ def latest_artifacts(db: Session, case: Case) -> dict[str, dict]:
     for row in items(db, "artifact", case_id=case.id):
         value = decode(row.payload)
         kind = value.get("kind")
-        if kind not in ARTIFACT_KINDS:
+        if kind not in ARTIFACT_KINDS and not str(kind).startswith("working_file_"):
             continue
         if kind not in latest or row.version > latest[kind]["version"]:
             latest[kind] = _view(row)
@@ -83,6 +87,50 @@ def latest_artifacts(db: Session, case: Case) -> dict[str, dict]:
 
 def latest_artifact(db: Session, case: Case, kind: str) -> dict | None:
     return latest_artifacts(db, case).get(kind)
+
+
+def project_order_draft(content: dict, quotation: dict, spec: dict | None) -> dict:
+    """Project controlled quote fields into a new PI; never rewrite customer PO.
+
+    All writers (manual, Agent and propagation) pass through append_artifact.
+    Party details, invoice references and bank information remain human inputs.
+    Confirmations belong to an immutable order version, never a new projection.
+    """
+    from .core import fail
+
+    if (quotation.get("freshness") or {}).get("status") in ("stale", "needs_review", "superseded"):
+        fail("STALE_QUOTATION", "请先同步当前报价，再生成 PI 草稿", 409)
+    quote = quotation.get("content") or {}
+    projected = deepcopy(content)
+    pi = deepcopy(projected.get("pi") or {})
+    confirmations = {"buyer": {"confirmed": False, "evidenceId": None},
+                     "seller": {"confirmed": False, "evidenceId": None}}
+    try:
+        quantity = Decimal(str(quote.get("quantity")))
+        unit = Decimal(str(quote.get("unitPriceUsd")))
+        if (not quantity.is_finite() or not unit.is_finite() or quantity <= 0 or
+                quantity != quantity.to_integral_value() or unit < 0 or quote.get("currency", "USD") not in (None, "", "USD")):
+            raise ValueError
+        total = (quantity * unit).quantize(Decimal("0.01"))
+    except (InvalidOperation, TypeError, ValueError):
+        # Partial/legacy drafts remain editable, but cannot turn user-supplied
+        # money into a verified PI. Retain explicit old references for the gate
+        # to report stale baselines instead of silently replacing their scope.
+        pi.update(quantity=None, unitPriceUsd=None, totalUsd=None, currency="USD")
+        projected.update(pi=pi, confirmations=confirmations, status="draft",
+                         piProjection={"status": "needs_review", "reason": "QUOTATION_INCOMPLETE"})
+        return projected
+    pi.update(quantity=int(quantity), unitPriceUsd=str(unit), totalUsd=str(total), currency="USD")
+    for key in ("product", "incoterm", "incotermsVersion", "namedPlace", "paymentTerms", "validUntil"):
+        # Missing controlled values stay unknown; old PI clauses cannot survive
+        # a newer quote that explicitly removed them.
+        pi[key] = quote.get(key)
+    projected.update(pi=pi, quotationVersionId=quotation["itemId"],
+                     specVersionId=spec["itemId"] if spec else None,
+                     confirmations=confirmations, status="draft")
+    projected.pop("piProjection", None)
+    projected["diff"] = order_diff(projected, quote, (spec or {}).get("content"))
+    return projected
 
 
 def append_artifact(
@@ -95,20 +143,27 @@ def append_artifact(
     run_id: str | None = None,
     job_id: str | None = None,
     status: str = "draft",
+    propagate: bool = True,
 ) -> dict:
     if kind not in ARTIFACT_KINDS:
         raise ValueError(f"unsupported artifact kind: {kind}")
+    if kind == "order":
+        current = latest_artifacts(db, case)
+        if current.get("quotation"):
+            content = project_order_draft(content, current["quotation"], current.get("spec"))
     rows = [
         row
         for row in items(db, "artifact", case_id=case.id)
         if decode(row.payload).get("kind") == kind
     ]
     version = max((row.version for row in rows), default=0) + 1
+    previous = _view(max(rows, key=lambda row: row.version)) if rows else None
     payload = {
         "caseId": case.id,
         "kind": kind,
         "title": title or kind,
         "version": version,
+        "basedOnId": previous["itemId"] if previous else None,
         "content": {**content, "kind": kind},
         "status": status,
         "runId": run_id,
@@ -126,6 +181,10 @@ def append_artifact(
         item_id=f"artifact_{case.id}_{kind}_v{version}",
     )
     db.flush()
+    value = _view(row)
+    if propagate:
+        from .propagation import artifact_changed
+        artifact_changed(db, case, previous, value)
     return _view(row)
 
 
@@ -192,6 +251,8 @@ def record_approval(
     target_row = db.get(Item, target)
     if not target_row or target_row.case_id != case.id or target_row.kind != "artifact":
         raise ValueError("确认目标必须是本项目成果版本")
+    if (decode(target_row.payload).get("freshness") or {}).get("status") in ("stale", "needs_review", "superseded"):
+        raise ValueError("成果输入已变化，请先完成同步或复核后重新确认")
     refs = [ref for ref in (evidence_refs or []) if isinstance(ref, str)]
     for ref in refs:
         row = db.get(Item, ref)
@@ -222,6 +283,8 @@ def open_changes(db: Session, case: Case) -> list[dict]:
 
 def _approval_for(db: Session, case: Case, scope: str, target: dict | None) -> dict | None:
     if not target:
+        return None
+    if (target.get("freshness") or {}).get("status") in ("stale", "needs_review", "superseded"):
         return None
     return latest_approval(db, case, scope, target["itemId"])
 
@@ -264,7 +327,7 @@ def release_gate(db: Session, case: Case) -> dict:
             gap("QUOTE_NOT_APPROVED", "报价尚未获得内部商业批准", "costing")
     if not sample:
         gap("SAMPLE_MISSING", "尚未记录样品", "sample")
-    elif sample.get("content", {}).get("specVersionId") != (spec or {}).get("itemId"):
+    elif not __import__(__package__ + ".propagation", fromlist=["sample_spec_applicable"]).sample_spec_applicable(db, case, sample, spec):
         gap("SAMPLE_SPEC_STALE", "样品批准的规格版本已不是当前规格", "sample")
     elif not _approval_for(db, case, "sample_approval", sample):
         gap("SAMPLE_NOT_APPROVED", "最终样品尚未获得客户书面批准", "sample")
@@ -495,6 +558,11 @@ def stage_state(db: Session, case: Case) -> list[dict]:
     # A stage can never be shown as confirmed while its own gate has a gap.
     for stage in stages:
         gaps = [gap["message"] for gap in gate["missing"] if gap["stage"] == stage["key"]]
+        stale = [value for value in latest.values() if value["itemId"] in stage["artifactVersionIds"]
+                 and (value.get("freshness") or {}).get("status") in ("stale", "needs_review", "superseded")]
+        if stale:
+            stage["status"] = "blocked"
+            stage["missing"] = list(dict.fromkeys([*stage["missing"], "相关成果输入已变化，待同步或复核"]))
         if stage["status"] == "confirmed" and gaps:
             stage["status"] = "blocked"
             stage["missing"] = list(dict.fromkeys([*stage["missing"], *gaps]))
@@ -616,6 +684,7 @@ def workbench_view(db: Session, case: Case, user: User) -> dict:
             "sampleTypes": SAMPLE_TYPES,
         },
         "nextAction": next_stage_action(stages),
+        "propagation": __import__(__package__ + ".propagation", fromlist=["propagation_view"]).propagation_view(db, case),
     }
 
 
@@ -633,7 +702,10 @@ def _quantity(spec_fields: dict) -> int | None:
 def revision_from_artifacts(case: Case, latest: dict[str, dict], *, number: int, run_id: str, job_id: str | None, summary: str, node: str | None) -> dict:
     spec = (latest.get("spec") or {}).get("content") or {}
     fields = spec.get("fields") or {}
-    quotation = (latest.get("quotation") or {}).get("content") or {}
+    quotation_artifact = latest.get("quotation") or {}
+    quotation = quotation_artifact.get("content") or {}
+    if (quotation_artifact.get("freshness") or {}).get("status") in ("stale", "needs_review", "superseded"):
+        quotation = {}
     assessment = (latest.get("inquiry_assessment") or {}).get("content") or {}
     quantity = _quantity(fields)
     unit = quotation.get("unitPriceUsd")
@@ -688,7 +760,7 @@ def revision_from_artifacts(case: Case, latest: dict[str, dict], *, number: int,
             "ta": "production",
             "qc": "production",
             "inquiry_assessment": "inquiry",
-        }[kind]
+        }.get(kind, "requirements")
         for kind in latest
     )
     return {
@@ -750,6 +822,8 @@ def commit_revision(db: Session, case: Case, summary: str, *, node: str | None =
     )
     create_item(db, "revision", revision, case_id=case.id, parent_id=case.id, version=number)
     case.current_revision = number
+    from .propagation import finalize_revision
+    finalize_revision(db, case)
     case.status = "active"
     case.active_run_id = None
     case.metadata_version += 1

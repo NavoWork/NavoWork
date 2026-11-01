@@ -121,6 +121,8 @@ export interface Revision {
   changeSummary: string[];
 }
 export interface Run {
+  executionOutcome?: 'partial' | 'failed' | null;
+  failedTools?: { tool: string; status: string; code?: string; summary?: string }[];
   node?: string | null;
   fileOutputs?: { file_id: string; name: string; sha256: string; downloadUrl: string }[];
   agentVerification?: { liveExecuted: boolean; mode: string } | null;

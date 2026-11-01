@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 from typing import Any
 
 from fastapi import Request
@@ -11,6 +12,7 @@ from .core import create_item, decode, encode, fail, item_view, items, now, touc
 from .domain import (
     QUOTE_REQUIRED_FIELDS,
     DomainError,
+    calculate_cost,
     merge_spec,
     missing_quote_fields,
     normalize_bom,
@@ -87,6 +89,57 @@ def _manual_edit(db: Session, case: Case, kind: str, body: dict) -> dict:
             merged["missing"] = [key for key in merged.get("missing", []) if not merged["fields"].get(key)]
         elif kind == "bom":
             merged = {"rows": normalize_bom(content.get("rows") if isinstance(content.get("rows"), list) else content)}
+        elif kind == "cost":
+            lines = content.get("lines")
+            if not isinstance(lines, list):
+                fail("INVALID_INPUT", "成本必须提供有来源的明细行", 400)
+            for line in lines:
+                if not isinstance(line, dict):
+                    fail("INVALID_INPUT", "成本明细行必须是对象", 400)
+                try:
+                    amount = Decimal(str(line.get("amountCny")))
+                except Exception:
+                    fail("INVALID_INPUT", "成本金额格式无效", 400)
+                if amount.is_finite() and amount != 0:
+                    source = db.get(Item, str(line.get("sourceId") or ""))
+                    valid = source and source.workspace_id == case.workspace_id and (
+                        (source.kind == "evidence" and source.case_id == case.id and item_view(source).get("sourceRole") in ("supplier_quote", "internal_note"))
+                        or (source.kind == "resource" and source.case_id in (None, case.id)
+                            and item_view(source).get("kind") == "knowledge" and item_view(source).get("status") == "published"
+                            and item_view(source).get("purpose") != "competitor"))
+                    if not valid:
+                        fail("MISSING_COST_SOURCE", "非零成本必须引用本项目供应商原件、内部依据或已发布成本知识；竞品零售价不能作为成本", 422)
+            computed = calculate_cost(lines, exchange_rate=content.get("exchangeRate"), margin=content.get("margin"), quantity=content.get("quantity"))
+            merged = {**content, **computed, "status": "draft"}
+            if content.get("bomBindings"):
+                bom = latest_artifacts(db, case).get("bom")
+                if not bom or content.get("bomVersionId") != bom["itemId"]:
+                    fail("INVALID_INPUT", "BOM 映射必须引用当前明确版本", 400)
+                bindings = content["bomBindings"]
+                if not isinstance(bindings, list) or len(bindings) > len(lines):
+                    fail("INVALID_INPUT", "BOM 映射格式无效", 400)
+                seen = set()
+                for binding in bindings:
+                    if not isinstance(binding, dict) or set(binding) != {"rowIndex", "lineIndex", "item", "unit"}:
+                        fail("INVALID_INPUT", "BOM 映射需明确行号、成本行、物料和单位", 400)
+                    ri, li = binding["rowIndex"], binding["lineIndex"]
+                    rows = bom["content"].get("rows") or []
+                    if type(ri) is not int or type(li) is not int or ri < 0 or li < 0 or ri >= len(rows) or li >= len(lines) or li in seen:
+                        fail("INVALID_INPUT", "BOM 映射行号无效或重复", 400)
+                    seen.add(li)
+                    source_row = rows[ri]
+                    if source_row.get("item") != binding["item"] or source_row.get("unit") != binding["unit"] or source_row.get("sourceId") != lines[li].get("sourceId"):
+                        fail("INVALID_INPUT", "BOM 映射的物料、单位或价格来源不一致", 400)
+                    try:
+                        quantity = Decimal(str(source_row.get("quantityPerPiece")))
+                        price = Decimal(str(source_row.get("unitPriceCny")))
+                        wastage = Decimal(str(source_row.get("wastage") or "0"))
+                        expected = quantity * price * (1 + wastage)
+                        matches = all(number.is_finite() and number >= 0 for number in (quantity, price, wastage)) and wastage < 1 and expected == Decimal(str(lines[li]["amountCny"])) and lines[li].get("scope", "per_unit") == "per_unit"
+                    except Exception:
+                        matches = False
+                    if not matches:
+                        fail("INVALID_INPUT", "BOM 映射成本须等于用量×单价×(1+损耗比例)", 400)
         elif kind == "quotation":
             cost = latest_artifacts(db, case).get("cost")
             if not cost:
@@ -163,7 +216,8 @@ def _record(db: Session, case: Case, user: User, body: dict) -> dict:
         if not latest.get("content", {}).get("specVersionId"):
             fail("BUSINESS_VALIDATION_FAILED", "样品尚未绑定规格版本", 422)
         spec = _latest_target(db, case, "spec")
-        if latest.get("content", {}).get("specVersionId") != spec["itemId"]:
+        from .propagation import sample_spec_applicable
+        if not sample_spec_applicable(db, case, latest, spec):
             fail("BUSINESS_VALIDATION_FAILED", "样品不是基于当前规格版本", 422)
     if scope in ("order_buyer_confirmation", "order_seller_confirmation"):
         if scope == "order_buyer_confirmation":
@@ -220,6 +274,26 @@ def _record(db: Session, case: Case, user: User, body: dict) -> dict:
 
 def workbench_routes(request: Request, db: Session, user: User, case: Case, tail: list[str], body: dict, form):
     method = request.method
+    if tail and tail[0] == "office":
+        from .office_files import office_routes
+        return office_routes(request, db, user, case, tail[1:], body, form)
+    if tail and tail[0] == "research":
+        from .research_api import research_routes
+        return research_routes(request, db, user, case, tail, body, form)
+    if tail == ["dependencies"] and method == "GET":
+        from .propagation import propagation_view
+        return propagation_view(db, case)
+    if len(tail) == 4 and tail[0] == "propagation" and tail[2] == "retry" and method == "POST":
+        from .propagation import retry_node
+        from sqlalchemy import text
+        db.execute(text("BEGIN IMMEDIATE"))
+        db.refresh(case)
+        try:
+            result = retry_node(db, case, tail[1], tail[3])
+        except ValueError as exc:
+            fail("PROPAGATION_CONFLICT", str(exc), 409)
+        db.commit()
+        return result
     if not tail and method == "GET":
         return workbench_view(db, case, user)
     if tail == ["stages"] and method == "GET":

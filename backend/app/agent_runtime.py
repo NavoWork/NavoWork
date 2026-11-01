@@ -14,7 +14,7 @@ from langgraph.graph.message import add_messages
 from langgraph.types import Command, interrupt
 from sqlalchemy import text
 
-from .agent_tools import SKILLS, WorkbenchToolbox, tool_schemas
+from .agent_tools import SKILLS, AgentToolError, WorkbenchToolbox, tool_schemas
 from .core import create_item, decode, encode, items, now, uid
 from .db import SessionLocal
 from .models import Case, Job, Run, User, WorkItem
@@ -62,6 +62,8 @@ SYSTEM = """你是 NavoWork 的包袋出口跟单 Agent，服务一个真实业�
 10. 核价至少需要基础价、包装、本地费用；其他费用类别缺失时在结果中标注，不阻断。缺关键信息时，调用 request_info 提 1-5 个具体问题；fields 必须是简短字段名（如“背包尺寸”“面料克重”“验货标准”），不要写成长句。提问后暂停本轮。
 11. 目标是产出可保存的草稿成果，不是停在分析。发现条款冲突时先写草稿并在 diff/notes 中标注，然后列出待人工确认项；不要用“将登记/将生成”代替工具调用。
 12. 回复用中文，简洁专业：不超过 6 行，先说明本轮结果，再列 1-3 个待确认项/下一步。不要输出 JSON、不要复述工具参数、不要长篇解释。
+13. 编辑真实 Office 文件时先 file_list_context、file_read_document，再 file_create_working_copy，使用返回的当前版本调用 file_edit_file 并 file_validate_artifact。原件只读，工作副本未知业务映射须待复核。file_ 工具不替代 update_requirements、calculate_cost、record_order 等业务工具。
+14. 按需用 create_competitor_analysis 比较带定位、日期与适用范围的原始竞品资料，候选建议不等于采用；有当前规格后可 generate_concept_image。recognize_bom_image 只生成待人工逐行复核的候选，不能据此直接批准成本。只能宣称工具实际成功的成果。
 
 当前项目：{title} · {customer}
 当前任务：{goal}
@@ -111,7 +113,18 @@ def build_graph(toolbox: WorkbenchToolbox, model, saver, *, system: str, max_too
     def model_node(state: State):
         if state.get("tool_steps", 0) >= max_tools:
             return {"status": "blocked"}
+        # Revocation/lease fencing applies before sending any further Case
+        # context to a model, as well as at each tool and finalization boundary.
+        with toolbox._tx():
+            pass
         response = bound.invoke([SystemMessage(content=system)] + state["messages"])
+        if not getattr(response, "tool_calls", None):
+            pending = _unresolved_failures(state.get("results") or [])
+            if pending and all(item.get("status") == "needs_info" for item in pending):
+                questions = [{"id": "question_" + str(item.get("_operation_key") or index)[:24],
+                    "question": str(item.get("summary") or "请补充当前工具缺失的业务依据")[:200]}
+                    for index, item in enumerate(pending[:5])]
+                return {"messages": [response], "pending_questions": questions, "status": "needs_info"}
         return {"messages": [response]}
 
     def tools_node(state: State):
@@ -125,6 +138,7 @@ def build_graph(toolbox: WorkbenchToolbox, model, saver, *, system: str, max_too
                 steps += 1
             payload = json.loads(json.dumps(result, ensure_ascii=False, default=str))
             payload["_tool_name"] = call["name"]
+            payload["_operation_key"] = _operation_key(call["name"], call.get("args") or {})
             results.append(payload)
             if call["name"] in ("request_info", "update_quotation") and result.get("questions"):
                 questions.extend(result["questions"])
@@ -144,16 +158,24 @@ def build_graph(toolbox: WorkbenchToolbox, model, saver, *, system: str, max_too
     def wait_node(state: State):
         answer = interrupt({"status": "needs_info", "questions": state.get("pending_questions", [])})
         text_value = answer.get("text") if isinstance(answer, dict) else str(answer)
+        # A host-validated answer completes request_info itself. Business tools
+        # that requested inputs still need an actual successful retry.
+        results = [{**item, "status": "success", "resolved_by": "user_input"}
+            if item.get("_tool_name") == "request_info" and item.get("status") == "needs_info" else item
+            for item in state.get("results", [])]
         return {
             "messages": [HumanMessage(content="用户补充：" + (text_value or ""))],
             "pending_questions": [],
             "status": "success",
             "tool_steps": 0,
+            "results": results,
         }
 
     def after_model(state: State):
         if state.get("status") == "blocked":
             return END
+        if state.get("status") == "needs_info" and state.get("pending_questions"):
+            return "wait_input"
         return "tools" if getattr(state["messages"][-1], "tool_calls", None) else END
 
     graph = StateGraph(State)
@@ -161,7 +183,7 @@ def build_graph(toolbox: WorkbenchToolbox, model, saver, *, system: str, max_too
     graph.add_node("tools", tools_node)
     graph.add_node("wait_input", wait_node)
     graph.add_edge(START, "model")
-    graph.add_conditional_edges("model", after_model, {"tools": "tools", END: END})
+    graph.add_conditional_edges("model", after_model, {"tools": "tools", "wait_input": "wait_input", END: END})
     graph.add_conditional_edges("tools", lambda state: "wait_input" if state.get("pending_questions") else "model", {"wait_input": "wait_input", "model": "model"})
     graph.add_edge("wait_input", "model")
     return graph.compile(checkpointer=saver)
@@ -171,15 +193,70 @@ def _artifact_signature(db, case: Case) -> dict[str, int]:
     return {kind: value["version"] for kind, value in latest_artifacts(db, case).items()}
 
 
+def _operation_key(name, args):
+    """A successful PDF retry must not conceal a failed XLSX export branch."""
+    target = {key: args[key] for key in ("kind", "format", "artifact_id", "evidence_id", "source_id", "spec_version_id") if key in args}
+    if not target and "file_id" in args:
+        target["file_id"] = args["file_id"]
+    return hashlib.sha256(json.dumps([name, target], sort_keys=True).encode()).hexdigest()
+
+
+def _unresolved_failures(results):
+    unresolved = {}
+    for result in results:
+        key = result.get("_operation_key") or result.get("_tool_name")
+        if result.get("status") in ("error", "conflict", "blocked", "needs_info"):
+            unresolved[key] = result
+        elif result.get("status") in ("success", "needs_review"):
+            unresolved.pop(key, None)
+    return list(unresolved.values())
+
+
+def _active_context(db, item_id, generation):
+    work = db.get(WorkItem, item_id)
+    run = db.get(Run, work.run_id) if work else None
+    job = db.get(Job, run.job_id) if run else None
+    actor = decode(job.payload).get("createdBy") if job else None
+    if not run or not job or not actor:
+        raise AgentToolError("STALE_CONTEXT", "项目或任务已不存在")
+    toolbox = WorkbenchToolbox(case_id=run.case_id, user_id=actor, run_id=run.id,
+        job_id=job.id, work_item_id=item_id, generation=generation)
+    return toolbox._authorize(db)
+
+
+def _failed_outcome(db, case, run, job, work, code, message, *, before=None, failures=None):
+    changed = before is not None and _artifact_signature(db, case) != before
+    payload = decode(run.payload)
+    has_outputs = bool(payload.get("fileOutputs")) or changed
+    summary = ("已保留成功成果；本轮仍有失败项。" if has_outputs else "本轮任务未完成。") + message
+    if changed:
+        revision = commit_revision(db, case, summary, node=decode(job.payload).get("agentNode"), run_id=run.id, job_id=job.id)
+        if revision:
+            run.output_revision = revision["number"]
+    run.status, job.status, work.status = "failed", "needs_review" if has_outputs else "failed", "done"
+    run.error = encode({"code": code, "message": summary[:1000]})
+    run.payload = encode({**payload, "executionOutcome": "partial" if has_outputs else "failed",
+        "failedTools": [{"tool": item.get("_tool_name"), "status": item.get("status"),
+            "code": item.get("code"), "summary": item.get("summary")} for item in failures or []],
+        "agentSummary": summary})
+    run.last_seq += 1
+    case.active_run_id = None
+    case.metadata_version += 1
+    case.updated_at = now()
+    create_item(db, "run_event", {"runId": run.id, "inquiryId": case.id, "seq": run.last_seq,
+        "type": "run.failed", "payload": {"code": code, "summary": summary,
+        "executionOutcome": "partial" if has_outputs else "failed"}, "createdAt": now()}, case_id=case.id, parent_id=run.id)
+    create_item(db, "message", {"inquiryId": case.id, "role": "assistant", "text": summary,
+        "runId": run.id, "createdAt": now()}, case_id=case.id)
+
+
 def _mark_waiting(item_id: str, generation: int, questions: list[dict], summary: str, artifacts_changed: bool = False) -> None:
     with SessionLocal() as db:
         db.execute(text("BEGIN IMMEDIATE"))
-        work = db.get(WorkItem, item_id)
-        run = db.get(Run, work.run_id) if work else None
-        if not work or not run or work.lease_generation != generation:
+        try:
+            case, user, run, job, work = _active_context(db, item_id, generation)
+        except AgentToolError:
             return
-        job = db.get(Job, run.job_id)
-        case = db.get(Case, run.case_id)
         if artifacts_changed:
             revision = commit_revision(db, case, summary, node=decode(job.payload).get("agentNode"), run_id=run.id, job_id=job.id)
             if revision:
@@ -208,38 +285,22 @@ def _mark_waiting(item_id: str, generation: int, questions: list[dict], summary:
         db.commit()
 
 
-def _fail(item_id: str, generation: int, code: str, message: str) -> None:
+def _fail(item_id: str, generation: int, code: str, message: str, *, before=None) -> None:
     with SessionLocal() as db:
         db.execute(text("BEGIN IMMEDIATE"))
-        work = db.get(WorkItem, item_id)
-        run = db.get(Run, work.run_id) if work else None
-        if not work or not run or work.lease_generation != generation:
+        try:
+            case, user, run, job, work = _active_context(db, item_id, generation)
+        except AgentToolError:
             return
-        job = db.get(Job, run.job_id)
-        case = db.get(Case, run.case_id)
-        run.status = "failed"
-        run.error = encode({"code": code, "message": message[:500]})
-        run.last_seq += 1
-        job.status = "failed"
-        work.status = "done"
-        if case and case.active_run_id == run.id:
-            case.active_run_id = None
-            case.metadata_version += 1
-        create_item(db, "run_event", {"runId": run.id, "inquiryId": run.case_id, "seq": run.last_seq, "type": "run.failed", "payload": {"code": code, "message": message[:500]}, "createdAt": now()}, case_id=run.case_id, parent_id=run.id)
+        _failed_outcome(db, case, run, job, work, code, message, before=before)
         db.commit()
 
 
-def execute_agent_work(item_id: str, generation: int) -> None:
+def execute_agent_work(item_id: str, generation: int, *, model=None) -> None:
     with SessionLocal() as db:
-        work = db.get(WorkItem, item_id)
-        run = db.get(Run, work.run_id) if work else None
-        if not run:
-            return
-        job = db.get(Job, run.job_id)
-        case = db.get(Case, run.case_id)
-        user = db.get(User, decode(job.payload).get("createdBy")) if job else None
-        if not job or not case or not user:
-            _fail(item_id, generation, "STALE_CONTEXT", "项目或任务已不存在")
+        try:
+            case, user, run, job, work = _active_context(db, item_id, generation)
+        except AgentToolError:
             return
         payload = decode(job.payload)
         node = payload.get("agentNode")
@@ -264,7 +325,8 @@ def execute_agent_work(item_id: str, generation: int) -> None:
             skills=", ".join(SKILLS),
         )
 
-    model = configured_model()
+    live_model = model is None
+    model = model or configured_model()
     if model is None:
         _fail(item_id, generation, "MODEL_NOT_CONFIGURED", "未配置模型，无法执行 Agent 工具调用")
         return
@@ -302,9 +364,9 @@ def execute_agent_work(item_id: str, generation: int) -> None:
         except Exception as exc:
             error_text = f"{type(exc).__name__}: {exc}"
             if "WEEKLY_LIMIT_EXCEEDED" in error_text or "RateLimit" in type(exc).__name__ or "429" in error_text:
-                _fail(item_id, generation, "MODEL_QUOTA_EXCEEDED", "模型额度已用完，请更换 API Key 或等待额度重置后重试")
+                _fail(item_id, generation, "MODEL_QUOTA_EXCEEDED", "模型额度已用完，请更换 API Key 或等待额度重置后重试", before=before)
             else:
-                _fail(item_id, generation, "MODEL_OR_GRAPH_FAILED", f"Agent 执行失败：{type(exc).__name__}: {str(exc)[:300]}")
+                _fail(item_id, generation, "MODEL_OR_GRAPH_FAILED", f"Agent 执行失败：{type(exc).__name__}", before=before)
             return
 
     messages = state.get("messages") or []
@@ -318,19 +380,25 @@ def execute_agent_work(item_id: str, generation: int) -> None:
         results = state.get("results") or []
         summary = results[-1].get("summary") if results else "本轮未产生业务变更。"
     if state.get("status") == "blocked":
-        _fail(item_id, generation, "EXECUTION_LIMIT", "Agent 工具调用次数达到上限，请拆分任务后重试")
+        _fail(item_id, generation, "EXECUTION_LIMIT", "Agent 工具调用次数达到上限，请拆分任务后重试", before=before)
         return
     with SessionLocal() as db:
         db.execute(text("BEGIN IMMEDIATE"))
-        work = db.get(WorkItem, item_id)
-        run = db.get(Run, work.run_id) if work else None
-        if not run or work.lease_generation != generation or run.status == "cancelled":
+        try:
+            case, user, run, job, work = _active_context(db, item_id, generation)
+        except AgentToolError:
             return
-        job = db.get(Job, run.job_id)
-        case = db.get(Case, run.case_id)
         after = _artifact_signature(db, case)
         changed = after != before
         node = decode(job.payload).get("agentNode") if job else None
+        run.payload = encode({**decode(run.payload), "agentVerification": {"liveExecuted": live_model, "mode": "live_model" if live_model else "offline_tool_test"}})
+        failures = _unresolved_failures(state.get("results") or [])
+        if failures:
+            labels = "、".join(dict.fromkeys(str(result.get("_tool_name") or "unknown") for result in failures))
+            _failed_outcome(db, case, run, job, work, "TOOL_EXECUTION_INCOMPLETE",
+                f"未完成工具：{labels}。请核对错误后重试对应分支。", before=before, failures=failures)
+            db.commit()
+            return
         finalize_agent_run(db, case, run, job, summary, node=node, artifacts_changed=changed)
         work.status = "done"
         db.commit()

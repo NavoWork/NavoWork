@@ -136,6 +136,7 @@ export function AgentPanel({
             <button className="wbv2-text-button" onClick={onCancel}><Square size={11} /> 停止</button>
           </div>
         )}
+        {!!run?.fileOutputs?.length && <div className="wbv2-tools" aria-label="本轮产出文件"><strong>本轮产出 · 待复核</strong>{run.fileOutputs.map((file) => <p key={file.file_id}><a href={file.downloadUrl}>{file.name}</a></p>)}</div>}
 
         {waiting && (
           <div className="wbv2-questions">

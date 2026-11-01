@@ -14,9 +14,10 @@ from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ValidationError
+from fastapi import HTTPException
 from sqlalchemy import text
 
-from .core import create_item, decode, encode, item_view, items, now, uid
+from .core import create_item, decode, encode, item_view, items, now, uid, require_case
 from .db import SessionLocal
 from .domain import (
     COST_CATEGORY_KEYS,
@@ -180,8 +181,8 @@ class RequestInfoArgs(BaseModel):
 
 
 class ExportArtifactArgs(BaseModel):
-    kind: Literal["spec", "bom", "quotation", "order", "sample", "production", "cost", "comparison"]
-    format: Literal["pdf", "xlsx", "html"] = "pdf"
+    kind: Literal["spec", "bom", "quotation", "order", "sample", "production", "cost", "comparison", "competitor_analysis", "design_brief"]
+    format: Literal["pdf", "xlsx", "docx", "html"] = "pdf"
 
 
 class LoadSkillArgs(BaseModel):
@@ -265,6 +266,11 @@ def tool_schemas(node: str | None = None) -> list[dict]:
                 },
             }
         )
+    from .workbench_files import schemas as file_schemas
+    schemas.extend(file_schemas())
+    from .research_tools import TOOL_SCHEMAS as research_schemas
+    if node in (None, "requirements"):
+        schemas.extend(research_schemas)
     return schemas
 
 
@@ -301,28 +307,31 @@ class WorkbenchToolbox:
         self.generation = generation
 
     # -- transactions -------------------------------------------------
+    def _authorize(self, db):
+        user = db.get(User, self.user_id)
+        if not user:
+            raise AgentToolError("CASE_SCOPE", "项目访问权限已失效")
+        try:
+            case = require_case(db, user, self.case_id)
+        except HTTPException:
+            raise AgentToolError("CASE_SCOPE", "项目访问权限已失效") from None
+        run, job, work = db.get(Run, self.run_id), db.get(Job, self.job_id), db.get(WorkItem, self.work_item_id)
+        if (not run or not job or not work or run.case_id != case.id or job.case_id != case.id
+            or run.job_id != job.id or decode(job.payload).get("createdBy") != user.id
+            or run.status != "running" or job.status != "running" or case.active_run_id != run.id
+            or case.current_revision != run.base_revision or work.run_id != run.id
+            or work.lease_generation != self.generation or work.status != "running"
+            or not work.lease_expires_at or work.lease_expires_at <= now()):
+            raise AgentToolError("STALE_CONTEXT", "项目版本、活动任务或执行租约已变化")
+        return case, user, run, job, work
+
     @contextmanager
     def _tx(self, write: bool = False):
         db = SessionLocal()
         try:
             if write:
                 db.execute(text("BEGIN IMMEDIATE"))
-            case = db.get(Case, self.case_id)
-            user = db.get(User, self.user_id)
-            run = db.get(Run, self.run_id)
-            job = db.get(Job, self.job_id)
-            work = db.get(WorkItem, self.work_item_id)
-            if not case or not user or not run or not job or not work:
-                raise AgentToolError("STALE_CONTEXT", "项目或任务已不存在")
-            if (
-                run.status != "running"
-                or case.active_run_id != run.id
-                or case.current_revision != run.base_revision
-                or work.run_id != run.id
-                or work.lease_generation != self.generation
-                or work.status != "running"
-            ):
-                raise AgentToolError("STALE_CONTEXT", "项目版本、活动任务或执行租约已变化")
+            case, user, run, job, _ = self._authorize(db)
             yield db, case, user, run, job
             if write:
                 db.commit()
@@ -357,6 +366,16 @@ class WorkbenchToolbox:
         self._event(db, name, result.get("status", "success"), summary)
 
     def call(self, name: str, arguments: dict) -> dict:
+        if name.startswith("file_"):
+            try:
+                from .workbench_files import call_file_tool
+                return _clean(call_file_tool(self, name, arguments) or {"status": "error", "summary": "未知文件工具"})
+            except Exception as exc:
+                return {"status": "error", "summary": f"文件工具失败：{type(exc).__name__}"}
+        from .research_tools import call_research_tool
+        research_result = call_research_tool(self, name, arguments)
+        if research_result is not None:
+            return _clean(research_result)
         if name not in TOOL_MODELS:
             return {"status": "error", "summary": f"未知工具：{name}"}
         if name not in allowed_tools(self.node):
@@ -368,7 +387,7 @@ class WorkbenchToolbox:
         try:
             result = getattr(self, f"tool_{name}")(args)
         except AgentToolError as exc:
-            result = {"status": exc.status, "summary": exc.message, "missing": exc.missing}
+            result = {"status": exc.status, "code": exc.code, "summary": exc.message, "missing": exc.missing}
         except (ValueError, KeyError, TypeError, InvalidOperation) as exc:
             result = {"status": "error", "summary": f"工具执行失败：{str(exc)[:300]}"}
         except Exception as exc:  # keep the provider-facing message short
@@ -910,6 +929,12 @@ class WorkbenchToolbox:
             from .workbench import export_workbench_artifact
             result = export_workbench_artifact(db, case, args.kind, args.format)
             payload = {"status": "success", "summary": f"已导出 {args.kind} {args.format}", "data": {"downloadUrl": result.get("downloadUrl"), "exportId": result.get("exportId")}}
+            blob = db.get(Blob, result.get("blobId"))
+            if blob:
+                run_data = decode(run.payload)
+                outputs = {entry["file_id"]: entry for entry in run_data.get("fileOutputs", [])}
+                outputs[blob.id] = {"file_id": blob.id, "name": blob.filename, "sha256": blob.sha256, "downloadUrl": result["downloadUrl"]}
+                run.payload = encode({**run_data, "fileOutputs": list(outputs.values())})
             self._log(db, "export_artifact", args.model_dump(), payload)
             return payload
 

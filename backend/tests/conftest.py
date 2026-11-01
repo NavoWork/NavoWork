@@ -1,16 +1,39 @@
+import os
+import sys
+import tempfile
+from pathlib import Path
 import pytest
+
+
+def pytest_configure(config):
+    # Several test modules import app.db during collection, before fixtures run.
+    # Freeze disposable paths before that first import, never the developer DB.
+    directory = tempfile.TemporaryDirectory(prefix="navowork-backend-tests-")
+    root = Path(directory.name)
+    values = {"DATABASE_URL": f"sqlite:///{(root / 'test.sqlite3').as_posix()}",
+              "STORAGE_ROOT": str(root / "storage"), "APP_ENV": "demo", "MODEL_API_KEY": ""}
+    if os.getenv("NAVOWORK_LIVE_RESEARCH") == "1":
+        values.pop("MODEL_API_KEY")
+    old = {key: os.environ.get(key) for key in values}
+    os.environ.update(values)
+
+    def cleanup():
+        if "app.db" in sys.modules:
+            sys.modules["app.db"].engine.dispose()
+        for key, value in old.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+        directory.cleanup()
+
+    config.add_cleanup(cleanup)
 
 
 @pytest.fixture(scope="session", autouse=True)
 def isolated_backend(tmp_path_factory):
-    root = tmp_path_factory.mktemp("backend")
-    with pytest.MonkeyPatch.context() as patch:
-        patch.setenv("DATABASE_URL", f"sqlite:///{(root / 'test.sqlite3').as_posix()}")
-        patch.setenv("STORAGE_ROOT", str(root / "storage"))
-        patch.setenv("APP_ENV", "demo")
-        patch.setenv("MODEL_API_KEY", "")
-        from app.main import app
-        yield app
+    from app.main import app
+    yield app
 
 
 @pytest.fixture(autouse=True)

@@ -18,6 +18,14 @@ python dev.py
 
 新询盘从侧栏“新建工作”创建；进入 Cases 后使用三栏工作台：左侧业务节点、中间成果与结构化编辑、右侧 Agent 对话。对话中的工具调用会读取项目原件、知识库和公司资产，并把结果写入对应成果版本。
 
+## 文件、研究与自动同步
+
+工作台保留 guilimao 的业务 Agent 工具链，同时组合受控 `file_` 工具读取、复制、编辑、校验和下载真实文件。成果区支持 DOCX 段落/表格/图片与简单 XLSX 单元格/公式的内联编辑和内容预览。人工文件版本会进入同一 Agent 的可读文件列表，原件和历史版本不覆盖。
+
+系统导出的规格 DOCX/XLSX、BOM XLSX 带显式字段映射。保存数量或 BOM 用量/价格/损耗后，自动重算绑定的成本、报价和订单差异，刷新相关原生导出；同组记录快照、一致性标识及失败格式，允许只重试失败分支。未知映射、旧基线和制造适用性进入待复核，不猜测价格或继承审批。
+
+需求节点的“竞品、概念图与 BOM 识别”支持有来源的比较、设计建议采纳、规格绑定的真实图像服务接口和图片 BOM 候选复核。图像/VLM 服务需要单独配置并验收，参见 [本轮 PRD 验收与边界](doc/19-guilimao-prd-acceptance.md) 和 [真实服务验收](backend/tests/live/README.md)。Office PDF 是同文件版本的基础内容预览，不承诺 Office 分页还原。
+
 ## 比赛演示资料
 
 新的演示包只导入客户原件、知识库和公司资产；**不预生成需求、报价、样品、订单或生产资料**。打开 Cases 后由你指挥 Agent 逐节点推进。
@@ -47,7 +55,7 @@ MODEL_BASE_URL=https://api.deepseek.com/v1
 ## 验证
 
 ```powershell
-backend/.venv/Scripts/python.exe -m pytest backend/tests agent-kit/tests -q
+backend/.venv/Scripts/python.exe -m pytest backend/tests agent-kit/tests -q -p no:cacheprovider
 npm run typecheck
 npm run test
 npm run build
@@ -60,7 +68,8 @@ npm run build
 根目录 npm workspaces 只包含 `fontend/`。直接执行 `npm run dev` 时，前端连接 `http://127.0.0.1:8000` 的 API；使用 `python dev.py` 可同时启动全部服务。前后端浏览器回归在 `fontend/` 执行 `npm run test:e2e`（会启动独立临时数据库）；Windows 默认使用已安装的 Edge，可用 `PLAYWRIGHT_BROWSER_PATH` 指定 Chrome/Edge 路径。
 
 - [Workbench v2 契约：阶段、成果、工具与 Skill](doc/18-workbench-v2-contract.md)
-- [产品需求](doc/TradeWorkbench_PRD_v1.0.md)
+- [当前 Hackathon PRD](doc/Navowork-PRD-v0.5--Hackathon删减版.md)
+- [本轮合入、验收与剩余边界](doc/19-guilimao-prd-acceptance.md)
 - [后端设计](doc/TradeWorkbench_Backend_Design_v1.0.md)
 - [Agent 节点图](doc/TradeWorkbench_Agent_Node_Graph_v1.0.md)
 - [前端接口说明](fontend/docs/INTEGRATION.md)

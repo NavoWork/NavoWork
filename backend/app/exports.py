@@ -122,13 +122,17 @@ def export_route(db: Session, user: User, parts: list[str], request: Request):
         blob = db.get(Blob, value["blobId"])
         if not blob:
             fail("NOT_FOUND", "导出文件不存在", 404)
-        return FileResponse(blob.path, media_type=blob.media_type, filename=blob.filename)
+        return FileResponse(blob.path, media_type=blob.media_type, filename=blob.filename,
+                            headers={"X-Artifact-Freshness": str((value.get("freshness") or {}).get("status") or value.get("status") or "ready")})
     fail("NOT_FOUND", "接口不存在", 404)
 
 
-def export_artifact(db: Session, case: Case, artifact: Item, fmt: str):
+def export_artifact(db: Session, case: Case, artifact: Item, fmt: str, *, commit: bool = True):
     """Render one immutable artifact version; exports remain draft until a separate approval."""
     value = item_view(artifact)
+    freshness = value.get("freshness") or {}
+    if freshness.get("status") in ("stale", "needs_review", "superseded"):
+        fail("STALE_ARTIFACT", "成果输入已变化，请先更新或复核当前版本", 409)
     if value.get("agentRecord"):
         # Reuse the bytes bound to this exact artifact snapshot, never re-render internal JSON for a customer.
         bound = [item_view(i) for i in items(db, "export", case_id=case.id)
@@ -136,11 +140,42 @@ def export_artifact(db: Session, case: Case, artifact: Item, fmt: str):
         if bound:
             return bound[-1]
         fail("EXPORT_NOT_AVAILABLE", "该成果版本尚无此格式；请重试对应文件导出分支", 422)
-    title = str(value.get("title") or value.get("kind"))
+    kind = value.get("kind")
+    title = "Pro forma invoice" if kind == "order" else str(value.get("title") or kind)
     content = value.get("content") or {}
     if not isinstance(content, dict):
         fail("INVALID_INPUT", "成果内容必须是结构化对象")
-    rows = [(str(key), json.dumps(cell, ensure_ascii=False) if isinstance(cell, (dict, list)) else str(cell) if cell is not None else "待确认") for key, cell in content.items()]
+    audience = "internal"
+    # Rebuild customer files from public values; never hide internal columns in
+    # an otherwise internal workbook or serialize arbitrary provenance metadata.
+    if kind == "quotation":
+        public = ("product", "quantity", "unitPriceUsd", "totalUsd", "currency", "incoterm", "incotermsVersion",
+                  "namedPlace", "paymentTerms", "validUntil", "moq", "sampleTime", "productionTime", "exclusions")
+        projected = {key: content[key] for key in public if key in content and not isinstance(content[key], (dict, list))}
+        if isinstance(content.get("exclusions"), list):
+            projected["exclusions"] = [text for text in content["exclusions"] if isinstance(text, str)]
+        content = projected
+        audience = "customer"
+    elif kind == "order":
+        public = ("number", "invoiceNumber", "date", "seller", "buyer", "product", "quantity", "unitPriceUsd",
+                  "totalUsd", "currency", "incoterm", "incotermsVersion", "namedPlace", "paymentTerms", "validUntil")
+        pi = content.get("pi") or {}
+        # Party records also have an explicit disclosure boundary.
+        content = {key: pi[key] for key in public if key in pi and not isinstance(pi[key], (dict, list))}
+        for party in ("seller", "buyer"):
+            if isinstance(pi.get(party), dict):
+                content[party] = {key: pi[party][key] for key in ("name", "address", "email", "phone")
+                                  if key in pi[party] and not isinstance(pi[party][key], (dict, list))}
+        audience = "customer"
+    def flatten(values, prefix=""):
+        for key, cell in values.items():
+            locator = f"{prefix}.{key}" if prefix else str(key)
+            if isinstance(cell, dict) and cell:
+                yield from flatten(cell, locator)
+            else:
+                yield locator, json.dumps(cell, ensure_ascii=False) if isinstance(cell, (dict, list, bool)) else str(cell) if cell is not None else "待确认"
+
+    rows = list(flatten(content))
     if fmt == "html":
         table = "".join(f"<tr><th>{html.escape(key)}</th><td>{html.escape(cell)}</td></tr>" for key, cell in rows)
         data = f"<!doctype html><html lang='zh-CN'><meta charset='utf-8'><title>{html.escape(title)}</title><style>body{{font:16px sans-serif;max-width:960px;margin:40px auto}}th,td{{border:1px solid #ccc;padding:8px;text-align:left;vertical-align:top}}table{{border-collapse:collapse;width:100%}}</style><h1>{html.escape(title)}</h1><p>草稿 · 固定成果版本 V{artifact.version} · 未发送</p><table>{table}</table></html>".encode()
@@ -151,9 +186,17 @@ def export_artifact(db: Session, case: Case, artifact: Item, fmt: str):
         book = Workbook()
         sheet = book.active
         sheet.title = "成果明细"
-        sheet.append(["字段", "值"])
-        for key, cell in rows:
-            sheet.append([key, "'" + cell if cell.startswith(("=", "+", "-", "@")) else cell])
+        literal = lambda cell: "'" + cell if isinstance(cell, str) and cell.startswith(("=", "+", "-", "@")) else cell
+        if kind == "bom":
+            sheet.title = "BOM"
+            columns = ["category", "item", "spec", "quantityPerPiece", "unit", "supplier", "unitPriceCny", "wastage", "sourceId"]
+            sheet.append(columns)
+            for row in content.get("rows", []):
+                sheet.append([literal(row.get(key)) for key in columns])
+        else:
+            sheet.append(["字段", "值"])
+            for key, cell in rows:
+                sheet.append([key, literal(cell)])
         sheet.column_dimensions["A"].width = 30
         sheet.column_dimensions["B"].width = 80
         for cell in sheet[1]:
@@ -161,6 +204,19 @@ def export_artifact(db: Session, case: Case, artifact: Item, fmt: str):
         buffer = io.BytesIO()
         book.save(buffer)
         data, media = buffer.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    elif fmt == "docx":
+        from docx import Document
+        document = Document()
+        document.add_heading(title, level=1)
+        document.add_paragraph(f"Draft · V{artifact.version} · Not sent")
+        table = document.add_table(rows=1, cols=2)
+        table.rows[0].cells[0].text, table.rows[0].cells[1].text = "Field", "Value"
+        for key, cell in rows:
+            cells = table.add_row().cells
+            cells[0].text, cells[1].text = key, cell
+        buffer = io.BytesIO()
+        document.save(buffer)
+        data, media = buffer.getvalue(), "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     elif fmt == "pdf":
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.cidfonts import UnicodeCIDFont
@@ -186,6 +242,10 @@ def export_artifact(db: Session, case: Case, artifact: Item, fmt: str):
     blob = store_blob(db, data, filename, media, case.id)
     export_id = uid("export")
     result = {"exportId": export_id, "status": "ready", "downloadUrl": f"/api/v1/workspaces/{case.workspace_id}/exports/{export_id}/download", "caseId": case.id, "artifactVersionId": artifact.id, "format": fmt, "mode": "draft", "blobId": blob.id, "createdAt": now()}
+    result.update(consistencyId=value.get("consistencyId"), inputSnapshotHash=value.get("inputSnapshotHash"))
+    result["templateVersion"] = "bom-rows-v1" if kind == "bom" and fmt == "xlsx" else "field-table-v1"
+    result["audience"] = audience
     create_item(db, "export", result, case_id=case.id, item_id=export_id)
-    db.commit()
+    if commit:
+        db.commit()
     return result

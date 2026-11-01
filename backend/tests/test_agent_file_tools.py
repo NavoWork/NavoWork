@@ -175,14 +175,14 @@ def test_workbench_agent_mode_uses_file_capable_tool_loop(client, monkeypatch):
     run_id = response.json()["id"]
     calls = []
 
-    def execute_file_work(item_id, generation):
+    def execute_agent_work(item_id, generation):
         calls.append((item_id, generation))
 
-    def unexpected_business_agent(*args, **kwargs):
-        raise AssertionError("agentMode must use the unified file-capable tool loop")
+    def unexpected_file_agent(*args, **kwargs):
+        raise AssertionError("Workbench must preserve its existing business tool loop")
 
-    monkeypatch.setattr("app.file_worker.execute_file_work", execute_file_work)
-    monkeypatch.setattr("app.agent_runtime.execute_agent_work", unexpected_business_agent)
+    monkeypatch.setattr("app.file_worker.execute_file_work", unexpected_file_agent)
+    monkeypatch.setattr("app.agent_runtime.execute_agent_work", execute_agent_work)
     from app.worker import work_once
 
     assert work_once(None)
@@ -193,7 +193,8 @@ def test_workbench_agent_mode_uses_file_capable_tool_loop(client, monkeypatch):
 
 def test_workbench_chat_edits_uploaded_docx_and_preserves_source(client, tmp_path, monkeypatch):
     from docx import Document
-    from app.file_worker import execute_file_work
+    from app.agent_runtime import execute_agent_work
+    monkeypatch.setenv("WORKBENCH_AGENT_CHECKPOINT_DB", str(tmp_path / "workbench.sqlite3"))
 
     source_doc = Document()
     source_doc.add_paragraph("Product: travel bag")
@@ -215,31 +216,30 @@ def test_workbench_chat_edits_uploaded_docx_and_preserves_source(client, tmp_pat
 
         def bind_tools(self, schemas):
             names = {schema["function"]["name"] for schema in schemas}
-            assert {"create_working_copy", "edit_file", "validate_artifact"} <= names
+            assert {"file_create_working_copy", "file_edit_file", "file_validate_artifact", "update_requirements", "calculate_cost", "record_order"} <= names
             return self
 
         def invoke(self, messages):
             if self.stage == 0:
                 self.stage += 1
-                return call("list_context", id="context")
+                return call("file_list_context", id="context")
             result = __import__("json").loads(messages[-1].content)
             if self.stage == 1:
                 source = next(file for file in result["data"]["files"] if file["file_id"] == source_id)
                 self.stage += 1
-                return call("create_working_copy", {"file_id": source["file_id"]}, id="copy")
+                return call("file_create_working_copy", {"file_id": source["file_id"]}, id="copy")
             if self.stage == 2:
                 artifact, output = result["artifacts"][0], result["outputs"][0]
                 self.stage += 1
-                return call("edit_file", {"artifact_id": artifact["artifact_id"], "baseline": artifact["version"],
+                return call("file_edit_file", {"artifact_id": artifact["artifact_id"], "baseline": artifact["version"],
                     "file_id": output["file_id"], "operations": [{"op": "append_paragraph", "text": "Reviewed by agent"}]}, id="edit")
             if self.stage == 3:
                 artifact = result["artifacts"][0]
                 self.stage += 1
-                return call("validate_artifact", {"artifact_id": artifact["artifact_id"], "version": artifact["version"]}, id="validate")
+                return call("file_validate_artifact", {"artifact_id": artifact["artifact_id"], "version": artifact["version"]}, id="validate")
             return AIMessage(content="Created and validated a separate working copy.")
 
-    result = execute_file_work(adapter.work_item_id, adapter.context().generation, model=EditingChatModel())
-    assert result["status"] == "needs_review", result
+    execute_agent_work(adapter.work_item_id, adapter.context().generation, model=EditingChatModel())
     from app.core import decode
     from app.db import SessionLocal
     from app.models import Blob, Item
@@ -249,7 +249,7 @@ def test_workbench_chat_edits_uploaded_docx_and_preserves_source(client, tmp_pat
         assert Path(source_blob.path).read_bytes() == original_bytes
     view = client.get(BASE + "/runs/" + run_response.json()["id"]).json()
     assert view["status"] == "succeeded" and len(view["fileOutputs"]) == 2
-    edited_output = next(file for file in view["fileOutputs"] if "edited-v2" in file["name"])
+    edited_output = next(file for file in view["fileOutputs"] if "working-v2" in file["name"])
     edited_bytes = client.get(edited_output["downloadUrl"]).content
     edited_doc = Document(BytesIO(edited_bytes))
     assert "Reviewed by agent" in " ".join(paragraph.text for paragraph in edited_doc.paragraphs)
@@ -292,3 +292,34 @@ def test_selected_assets_resources_and_revocation(client, monkeypatch):
     from navowork_agent.contracts import AgentError
     with pytest.raises(AgentError, match="revoked"):
         a.read_bytes(rid)
+
+
+def test_agent_can_continue_from_human_office_versions_and_native_exports(client):
+    from docx import Document
+    from app.db import SessionLocal
+    from app.exports import export_artifact
+    from app.models import Case, Item
+    from app.workbench import append_artifact
+
+    document = Document()
+    document.add_paragraph("Original")
+    buffer = BytesIO()
+    document.save(buffer)
+    source = client.post(CASE + "/evidence", files={"file": ("human.docx", buffer.getvalue(),
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document")}).json()
+    office_path = CASE + "/workbench/office"
+    copied = client.post(office_path, json={"fileId": source["id"]}).json()
+    saved = client.put(office_path + "/" + copied["documentId"], json={"baseVersion": 1, "baseHash": copied["sha256"],
+        "operations": [{"op": "set_paragraph", "index": 0, "text": "Human revised"}]})
+    assert saved.status_code == 200, saved.text
+    office_id = copied["documentId"] + ":v2"
+    with SessionLocal() as db:
+        case = db.get(Case, "inq_demo_bag")
+        spec = append_artifact(db, case, "spec", {"fields": {"product": "Canvas bag"}})
+        exported = export_artifact(db, case, db.get(Item, spec["itemId"]), "docx")
+    adapter = claim(start(client)["id"])
+    refs = {ref.file_id: ref for ref in adapter.list_files()}
+    assert office_id in refs and exported["exportId"] in refs
+    assert adapter.read_document(office_id)["sections"][0]["text"] == "Human revised"
+    assert Document(BytesIO(adapter.read_bytes(exported["exportId"]))).tables[0].cell(1, 1).text == "Canvas bag"
+    assert adapter.read_bytes(office_id) == client.get(saved.json()["downloadUrl"]).content

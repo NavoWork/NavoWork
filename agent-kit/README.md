@@ -1,6 +1,6 @@
 # NavoWork Agent Kit
 
-独立的 Case 文件工具与报价 Agent。代码基于 `justike` 合入 `origin/lirui@5fcf0a1` 后开发。当前模块提供本地执行和测试入口；宿主接入状态见 `docs/host-mapping.md`，不能将 CLI 回放视为工作台集成验收。
+独立的 Case 文件工具与报价 Agent。代码基于 `justike` 合入 `origin/lirui@5fcf0a1` 后开发。当前模块提供本地执行和测试入口；工作台复用其中受控文件工具，并保留 guilimao 原生业务工具链；宿主接入状态见 `docs/host-mapping.md`，不能将 CLI 回放视为工作台集成验收。
 
 ## 安装与验证
 
@@ -48,15 +48,15 @@ navowork-agent run --workspace ./agent-kit/output/live-case --resume '工厂补�
 
 ## 暴露的工具
 
-`list_context`、`read_document`、`load_skill`、`list_artifacts`、`calculate_quote`、`publish_documents`、`create_working_copy`、`edit_file`、`validate_artifact`、`export_artifact`、`package_customer_files`、`request_info`。参数 JSON Schema 来自严格 Pydantic 模型，拒绝未知顶层参数。权限上下文、物理路径、已确认用户依据和测试故障注入都不能由工具参数设置。没有 shell、任意 Python、外发、批准或收款工具。
+`list_context`、`read_document`、`load_skill`、`list_artifacts`、`calculate_quote`、`publish_documents`、`prepare_pi`、`create_working_copy`、`edit_file`、`validate_artifact`、`export_artifact`、`package_customer_files`、`request_info`。参数 JSON Schema 来自严格 Pydantic 模型，拒绝未知顶层参数。权限上下文、物理路径、已确认用户依据和测试故障注入都不能由工具参数设置。没有 shell、任意 Python、外发、批准或收款工具。
 
-两个产品 Skill 随包保存在 `src/navowork_agent/skills/`，由工具按需加载，不安装个人 Codex skills。DOCX/XLSX 来源须先复制为独立工作副本，工具保留原件并对副本生成新版本。模型负责语义映射、判断假设/否定与选择工具，程序负责确定性计算、访问和版本检查。测试中由脚本构建快照的流程明确属于离线工具回放。
+四个产品 Skill 随包保存在 `src/navowork_agent/skills/`，由工具按需加载，不安装个人 Codex skills。DOCX/XLSX 来源须先复制为独立工作副本，工具保留原件并对副本生成新版本。模型负责语义映射、判断假设/否定与选择工具，程序负责确定性计算、访问和版本检查。测试中由脚本构建快照的流程明确属于离线工具回放。
 
 报价使用 Decimal，数量为严格正整数，成本项明确范围 `per_unit` / `per_order`；base、packaging、local 任一缺失都不补零。FX 为 CNY/USD，毛利是 `[0,1)` 的比例；按单件向上舍入 USD 0.01 再乘数量。每个已知字段需要来源定位或完全匹配的宿主用户依据。引用检查能核验哈希、定位和摘录存在，不能自动证明模型的语义解释正确；后者需要真实模型与外部评测。
 
 ## 文件与版本
 
-- 读取 UTF-8 TXT、正确解码的 EML、文字 PDF、基础 XLSX 和 DOCX；返回页码、表名/单元格、段落/表格定位。图片和扫描件没有 OCR 能力。
+- 读取 UTF-8 TXT、正确解码的 EML、文字 PDF、基础 XLSX 和 DOCX；返回页码、表名/单元格、段落/表格定位。图片和扫描件不由该文本读取器 OCR；工作台另通过 BOM vision 扩展生成待复核候选。
 - 从同一受控快照制作规格 DOCX、内部成本 XLSX、客户报价 XLSX/PDF。缺价仍生成非价格草稿；报价状态为 Pending pricing，金额 Unknown。
 - XLSX 只重算同表相对 A1 引用、四则运算、SUM、ROUND、ROUNDUP；不支持绝对引用、跨表、外链和其他函数。缓存写回 OOXML 后重新打开检查，并核对报价金额。编辑支持单元格和无公式工作簿的空行/列插入；不会伪装支持任意公式引用平移。
 - DOCX 编辑支持段落、表格单元格和受控图片引用。任意字段手改会标记需要内容协调并阻止自动覆盖；追加的规格备注进入快照，在下次生成时保留。复杂排版和任意 Office 特性不在范围内。

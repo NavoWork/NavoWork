@@ -10,6 +10,7 @@ export interface RequestOptions {
   body?: unknown;
   signal?: AbortSignal;
   idempotencyKey?: string;
+  timeoutMs?: number;
 }
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   if (mode === 'mock') return mockRequest(path, options) as Promise<T>;
@@ -20,7 +21,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const timeout = new AbortController();
   const timer = setTimeout(
     () => timeout.abort(new DOMException('请求超时，请重试', 'TimeoutError')),
-    30000,
+    options.timeoutMs ?? 30000,
   );
   try {
     const response = await fetch(`${baseUrl.replace(/\/$/, '')}${path}`, {

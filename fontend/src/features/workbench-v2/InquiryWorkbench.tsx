@@ -29,6 +29,8 @@ import type {
 } from '../../api/types';
 import { ErrorNotice, Loading, Modal } from '../../components/ui';
 import { AgentPanel } from './AgentPanel';
+import { ResearchPanel, PropagationPanel } from './ResearchPanel';
+import { OfficeFiles } from './OfficeFiles';
 import {
   CostingPanel,
   InquiryPanel,
@@ -365,6 +367,9 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
 
           {notice && <div className="wbv2-notice"><Check size={14} />{notice}</div>}
           <ErrorNotice error={error} onRetry={() => setError(undefined)} />
+          <OfficeFiles revision={data.case.currentRevision} path={path} disabled={busy || !!data.case.activeRunId || !!data.case.pendingRunId} onChanged={() => void invalidate()} />
+          {stage === 'requirements' && <ResearchPanel path={path} data={data} disabled={busy || !!data.case.activeRunId || !!data.case.pendingRunId} onChanged={() => void invalidate()} />}
+          <PropagationPanel path={path} revision={data.case.currentRevision} disabled={busy || !!data.case.activeRunId || !!data.case.pendingRunId} onChanged={() => void invalidate()} />
 
           {stage === 'inquiry' && <InquiryPanel data={data} onAgent={sendAgent} />}
           {stage === 'requirements' && <RequirementsPanel data={data} onAgent={sendAgent} onSave={saveArtifact} onConfirm={openConfirm} busy={busy} />}
