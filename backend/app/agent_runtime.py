@@ -45,6 +45,7 @@ class State(TypedDict, total=False):
     pending_questions: list[dict]
     results: list[dict]
     binding: str
+    skip_missing: bool
 
 
 SYSTEM = """你是 NavoWork 的包袋出口跟单 Agent，服务一个真实业务的单人工作台。
@@ -64,6 +65,7 @@ SYSTEM = """你是 NavoWork 的包袋出口跟单 Agent，服务一个真实业�
 12. 默认用中文简洁答复，先说明本轮结果，再列必要的待确认项。邮件、翻译和方案按用户要求的语言和长度输出。不要输出 JSON 或复述工具参数。
 13. 编辑真实 Office 文件时先 file_list_context、file_read_document，再 file_create_working_copy，使用返回的当前版本调用 file_edit_file 并 file_validate_artifact。原件只读，工作副本未知业务映射须待复核。file_ 工具不替代 update_requirements、calculate_cost、record_order 等业务工具。
 14. 按需用 create_competitor_analysis 比较带定位、日期与适用范围的原始竞品资料，候选建议不等于采用；有当前规格后可 generate_concept_image。imageCapability.mode=preset 时该工具载入预置演示图，可以说明设计要点，但不能声称现场调用了生图 API 或按用户修改重新绘制。recognize_bom_image 只生成待人工逐行复核的候选，不能据此直接批准成本。只能宣称工具实际成功的成果。
+15. 用户选择跳过缺失项时，继续保存可完成的草稿，未知字段仍留空，并在结果中列出缺项。不要再次暂停；无法计算的价格或无法核验的确认保持未完成。跳过不是批准或解决缺项。
 
 当前项目：{title} · {customer}
 当前任务：{goal}
@@ -137,10 +139,16 @@ def build_graph(toolbox: WorkbenchToolbox, model, saver, *, system: str, max_too
                 result = toolbox.call(call["name"], call.get("args") or {})
                 steps += 1
             payload = json.loads(json.dumps(result, ensure_ascii=False, default=str))
+            if state.get("skip_missing") and result.get("status") == "needs_info":
+                gaps = result.get("questions") or [{"question": result.get("summary", "资料仍待补充")}]
+                with toolbox._tx(write=True) as (db, case, user, run, job):
+                    from .inquiry_warnings import record_missing
+                    record_missing(case, job, run, gaps, skipped=True)
+                payload.update(status="deferred", original_status="needs_info", summary="该缺项已暂时跳过，保持待确认；继续完成其他可用内容。")
             payload["_tool_name"] = call["name"]
             payload["_operation_key"] = _operation_key(call["name"], call.get("args") or {})
             results.append(payload)
-            if call["name"] in ("request_info", "update_quotation") and result.get("questions"):
+            if not state.get("skip_missing") and call["name"] in ("request_info", "update_quotation") and result.get("questions"):
                 questions.extend(result["questions"])
             messages.append(ToolMessage(content=json.dumps(payload, ensure_ascii=False)[:40000], tool_call_id=call["id"]))
         unique = {}
@@ -158,10 +166,11 @@ def build_graph(toolbox: WorkbenchToolbox, model, saver, *, system: str, max_too
     def wait_node(state: State):
         answer = interrupt({"status": "needs_info", "questions": state.get("pending_questions", [])})
         text_value = answer.get("text") if isinstance(answer, dict) else str(answer)
+        skipped = isinstance(answer, dict) and answer.get("skipMissing") is True
         # A host-validated answer completes request_info itself. Business tools
         # that requested inputs still need an actual successful retry.
-        results = [{**item, "status": "success", "resolved_by": "user_input"}
-            if item.get("_tool_name") == "request_info" and item.get("status") == "needs_info" else item
+        results = [{**item, "status": "deferred" if skipped else "success", "resolved_by": "user_skip" if skipped else "user_input"}
+            if item.get("status") == "needs_info" and (skipped or item.get("_tool_name") == "request_info") else item
             for item in state.get("results", [])]
         return {
             "messages": [HumanMessage(content="用户补充：" + (text_value or ""))],
@@ -169,6 +178,7 @@ def build_graph(toolbox: WorkbenchToolbox, model, saver, *, system: str, max_too
             "status": "success",
             "tool_steps": 0,
             "results": results,
+            "skip_missing": skipped or state.get("skip_missing", False),
         }
 
     def after_model(state: State):
@@ -207,7 +217,7 @@ def _unresolved_failures(results):
         key = result.get("_operation_key") or result.get("_tool_name")
         if result.get("status") in ("error", "conflict", "blocked", "needs_info"):
             unresolved[key] = result
-        elif result.get("status") in ("success", "needs_review"):
+        elif result.get("status") in ("success", "needs_review", "deferred"):
             unresolved.pop(key, None)
     return list(unresolved.values())
 
@@ -265,6 +275,8 @@ def _mark_waiting(item_id: str, generation: int, questions: list[dict], summary:
         data = decode(run.payload)
         data["clarification"] = {"questions": questions}
         run.payload = encode(data)
+        from .inquiry_warnings import record_missing
+        record_missing(case, job, run, questions)
         run.status = "needs_input"
         run.phase = "understanding"
         run.last_seq += 1
@@ -353,7 +365,7 @@ def execute_agent_work(item_id: str, generation: int, *, model=None) -> None:
             else:
                 graph_input = {"messages": [HumanMessage(content=goal)], "tool_steps": 0, "results": [], "pending_questions": [], "status": "success"}
         else:
-            graph_input = {"messages": [*chat_history, HumanMessage(content=goal)], "tool_steps": 0, "results": [], "pending_questions": [], "status": "success", "binding": _thread(run.case_id, job.id)}
+            graph_input = {"messages": [*chat_history, HumanMessage(content=goal)], "tool_steps": 0, "results": [], "pending_questions": [], "status": "success", "binding": _thread(run.case_id, job.id), "skip_missing": bool(payload.get("skipMissing"))}
         try:
             for update in graph.stream(graph_input, config=config, stream_mode="updates"):
                 if update.get("__interrupt__"):
@@ -403,6 +415,12 @@ def execute_agent_work(item_id: str, generation: int, *, model=None) -> None:
                 f"未完成工具：{labels}。请核对错误后重试对应分支。", before=before, failures=failures)
             db.commit()
             return
+        skipped = decode(run.payload).get("skippedQuestions", [])
+        if skipped:
+            summary = "已保留可完成的草稿。以下缺项已跳过，仍待确认：\n" + "\n".join(f"- {q}" for q in skipped) + "\n\n" + summary
+        elif changed and (node or before.get("spec") != after.get("spec")):
+            from .inquiry_warnings import clear_checked_warnings
+            clear_checked_warnings(case, job, run)
         finalize_agent_run(db, case, run, job, summary, node=node, artifacts_changed=changed)
         work.status = "done"
         db.commit()

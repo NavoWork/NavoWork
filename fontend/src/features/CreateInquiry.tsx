@@ -86,6 +86,7 @@ export function CreateInquiry({
         </div>}
         {demo ? <>
           <p className="preferences-note">带入模拟询盘与参考资料。AI 现场完成分析、报价和回复，产品生图展示预置演示图。</p>
+          {scenarioId === 'de-backpack' && <p className="preferences-note">德国背包已备齐规格、样品、订单与付款模拟资料，适合完整流程演示。</p>}
           <div className="demo-scenarios" role="radiogroup" aria-label="演示数据集">
             {scenarios.data?.items.map((item, index) => <label key={item.id} className={`demo-scenario ${scenarioId === item.id ? 'selected' : ''}`}>
               <input type="radio" name="scenario" value={item.id} checked={scenarioId === item.id} disabled={pending} onChange={() => setScenarioId(item.id)} />

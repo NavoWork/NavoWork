@@ -239,6 +239,25 @@
   font-size: 10px;
   padding: 5px 0 8px 28px;
 }
+.ic-node-warning {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: #d5a245;
+  vertical-align: middle;
+  margin-left: 6px;
+}
+.ic-missing-warning {
+  margin: 16px 24px 0;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, #d5a245 35%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, #d5a245 8%, transparent);
+  color: var(--navo-color-text-secondary);
+  font-size: 13px;
+}
+.ic-missing-warning summary { cursor: pointer; }
+.ic-missing-warning svg { vertical-align: middle; margin-right: 6px; color: #d5a245; }
+.ic-missing-warning li { margin: 6px 0; }
 .ic-directory-footer {
   display: flex;
   gap: 6px;

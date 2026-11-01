@@ -156,7 +156,7 @@ def case_routes(request: Request, db: Session, user: User, parts: list[str], bod
             if result:
                 return result
             demo_id = body.get("demoScenarioId")
-            demo_scope = body.get("demoDataScope", "reference")
+            demo_scope = body.get("demoDataScope", "full" if demo_id == "de-backpack" else "reference")
             if demo_id:
                 if demo_scope not in ("reference", "full"):
                     fail("INVALID_INPUT", "未知的演示资料范围", 400)
@@ -358,8 +358,13 @@ def create_run(request: Request, db: Session, user: User, case: Case, body: dict
     require_capability(db, "agent")
     if body.get("replyToRunId"):
         return resume_run(request, db, user, case, body, marker)
-    if decode(case.payload).get("pendingRunId"):
-        fail("RUN_NEEDS_INPUT", "请先回答当前任务的问题或取消该任务", 409)
+    pending_id = decode(case.payload).get("pendingRunId")
+    skip_pending_id = body.get("skipPendingRunId")
+    if pending_id and skip_pending_id != pending_id:
+        fail("RUN_NEEDS_INPUT", "请先补充当前任务，或选择跳过缺项后继续生成", 409, {"runId": pending_id})
+    pending_run = db.get(Run, str(skip_pending_id)) if skip_pending_id else None
+    if skip_pending_id and (not pending_run or pending_run.case_id != case.id or pending_run.id != pending_id or pending_run.status != "needs_input"):
+        fail("REVISION_CONFLICT", "待补充任务已更新，请刷新后重试", 409)
     base_revision = int(body.get("baseRevision", case.current_revision))
     if base_revision != case.current_revision:
         fail("REVISION_CONFLICT", "业务版本已有更新", 409, {"currentRevision": case.current_revision})
@@ -428,12 +433,24 @@ def create_run(request: Request, db: Session, user: User, case: Case, body: dict
         facts = {**decode(case.payload).get("agentFacts", {}), **confirmed_facts(instruction)}
         context.update(agentFileTools=True, agentFacts=facts, agentMessages=[instruction])
         case.payload = encode({**decode(case.payload), "agentFacts": facts})
+    skipped_questions = []
+    if pending_run:
+        from .run_context import defer_pending_run
+        skipped_questions = defer_pending_run(db, case, pending_run)
+        context["skipMissing"] = True
+        instruction += "\n用户选择跳过待补充项并生成本节点。依据已有资料保存可完成的草稿，以下内容保持待确认，不要重复暂停或编造：\n" + "\n".join(q["question"] for q in skipped_questions)
     job = Job(id=uid("job"), case_id=case.id, kind=kind, goal=instruction, graph_version="workbench-v2" if agent_mode else "sop-v2", payload=encode({**context, "inputRefs": body.get("inputRefs", []), "costInputs": cost_inputs, "selectedSupplierOfferId": selected_offer_id, "changeSetId": body.get("changeSetId"), "interactive": interactive, "generationTarget": generation_target, "agentMode": agent_mode, "agentNode": body.get("agentNode")}))
-    run = Run(id=uid("run"), job_id=job.id, case_id=case.id, base_revision=base_revision, action=action, instruction=instruction, payload=encode({"assetVersionIds": body.get("assetVersionIds", []), "agentNode": body.get("agentNode")}))
+    if body.get("simulationNode"):
+        job.graph_version = "simulation-v1"
+        job.payload = encode({**decode(job.payload), "simulationNode": body["simulationNode"]})
+    run = Run(id=uid("run"), job_id=job.id, case_id=case.id, base_revision=base_revision, action=action, instruction=instruction, payload=encode({"assetVersionIds": body.get("assetVersionIds", []), "agentNode": body.get("agentNode"), "executionMode": "simulation" if body.get("simulationNode") else "live"}))
     db.add(job)
     db.flush()
     db.add(run)
     db.flush()
+    if skipped_questions:
+        from .inquiry_warnings import record_missing
+        record_missing(case, job, run, skipped_questions, skipped=True)
     db.add(WorkItem(id=uid("work"), run_id=run.id))
     case_data = decode(case.payload)
     case_data["latestRunId"] = run.id

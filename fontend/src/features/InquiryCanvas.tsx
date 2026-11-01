@@ -37,6 +37,7 @@ import {
   Search,
   ShieldAlert,
   Table2,
+  TriangleAlert,
   Upload,
   X,
 } from 'lucide-react';
@@ -103,6 +104,7 @@ type PreviewNode = Node<
     modified: boolean;
     generate?: () => void;
     generating: boolean;
+    skipsPending?: boolean;
   },
   'preview'
 >;
@@ -130,7 +132,7 @@ function PreviewCard({ data, selected }: NodeProps<PreviewNode>) {
           <ArrowUpRight size={14} />
         </button>
       </div>
-      <h3>{doc.title}</h3>
+      <h3>{doc.title}{!!doc.warnings?.length && <span className="ic-node-warning" role="img" aria-label={`${doc.title}有${doc.warnings.length}项待确认`} title={doc.warnings.join('\n')}><TriangleAlert size={16} /></span>}</h3>
       {doc.file ? (
         <FilePreview file={doc.file} base={data.base} scope={data.scope} compact />
       ) : (
@@ -153,7 +155,7 @@ function PreviewCard({ data, selected }: NodeProps<PreviewNode>) {
             data.generate?.();
           }}
         >
-          依据现有资料生成
+          {data.skipsPending ? '跳过缺项并生成' : '依据现有资料生成'}
         </button>
       )}
       <Handle type="source" position={Position.Right} isConnectable={false} />
@@ -211,6 +213,7 @@ interface Props {
   base: string;
   path: string;
   readOnly: boolean;
+  generationDisabled?: boolean;
   conversation: ReactNode;
   replyEditor: ReactNode;
   replyText?: string;
@@ -325,6 +328,7 @@ function CanvasWorkspace({
   base,
   path,
   readOnly,
+  generationDisabled,
   conversation,
   replyEditor,
   replyText,
@@ -640,7 +644,8 @@ function CanvasWorkspace({
       scope,
       open,
       modified: state.drafts[doc.id] !== undefined,
-      generating: readOnly,
+      generating: readOnly || !!generationDisabled,
+      skipsPending: !!inquiry.pendingRunId,
       generate:
         onGenerate && ['requirements', 'risks', 'quote', 'reply'].includes(doc.kind)
           ? () => onGenerate(doc.kind as GenerationNode)
@@ -854,6 +859,7 @@ function CanvasWorkspace({
                       {closed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
                       {closed ? <Folder size={14} /> : <FolderOpen size={14} />}
                       <span>{folder.title}</span>
+                      {!!folder.node?.warnings?.length && <TriangleAlert size={13} className="ic-node-warning" aria-label="存在待确认项" />}
                       <small>{folder.items.length}</small>
                     </button>
                     {!closed && (
@@ -1068,6 +1074,10 @@ function CanvasWorkspace({
                   aria-labelledby={`ic-tab-${scope}-${id}`}
                   hidden={active !== id}
                 >
+                  {!!doc.warnings?.length && <details className="ic-missing-warning">
+                    <summary><TriangleAlert size={15} />{doc.warnings.length} 项待确认{doc.skippedMissing ? ' · 已暂时跳过' : ''}</summary>
+                    <ul>{doc.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
+                  </details>}
                   {doc.kind === 'original' ? (
                     <OriginalDocument
                       inquiry={inquiry}

@@ -10,10 +10,11 @@ const agentNodes: Partial<Record<GenerationNode, string>> = {
 
 export function generateInquiryNode(path: string, inquiry: Inquiry, node: GenerationNode, instruction?: string) {
   const agentNode = agentNodes[node];
-  return api.post<Run>(`${path}/${agentNode ? 'workbench/agent' : 'node-generations'}`, {
+  return api.post<Run>(`${path}/workbench/simulations`, {
     node: agentNode || node,
     baseRevision: inquiry.currentRevision,
     contextScope: 'inquiry',
+    ...(inquiry.pendingRunId ? { skipPendingRunId: inquiry.pendingRunId } : {}),
     instruction: instruction || `请读取当前询盘的全部原件、附件、参考资料与已有成果，生成「${nodeLabels[node]}」草稿。使用资料中已有的条件，标记真实缺项和待确认内容。`,
   });
 }

@@ -205,7 +205,7 @@ export function InquiryWorkspace({
     enabled: active && !!activeRunId,
     queryFn: ({ signal }) => api.get<Run>(`${base}/runs/${activeRunId}`, signal),
     refetchInterval: (q) =>
-      !q.state.data || ['queued', 'running'].includes(q.state.data.status) ? 900 : false,
+      !q.state.data || ['queued', 'running'].includes(q.state.data.status) ? q.state.data?.executionMode === 'simulation' ? 180 : 900 : false,
     retry: false,
   });
   const run = runQuery.data;
@@ -286,7 +286,7 @@ export function InquiryWorkspace({
     }
   }
   async function generateNode(node: GenerationNode, instruction?: string) {
-    if (!inquiry || generationPending.current || busy || readOnly || inquiry.pendingRunId || replyEditsPending) return;
+    if (!inquiry || generationPending.current || busy || readOnly || replyEditsPending) return;
     generationPending.current = true;
     showAIChat();
     try {
@@ -296,6 +296,7 @@ export function InquiryWorkspace({
         setRevisionNumber(null);
         queryClient.setQueryData(['run', scope, next.id], next);
         await refresh();
+        if (inquiry.pendingRunId) setNotice('已保留待确认项，正在依据现有资料生成所选节点。');
       });
     } finally {
       generationPending.current = false;
@@ -628,7 +629,10 @@ export function InquiryWorkspace({
             <span className="iw-small-label">仅当前询盘</span>
           </div>
           <InquiryCanvas
-            inquiry={inquiry}
+            inquiry={run?.status === 'needs_input' && run.clarification?.questions.length ? {
+              ...inquiry,
+              nodeWarnings: { ...inquiry.nodeWarnings, [run.node || 'requirements']: run.clarification.questions.map((q) => ({ question: q.question, runId: run.id, skipped: false })) },
+            } : inquiry}
             revision={revision}
             revisions={detail.data?.revisions || []}
             messages={detail.data?.messages || []}
@@ -636,6 +640,7 @@ export function InquiryWorkspace({
             base={base}
             path={path}
             readOnly={readOnly}
+            generationDisabled={busy || replyEditsPending}
             onGenerate={
               mode === 'real'
                 ? (node, instruction) => void generateNode(node, instruction)
@@ -782,6 +787,15 @@ export function InquiryWorkspace({
                       <TriangleAlert size={13} /> {q.question}
                     </p>
                   ))}
+                  {run.status === 'needs_input' && mode === 'real' && (
+                    <button className="button iw-skip-missing" disabled={busy} onClick={() => void operate(async () => {
+                      const next = await api.post<Run>(`${path}/runs`, { replyToRunId: run.id, baseRevision: run.baseRevision, skipMissing: true });
+                      queryClient.setQueryData(['run', scope, next.id], next);
+                      await runQuery.refetch();
+                      await refresh();
+                      setNotice('已跳过缺失项，继续生成可完成的草稿。节点会保留待确认警告。');
+                    })}>跳过缺失项，继续生成</button>
+                  )}
                   {!!run.fileOutputs?.length && (
                     <div aria-label="本次生成的文件">
                       <p>已生成文件草稿，需审核后使用。</p>

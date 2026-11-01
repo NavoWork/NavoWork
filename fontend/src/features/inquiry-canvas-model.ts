@@ -43,6 +43,8 @@ export interface WorkspaceDocument {
   directoryOnly?: boolean;
   evidenceId?: string;
   reference?: { sourceId: string; version: number };
+  warnings?: string[];
+  skippedMissing?: boolean;
 }
 
 const workflowKinds: DocumentKind[] = ['requirements', 'quote', 'risks', 'reply'];
@@ -102,11 +104,11 @@ export function progressiveCanvasDocuments(
 ): WorkspaceDocument[] {
   const next = workflowKinds
     .map((kind) => documents.find((doc) => doc.kind === kind))
-    .find((doc) => doc && !doc.hasContent);
+    .find((doc) => doc && !doc.hasContent && !doc.skippedMissing);
   return documents.filter((doc) => {
     if (doc.kind === 'conversation' || doc.kind === 'revision') return false;
     if (doc.kind === 'result') return includeResults;
-    if (workflowKinds.includes(doc.kind)) return doc.hasContent || doc === next;
+    if (workflowKinds.includes(doc.kind)) return doc.hasContent || doc.skippedMissing || doc === next;
     return true;
   });
 }
@@ -456,6 +458,10 @@ export function workspaceDocuments({
     })),
   );
   for (const doc of docs) {
+    const node = ({ original: 'inquiry', requirements: 'requirements', quote: 'costing', risks: 'risks', reply: 'reply' } as Record<string, string>)[doc.kind];
+    const warnings = !doc.revision || doc.revision.number === inquiry.currentRevision ? inquiry.nodeWarnings?.[node] || [] : [];
+    doc.warnings = [...new Set(warnings.map((warning) => warning.question))];
+    doc.skippedMissing = warnings.some((warning) => warning.skipped);
     if (doc.kind !== 'original' && state.drafts[doc.id] !== undefined) {
       doc.text = state.drafts[doc.id];
       if (workflowKinds.includes(doc.kind)) doc.hasContent = hasMeaningfulText(doc.text);

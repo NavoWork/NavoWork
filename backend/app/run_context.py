@@ -146,6 +146,25 @@ def prepare_context(db, user, case, body):
             "supplierOffers": offers, "acceptedProposal": proposal, "priorExtracted": prior if baseline else {}, "createdBy": user.id}
 
 
+def defer_pending_run(db, case, run):
+    """Keep a waiting draft and its gaps while the user moves to another node."""
+    from .inquiry_warnings import record_missing
+    from .workbench import finalize_agent_run
+    job = db.get(Job, run.job_id)
+    questions = decode(run.payload).get("clarification", {}).get("questions", [])
+    record_missing(case, job, run, questions, skipped=True)
+    data = decode(case.payload)
+    data.pop("pendingRunId", None)
+    case.payload = encode(data)
+    run_data = decode(run.payload)
+    run_data.pop("clarification", None)
+    run.payload = encode(run_data)
+    create_item(db, "message", {"inquiryId": case.id, "role": "user", "text": "暂时跳过缺失项，保留待确认内容并继续。", "runId": run.id, "createdAt": now()}, case_id=case.id)
+    finalize_agent_run(db, case, run, job, "已保留现有草稿并跳过本轮缺项，可以继续后续节点。缺失内容仍待确认，尚未完成的成果不会标记为已生成。")
+    db.query(WorkItem).filter(WorkItem.run_id == run.id).one().status = "done"
+    return questions
+
+
 def resume_run(request, db, user, case, body, marker):
     from .worker import run_view
     run = db.get(Run, str(body["replyToRunId"]))
@@ -160,10 +179,27 @@ def resume_run(request, db, user, case, body, marker):
         require_capability(db, "costing")
     answers = body.get("answers")
     questions = decode(run.payload).get("clarification", {}).get("questions", [])
+    skip_missing = body.get("skipMissing") is True
+    if skip_missing:
+        from .inquiry_warnings import record_missing
+        record_missing(case, job, run, questions, skipped=True)
+        if not payload.get("agentMode"):
+            # Legacy checkpoints cannot consume a skip command. Preserve their
+            # current draft and unblock the next node without inventing answers.
+            defer_pending_run(db, case, run)
+            result = run_view(run)
+            idem_store(db, marker, result)
+            db.commit()
+            return result
+        answers = [{"questionId": q["id"], "value": "暂时跳过，保持待确认"} for q in questions]
     expected = {q["id"] for q in questions}
     if not isinstance(answers, list) or len(answers) != len(expected) or any(not isinstance(a, dict) or not isinstance(a.get("value"), str) or not a["value"].strip() or len(a["value"]) > 20000 for a in answers) or {a.get("questionId") for a in answers} != expected:
         fail("INVALID_INPUT", "请逐项填写当前任务的澄清答案")
     resume = {"text": "\n".join(a["value"].strip() for a in answers)}
+    if skip_missing:
+        resume = {"skipMissing": True, "text": "用户选择跳过以下缺失项，继续完成能完成的草稿：\n"
+            + "\n".join(q["question"] for q in questions)
+            + "\n未知内容保持空白或待确认，不要编造，不要重复暂停提问。无法核价时不要编造价格，保存其他可完成内容并说明缺口。跳过不代表业务批准或缺项已解决。"}
     if job.kind == "prepare_quote" and not is_agent:
         row = db.get(Item, str(body.get("selectedSupplierOfferId", "")))
         if not row or row.kind != "supplier_offer" or row.case_id != case.id:

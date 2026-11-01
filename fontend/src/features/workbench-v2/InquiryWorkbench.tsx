@@ -14,6 +14,7 @@ import {
   RotateCcw,
   ShieldCheck,
   Sparkles,
+  TriangleAlert,
   Upload,
   X,
 } from 'lucide-react';
@@ -113,7 +114,7 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
     queryKey: ['workbench-run', scope, currentRunId],
     enabled: active && !!currentRunId,
     queryFn: ({ signal }) => api.get<Run>(`${base}/runs/${currentRunId}`, signal),
-    refetchInterval: (query) => (!query.state.data || ['queued', 'running'].includes(query.state.data.status) ? 1100 : false),
+    refetchInterval: (query) => (!query.state.data || ['queued', 'running'].includes(query.state.data.status) ? query.state.data?.executionMode === 'simulation' ? 180 : 1100 : false),
     retry: false,
   });
   const messages = useQuery({
@@ -183,8 +184,8 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
     }
   };
 
-  const sendAgent = async (instruction: string, node?: string, selection?: ComposerContext) => {
-    if (!data || busy || data.case.activeRunId || data.case.pendingRunId) return false;
+  const sendAgent = async (instruction: string, node?: string, selection?: ComposerContext, simulation = false) => {
+    if (!data || busy || data.case.activeRunId || (data.case.pendingRunId && !simulation)) return false;
     setBusy(true);
     setError(undefined);
     setNotice('');
@@ -193,8 +194,9 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
       if (selection?.knowledge.some((doc) => !doc.sourceVersionId)) {
         throw new Error('引用中包含本机旧资料，请移除后从团队知识库重新选择。');
       }
-      const result = await api.post<Run>(`${path}/workbench/agent`, {
+      const result = await api.post<Run>(`${path}/workbench/${simulation ? 'simulations' : 'agent'}`, {
         node,
+        ...(simulation && data.case.pendingRunId ? { skipPendingRunId: data.case.pendingRunId } : {}),
         instruction: context?.skills.length
           ? `${instruction}\n\n本次技能要求：\n${context.skills.map((skill) => `${skill.name}：${skill.instructions.join('；')}`).join('\n')}`
           : instruction,
@@ -204,7 +206,7 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
       });
       qc.setQueryData(['workbench-run', scope, result.id], result);
       setRunId(result.id);
-      setNotice('任务已提交，Agent 正在处理。');
+      setNotice(simulation ? '正在模拟生成节点资料。' : '任务已提交，Agent 正在处理。');
       void invalidate();
       return true;
     } catch (e) {
@@ -215,7 +217,9 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
     }
   };
 
-  const answerAgent = async (answers: { questionId: string; value: string }[]) => {
+  const generateStage = (instruction: string, node?: string) => sendAgent(instruction, node, undefined, true);
+
+  const answerAgent = async (answers: { questionId: string; value: string }[], skipMissing = false) => {
     if (!data || !run.data) return false;
     setBusy(true);
     setError(undefined);
@@ -225,11 +229,12 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
         replyToRunId: run.data.id,
         baseRevision: run.data.baseRevision,
         answers,
+        skipMissing,
       });
       setRunId(result.id);
       await invalidate();
       await qc.invalidateQueries({ queryKey: ['workbench-run', scope] });
-      setNotice('补充已提交，继续同一任务。');
+      setNotice(skipMissing ? '已跳过缺失项，继续生成草稿；节点保留待确认警告。' : '补充已提交，继续同一任务。');
       return true;
     } catch (e) {
       setError(e);
@@ -337,7 +342,7 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
                     <strong>{item.title}</strong>
                     <small>{stageLabel(item)}{item.missing?.length ? ` · ${item.missing.length} 项缺项` : ''}</small>
                   </span>
-                  <StatusDot status={item.status} />
+                  {data.case.nodeWarnings?.[key]?.length ? <TriangleAlert size={15} className="ic-node-warning" aria-label={`${item.title}存在待确认项`} /> : <StatusDot status={item.status} />}
                 </button>
               );
             })}
@@ -353,13 +358,13 @@ export function InquiryWorkbench({ inquiryId, session, onChanged }: { inquiryId:
         <main className={`wbv2-main ${stage === 'inquiry' ? 'wbv2-inquiry-main' : ''}`}>
           {notice && <div className="wbv2-notice"><Check size={14} />{notice}</div>}
           <ErrorNotice error={error} onRetry={() => setError(undefined)} />
-          {stage === 'inquiry' && <InquiryPanel data={data} onAgent={sendAgent} />}
-          {stage === 'requirements' && <RequirementsPanel data={data} onAgent={sendAgent} onSave={saveArtifact} onConfirm={openConfirm} busy={busy} />}
-          {stage === 'costing' && <CostingPanel data={data} onAgent={sendAgent} onSave={saveArtifact} onConfirm={openConfirm} onExport={exportArtifact} busy={busy} />}
-          {stage === 'sample' && <SamplePanel data={data} onAgent={sendAgent} onConfirm={openConfirm} busy={busy} />}
-          {stage === 'order' && <OrderPanel data={data} onAgent={sendAgent} onConfirm={openConfirm} busy={busy} />}
+          {stage === 'inquiry' && <InquiryPanel data={data} onAgent={generateStage} />}
+          {stage === 'requirements' && <RequirementsPanel data={data} onAgent={generateStage} onSave={saveArtifact} onConfirm={openConfirm} busy={busy} />}
+          {stage === 'costing' && <CostingPanel data={data} onAgent={generateStage} onSave={saveArtifact} onConfirm={openConfirm} onExport={exportArtifact} busy={busy} />}
+          {stage === 'sample' && <SamplePanel data={data} onAgent={generateStage} onConfirm={openConfirm} busy={busy} />}
+          {stage === 'order' && <OrderPanel data={data} onAgent={generateStage} onConfirm={openConfirm} busy={busy} />}
           {stage === 'production' && (
-            <ProductionPanel data={data} onAgent={sendAgent} onConfirm={openConfirm} onRelease={release} onStage={setStage} busy={busy} />
+            <ProductionPanel data={data} onAgent={generateStage} onConfirm={openConfirm} onRelease={release} onStage={setStage} busy={busy} />
           )}
 
           <div className="wbv2-file-tools">

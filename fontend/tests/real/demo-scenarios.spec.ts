@@ -60,7 +60,7 @@ test('create independent demo inquiries and use real Agent chat from both views'
     const node = await page.locator('.react-flow__node:visible').nth(1).boundingBox();
     return { board, node, fits: !!board && !!node && node.x >= board.x && node.x + node.width <= board.x + board.width + 1 };
   }).toMatchObject({ fits: true });
-  const nodeDispatch = page.waitForResponse(r => r.url().endsWith('/workbench/agent') && r.request().method() === 'POST');
+  const nodeDispatch = page.waitForResponse(r => r.url().endsWith('/workbench/simulations') && r.request().method() === 'POST');
   await page.getByRole('button', { name: '依据现有资料生成', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   const nodeResponse = await nodeDispatch;
@@ -76,7 +76,7 @@ test('create independent demo inquiries and use real Agent chat from both views'
   const blank = await blankResponse.json();
   await page.goto(`/inquiries/${blank.id}`);
   await expect(page.locator('.react-flow__node:visible')).toHaveCount(2);
-  const blankDispatch = page.waitForResponse(r => r.url().endsWith('/workbench/agent') && r.request().method() === 'POST');
+  const blankDispatch = page.waitForResponse(r => r.url().endsWith('/workbench/simulations') && r.request().method() === 'POST');
   await page.getByRole('button', { name: '依据现有资料生成', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   const blankRunResponse = await blankDispatch;

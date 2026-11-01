@@ -5,6 +5,7 @@ export interface Session {
   workspace: { id: string; name: string };
 }
 export interface Inquiry {
+  nodeWarnings?: Record<string, { question: string; runId: string; skipped: boolean }[]>;
   demoScenarioId?: string;
   demoDataScope?: 'reference' | 'full';
   customerContext?: CustomerContext;
@@ -139,6 +140,8 @@ export interface Revision {
   context?: RunContext;
 }
 export interface Run {
+  executionMode?: 'simulation' | 'live';
+  skippedQuestions?: string[];
   executionOutcome?: 'partial' | 'failed' | null;
   failedTools?: { tool: string; status: string; code?: string; summary?: string }[];
   node?: string | null;

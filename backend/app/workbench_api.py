@@ -303,7 +303,7 @@ def workbench_routes(request: Request, db: Session, user: User, case: Case, tail
         from .concept_images import image_capability
         image = image_capability(case)
         return {"chat": {"configured": bool(os.getenv("MODEL_API_KEY") and os.getenv("MODEL_NAME"))}, "image": image}
-    if tail == ["agent"] and method == "POST":
+    if tail in (["agent"], ["simulations"]) and method == "POST":
         from .main import create_run
         instruction = str(body.get("instruction") or body.get("goal") or "").strip()
         if not instruction:
@@ -314,7 +314,10 @@ def workbench_routes(request: Request, db: Session, user: User, case: Case, tail
             # Explicit workflow suggestions keep their stage. Free conversation
             # can choose any relevant capability, including image generation.
             node = next((key for key, prompt in PROMPTS.items() if instruction.startswith(prompt)), None)
-        if node is not None and node not in NODE_KINDS:
+        simulation = tail == ["simulations"]
+        if simulation and node not in {*NODE_KINDS, "risks", "reply"}:
+            fail("INVALID_INPUT", "未知模拟节点", 400)
+        if not simulation and node is not None and node not in NODE_KINDS:
             fail("INVALID_INPUT", "未知的业务节点", 400)
         kind = NODE_KINDS.get(node or "", "confirm_requirements")
         return create_run(
@@ -329,6 +332,7 @@ def workbench_routes(request: Request, db: Session, user: User, case: Case, tail
                 "instruction": instruction,
                 "agentMode": True,
                 "agentNode": node,
+                "simulationNode": node if simulation else None,
             },
             kind=kind,
         )

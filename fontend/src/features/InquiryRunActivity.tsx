@@ -50,7 +50,21 @@ const settledTitles = {
   cancelled: '本轮处理已停止',
 };
 
-export function InquiryRunActivity({ run }: { run: Run }) {
+function useSimulationProgress(actual: Run): Run {
+  const [progress, setProgress] = useState({ id: actual.id, index: ['queued', 'running'].includes(actual.status) ? 0 : phases.length });
+  useEffect(() => {
+    if (actual.executionMode !== 'simulation') return;
+    setProgress((old) => old.id === actual.id ? old : { id: actual.id, index: ['queued', 'running'].includes(actual.status) ? 0 : phases.length });
+    const target = actual.status === 'succeeded' ? phases.length : Math.max(0, phases.findIndex((phase) => phase.id === actual.phase));
+    const timer = window.setInterval(() => setProgress((old) => old.id === actual.id && old.index < target ? { ...old, index: old.index + 1 } : old), 480);
+    return () => window.clearInterval(timer);
+  }, [actual.id, actual.executionMode, actual.phase, actual.status]);
+  if (actual.executionMode !== 'simulation' || progress.id !== actual.id || progress.index >= phases.length || !['running', 'succeeded'].includes(actual.status)) return actual;
+  return { ...actual, status: 'running', phase: phases[progress.index].id, completedPhases: phases.slice(0, progress.index).map((phase) => phase.id) };
+}
+
+export function InquiryRunActivity({ run: actualRun }: { run: Run }) {
+  const run = useSimulationProgress(actualRun);
   const active = run.status === 'queued' || run.status === 'running';
   const queued = run.status === 'queued';
   const phaseIndex = phases.findIndex((phase) => phase.id === run.phase);
@@ -71,9 +85,9 @@ export function InquiryRunActivity({ run }: { run: Run }) {
       ? '正在准备，马上开始'
       : run.status === 'running'
         ? phase.title
-        : settledTitles[run.status];
+        : run.status === 'succeeded' && run.skippedQuestions?.length ? '草稿已保存，仍有待确认项' : settledTitles[run.status];
   const Icon =
-    run.status === 'succeeded'
+    run.skippedQuestions?.length ? TriangleAlert : run.status === 'succeeded'
       ? Check
       : run.status === 'failed' || run.status === 'needs_input'
         ? TriangleAlert
@@ -91,7 +105,7 @@ export function InquiryRunActivity({ run }: { run: Run }) {
           <div className="iw-run-eyebrow">
             <span>
               Navowork{' '}
-              <span className="iw-run-eyebrow-label">{active ? '正在为你处理' : '本轮记录'}</span>
+              <span className="iw-run-eyebrow-label">{run.executionMode === 'simulation' ? '模拟生成' : active ? '正在为你处理' : '本轮记录'}</span>
             </span>
             {active && (
               <span className="iw-run-elapsed" aria-hidden="true">
@@ -110,7 +124,7 @@ export function InquiryRunActivity({ run }: { run: Run }) {
             )}
           </div>
         </div>
-        {!active && <StatusBadge status={run.status} />}
+        {!active && <StatusBadge status={run.skippedQuestions?.length && run.status === 'succeeded' ? 'needs_input' : run.status} />}
       </div>
       {active && (
         <p className="iw-run-description" key={queued ? 'queued' : phase.id}>

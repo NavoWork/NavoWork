@@ -40,7 +40,7 @@ export function AgentPanel({
   busy: boolean;
   selectedRefs: number;
   onSend: (text: string, selection: ComposerContext) => Promise<boolean>;
-  onAnswer: (answers: { questionId: string; value: string }[]) => Promise<boolean>;
+  onAnswer: (answers: { questionId: string; value: string }[], skipMissing?: boolean) => Promise<boolean>;
   onOpenSources: () => void;
   onCancel: () => void;
   error: unknown;
@@ -175,6 +175,7 @@ export function AgentPanel({
 
           {waiting && (
             <div className="wbv2-questions">
+              <button className="button iw-skip-missing" disabled={busy} onClick={() => void onAnswer([], true)}>跳过缺失项，继续生成</button>
               <div className="wbv2-questions-head">
                 <CircleAlert size={15} />
                 <strong>需要你补充</strong>

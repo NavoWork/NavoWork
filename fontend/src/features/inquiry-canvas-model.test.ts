@@ -77,6 +77,17 @@ const businessNodes = (docs: ReturnType<typeof documents>) =>
   progressiveCanvasDocuments(docs).map((doc) => doc.kind);
 
 describe('progressive inquiry canvas', () => {
+  it('keeps skipped empty nodes visible with warnings while revealing the next node', () => {
+    const docs = workspaceDocuments({ inquiry: { ...inquiry, nodeWarnings: {
+      requirements: [{ question: '请补充尺寸。', runId: 'run-skip', skipped: true }],
+    } }, revisions: [], messages: [], state: initialCanvas() });
+    const nodes = progressiveCanvasDocuments(docs);
+    expect(nodes.map((node) => node.kind)).toEqual(['original', 'requirements', 'quote']);
+    const requirements = nodes.find((node) => node.kind === 'requirements')!;
+    expect(requirements.text).toBe('');
+    expect(requirements.hasContent).toBe(false);
+    expect(requirements.warnings).toEqual(['请补充尺寸。']);
+  });
   it('starts with the original inquiry and one genuinely empty requirements node', () => {
     const docs = documents();
     expect(businessNodes(docs)).toEqual(['original', 'requirements']);

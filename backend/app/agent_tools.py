@@ -479,6 +479,7 @@ class WorkbenchToolbox:
                 "case": {"id": case.id, "title": decode(case.payload).get("title"), "customer": decode(case.payload).get("customer"), "originalText": (decode(case.payload).get("originalText") or "")[:6000], "destination": decode(case.payload).get("destination"), "currentRevision": case.current_revision, "nextAction": decode(case.payload).get("nextAction")},
                 "customerProfile": (profile or {}).get("profile"),
                 "customerContext": decode(case.payload).get("customerContext"),
+                "nodeWarnings": decode(case.payload).get("nodeWarnings", {}),
                 "stages": [{"key": s["key"], "status": s["status"], "summary": s["summary"], "missing": s["missing"], "nextAction": s["nextAction"]} for s in stages],
                 "artifacts": artifacts,
                 "canvasFiles": decode(job.payload).get("canvasManifest", []),

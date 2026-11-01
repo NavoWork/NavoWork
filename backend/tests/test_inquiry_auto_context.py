@@ -9,8 +9,8 @@ BASE = "/api/v1/workspaces/ws_demo"
 
 
 def test_agent_automatically_reads_current_sources_and_saved_canvas(client):
-    current = client.post(BASE + "/inquiries", json={"demoScenarioId": "de-backpack"}).json()
-    foreign = client.post(BASE + "/inquiries", json={"demoScenarioId": "de-backpack"}).json()
+    current = client.post(BASE + "/inquiries", json={"demoScenarioId": "us-tote"}).json()
+    foreign = client.post(BASE + "/inquiries", json={"demoScenarioId": "us-tote"}).json()
     path = BASE + "/inquiries/" + current["id"]
     foreign_path = BASE + "/inquiries/" + foreign["id"]
     foreign_view = client.get(foreign_path + "/workbench").json()
@@ -59,7 +59,7 @@ def test_agent_automatically_reads_current_sources_and_saved_canvas(client):
 
 
 def test_legacy_node_generation_also_includes_all_inquiry_references(client):
-    inquiry = client.post(BASE + "/inquiries", json={"demoScenarioId": "de-backpack"}).json()
+    inquiry = client.post(BASE + "/inquiries", json={"demoScenarioId": "us-tote"}).json()
     path = BASE + "/inquiries/" + inquiry["id"]
     response = client.post(path + "/node-generations", json={"node": "risks", "baseRevision": 0,
         "contextScope": "inquiry", "instruction": "读取当前询盘全部资料，整理风险"})

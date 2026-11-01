@@ -18,6 +18,34 @@ def _create(client, scenario_id="de-backpack", key=None, scope="full"):
     return result.json()
 
 
+def test_backpack_complete_inputs_and_idempotent_non_destructive_upgrade(client):
+    from app.demo_scenarios import complete_existing_backpack
+    from app.domain import SPEC_KEYS
+    from app.models import Case, Item
+    from app.core import encode
+    from app.run_context import inquiry_knowledge
+    inputs = scenario_inputs("de-backpack")
+    assert all(inputs["fields"].get(key) for key in SPEC_KEYS)
+    assert inputs["computed"]["unitPriceUsd"] == "8.69"
+    case = _create(client, scope="reference")
+    with SessionLocal() as db:
+        row = db.get(Case, case["id"])
+        payload = decode(row.payload)
+        payload["demoInputVersion"] = 1
+        row.payload = encode(payload)
+        original = db.get(Item, payload["demoEvidence"]["original"])
+        original_bytes = original.payload
+        assert complete_existing_backpack(db, row) is True
+        assert complete_existing_backpack(db, row) is False
+        assert original.payload == original_bytes
+        assert len([r for r in inquiry_knowledge(db, row) if r.case_id == row.id]) == 3
+        assert row.current_revision == 0
+        assert decode(row.payload)["demoDataScope"] == "full"
+        db.commit()
+    view = client.get(BASE + "/" + case["id"] + "/workbench").json()
+    assert view["artifacts"] == {} and view["approvals"] == []
+
+
 @pytest.mark.parametrize("scenario_id", [s["id"] for s in SCENARIOS])
 def test_default_demo_has_only_inputs_and_free_conversation(client, scenario_id):
     response = client.post(BASE, json={"demoScenarioId": scenario_id})
@@ -25,12 +53,12 @@ def test_default_demo_has_only_inputs_and_free_conversation(client, scenario_id)
     case = response.json()
     path = BASE + '/' + case['id']
     view = client.get(path + '/workbench').json()
-    assert case['demoDataScope'] == 'reference'
+    assert case['demoDataScope'] == ('full' if scenario_id == 'de-backpack' else 'reference')
     assert view['artifacts'] == {}
-    assert len(view['evidence']) == 4
-    assert {e['sourceRole'] for e in view['evidence']} == {'customer_request', 'supplier_quote'}
-    assert len([k for k in view['knowledge'] if k.get('caseId') == case['id']]) == 2
-    assert client.get(path + '/demo-guide').json()['kind'] == 'chat'
+    assert len(view['evidence']) == (11 if scenario_id == 'de-backpack' else 4)
+    assert {'customer_request', 'supplier_quote'} <= {e['sourceRole'] for e in view['evidence']}
+    assert len([k for k in view['knowledge'] if k.get('caseId') == case['id']]) == (3 if scenario_id == 'de-backpack' else 2)
+    assert client.get(path + '/demo-guide').json()['kind'] == ('run' if scenario_id == 'de-backpack' else 'chat')
     dispatched = client.post(path + '/workbench/agent', json={'instruction': '请按询盘生成产品设计图', 'baseRevision': 0})
     assert dispatched.status_code == 200, dispatched.text
     with SessionLocal() as db:
@@ -50,7 +78,7 @@ def test_demo_creation_is_fresh_idempotent_and_scoped(client, other_client):
     path = BASE + "/" + first["id"]
     view = client.get(path + "/workbench").json()
     assert view["artifacts"] == {}
-    assert len(view["evidence"]) == 10
+    assert len(view["evidence"]) == 11
     assert len([k for k in view["knowledge"] if k.get("caseId") == first["id"]]) == 3
     assert first["customerContext"]["simulation"] is True
     assert client.get('/api/v1/workspaces/ws_demo/library/documents').status_code == 200

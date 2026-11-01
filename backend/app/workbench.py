@@ -51,6 +51,8 @@ ARTIFACT_KINDS = (
     "competitor_analysis",
     "design_brief",
     "concept_image",
+    "risk_review",
+    "customer_reply",
 )
 
 APPROVAL_SCOPES = (
@@ -742,6 +744,8 @@ def revision_from_artifacts(case: Case, latest: dict[str, dict], *, number: int,
                 },
             }
     risks = []
+    for message in (latest.get("risk_review") or {}).get("content", {}).get("risks", []):
+        risks.append({"id": uid("risk"), "severity": "warning", "category": "review", "message": message, "suggestedAction": "确认后再用于正式业务", "status": "open", "evidenceRefs": []})
     for message in assessment.get("risks") or []:
         if isinstance(message, str):
             risks.append({"id": uid("risk"), "severity": "warning", "category": "inquiry", "message": message, "suggestedAction": "向客户或供应商澄清", "status": "open", "evidenceRefs": []})
@@ -761,6 +765,8 @@ def revision_from_artifacts(case: Case, latest: dict[str, dict], *, number: int,
             "ta": "production",
             "qc": "production",
             "inquiry_assessment": "inquiry",
+            "risk_review": "risks",
+            "customer_reply": "reply",
         }.get(kind, "requirements")
         for kind in latest
     )
@@ -791,7 +797,7 @@ def revision_from_artifacts(case: Case, latest: dict[str, dict], *, number: int,
             "status": "proposed",
         },
         "quote": quote,
-        "replies": {"en-US": "", "es-MX": ""},
+        "replies": (latest.get("customer_reply") or {}).get("content", {}).get("replies") or {"en-US": "", "es-MX": ""},
         "risks": risks,
         "checks": [
             {"label": "规格完整性", "status": "passed" if spec_ready(spec) else "warning"},
